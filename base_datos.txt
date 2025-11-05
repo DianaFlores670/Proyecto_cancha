@@ -1,0 +1,250 @@
+BASE-DATOS
+
+sudo -u postgres pg_dump -d canchalic > cancha_003.sql
+
+
+
+GESTOR DE LA BASE DE DATOS: PostgreSQL
+
+-- 2. Crear tipos enumerados
+
+CREATE TYPE sexo_enum AS ENUM ('masculino', 'femenino');
+
+CREATE TABLE USUARIO (
+    id_persona SERIAL PRIMARY KEY,
+    nombre VARCHAR(100),
+    apellido VARCHAR(100),
+    contrasena VARCHAR(255) NOT NULL,
+    telefono VARCHAR(20),
+    correo VARCHAR(100) UNIQUE NOT NULL,
+    sexo sexo_enum,
+    imagen_perfil TEXT,
+    usuario VARCHAR(50) UNIQUE NOT NULL
+    latitud numeric(9, 6),
+    longitud numeric(9, 6),
+    fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE ADMINISTRADOR (
+    id_administrador INT PRIMARY KEY,
+    direccion TEXT,
+    estado BOOLEAN DEFAULT TRUE, -- activo/inactivo
+    ultimo_login TIMESTAMP,
+    fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_administrador_persona FOREIGN KEY (id_administrador) REFERENCES PERSONA(id_persona) ON DELETE CASCADE
+);
+
+CREATE TABLE CLIENTE (
+    id_cliente INT PRIMARY KEY,
+    fecha_registro DATE NOT NULL DEFAULT CURRENT_DATE,
+    fecha_nac DATE,
+    carnet_identidad VARCHAR(10),
+    ci_complemento VARCHAR(3),
+    CONSTRAINT fk_cliente_persona FOREIGN KEY (id_cliente) REFERENCES PERSONA(id_persona) ON DELETE CASCADE
+);
+
+CREATE TABLE ADMIN_ESP_DEP (
+    id_admin_esp_dep INT PRIMARY KEY,
+    fecha_ingreso DATE NOT NULL,
+    direccion VARCHAR(255),
+    estado BOOLEAN DEFAULT TRUE, -- activo/inactivo
+    CONSTRAINT fk_admin_esp_dep_persona FOREIGN KEY (id_admin_esp_dep) REFERENCES PERSONA(id_persona) ON DELETE CASCADE
+);
+
+CREATE TABLE DEPORTISTA (
+    id_deportista INT PRIMARY KEY,
+    disciplina_principal VARCHAR(100),
+    CONSTRAINT fk_deportista_persona FOREIGN KEY (id_deportista) REFERENCES PERSONA(id_persona) ON DELETE CASCADE
+);
+
+CREATE TABLE CONTROL (
+    id_control INT PRIMARY KEY,
+    fecha_asignacion DATE,
+    estado BOOLEAN DEFAULT TRUE,
+    CONSTRAINT fk_control_persona FOREIGN KEY (id_control) REFERENCES PERSONA(id_persona) ON DELETE CASCADE
+);
+
+CREATE TABLE ENCARGADO (
+    id_encargado INT PRIMARY KEY,
+    responsabilidad VARCHAR(255),
+    fecha_inicio DATE,
+    hora_ingreso TIME,
+    hora_salida TIME,
+    estado BOOLEAN DEFAULT TRUE,
+    CONSTRAINT fk_encargado_persona FOREIGN KEY (id_encargado) REFERENCES PERSONA(id_persona) ON DELETE CASCADE
+);
+
+CREATE TABLE EMPRESA (
+    id_empresa SERIAL PRIMARY KEY,
+    fecha_registrado TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    logo_imagen VARCHAR(255),
+    nombre_sistema VARCHAR(100) NOT NULL,
+    titulo_h1 VARCHAR(150),
+    descripcion_h1 TEXT,
+    te_ofrecemos TEXT,
+    imagen_1 VARCHAR(255),
+    imagen_2 VARCHAR(255),
+    imagen_3 VARCHAR(255),
+    titulo_1 VARCHAR(150),
+    titulo_2 VARCHAR(150),
+    titulo_3 VARCHAR(150),
+    descripcion_1 TEXT,
+    descripcion_2 TEXT,
+    descripcion_3 TEXT,
+    mision TEXT,
+    vision TEXT,
+    nuestro_objetivo TEXT;
+    objetivo_1 TEXT,
+    objetivo_2 TEXT,
+    objetivo_3 TEXT,
+    quienes_somos TEXT,
+    correo_empresa VARCHAR(150) UNIQUE,
+    telefono VARCHAR(50),
+    direccion TEXT,
+    id_administrador INT NOT NULL,
+    imagen_hero character varying(255),
+    CONSTRAINT fk_admin FOREIGN KEY (id_administrador) REFERENCES ADMINISTRADOR(id_administrador) ON DELETE CASCADE
+);
+
+CREATE TABLE ESPACIO_DEPORTIVO (
+    id_espacio SERIAL PRIMARY KEY,
+    nombre VARCHAR(100) NOT NULL,
+    direccion VARCHAR(255),
+    descripcion TEXT,
+    latitud DECIMAL(9,6),
+    longitud DECIMAL(9,6),
+    horario_apertura TIME,
+    horario_cierre TIME,
+    imagen_pricipal TEXT,
+    imagen_sec_1 TEXT,
+    imagen_sec_2 TEXT,
+    imagen_sec_3 TEXT,
+    imagen_sec_4 TEXT,
+    id_admin_esp_dep INT NOT NULL,
+    CONSTRAINT fk_espacio_admin FOREIGN KEY (id_admin) REFERENCES ADMINISTRADOR_ESP_DEPORTIVO(id_admin_esp_dep) ON DELETE CASCADE
+);
+
+CREATE TYPE estado_cancha_enum AS ENUM ('disponible', 'ocupada', 'mantenimiento');
+
+CREATE TABLE CANCHA (
+    id_cancha SERIAL PRIMARY KEY,
+    nombre VARCHAR(100) NOT NULL,
+    ubicacion VARCHAR(255),
+    capacidad INT,
+    estado estado_cancha_enum,
+    monto_por_hora NUMERIC(10,2),
+    imagen_cancha TEXT,
+    id_espacio INT NOT NULL,
+    CONSTRAINT fk_cancha_espacio FOREIGN KEY (id_espacio) REFERENCES ESPACIO_DEPORTIVO(id_espacio) ON DELETE CASCADE
+);
+
+CREATE TABLE DISCIPLINA (
+    id_disciplina SERIAL PRIMARY KEY,
+    nombre VARCHAR(100) NOT NULL,
+    descripcion TEXT
+);
+
+CREATE TYPE estado_reserva_enum AS ENUM ('pendiente', 'pagada', 'en_cuotas', 'cancelada');
+
+CREATE TABLE RESERVA (
+    id_reserva SERIAL PRIMARY KEY,
+    fecha_reserva DATE NOT NULL,
+    cupo INT,
+    monto_total NUMERIC(10,2),
+    saldo_pendiente NUMERIC(10,2),
+    estado estado_reserva_enum NOT NULL,
+    id_cliente INT NOT NULL,
+    id_cancha INT NOT NULL,
+    CONSTRAINT fk_reserva_cliente FOREIGN KEY (id_cliente) REFERENCES CLIENTE(id_cliente) ON DELETE CASCADE,
+    CONSTRAINT fk_reserva_cancha FOREIGN KEY (id_cancha) REFERENCES CANCHA(id_cancha) ON DELETE CASCADE,
+);
+
+CREATE TABLE RESERVA_HORARIO (
+    id_horario SERIAL PRIMARY KEY,
+    id_reserva INT NOT NULL,
+    fecha DATE,              		  -- el día reservado
+    hora_inicio TIME NOT NULL,        -- hora de inicio
+    hora_fin TIME NOT NULL,           -- hora de fin (ej. 10:00-11:00)
+    monto NUMERIC(10,2),              -- opcional: monto por ese bloque
+    CONSTRAINT fk_reserva_horario FOREIGN KEY (id_reserva) REFERENCES RESERVA(id_reserva) ON DELETE CASCADE
+);
+
+CREATE TYPE metodo_pago_enum AS ENUM ('tarjeta', 'efectivo', 'transferencia', 'QR');
+
+CREATE TABLE PAGO (
+    id_pago SERIAL PRIMARY KEY,
+    monto NUMERIC(10,2),
+    metodo_pago metodo_pago_enum,
+    fecha_pago DATE,
+    id_reserva INT NOT NULL,
+    CONSTRAINT fk_pago_reserva FOREIGN KEY (id_reserva) REFERENCES RESERVA(id_reserva) ON DELETE CASCADE
+);
+
+CREATE TYPE estado_qr_enum AS ENUM ('activo', 'expirado', 'usado');
+
+CREATE TABLE QR_RESERVA (
+    id_qr SERIAL PRIMARY KEY,
+    fecha_generado TIMESTAMP NOT NULL,
+    fecha_expira TIMESTAMP,
+    qr_url_imagen TEXT,
+    codigo_qr VARCHAR(255),
+    estado estado_qr_enum,
+    verificado BOOLEAN DEFAULT FALSE,
+    id_reserva INT NOT NULL UNIQUE,
+    id_control INT,
+    CONSTRAINT fk_qr_reserva_reserva FOREIGN KEY (id_reserva) REFERENCES RESERVA(id_reserva) ON DELETE CASCADE,
+    CONSTRAINT fk_qr_reserva_control FOREIGN KEY (id_control) REFERENCES CONTROL(id_control) ON DELETE SET NULL
+);
+
+CREATE TABLE REPORTE_INCIDENCIA (
+    id_reporte SERIAL PRIMARY KEY,
+    detalle TEXT,
+    sugerencia TEXT,
+    verificado BOOLEAN DEFAULT FALSE,
+    id_encargado INT NOT NULL,
+    id_reserva INT NOT NULL,
+    CONSTRAINT fk_reporte_encargado FOREIGN KEY (id_encargado) REFERENCES ENCARGADO(id_encargado) ON DELETE CASCADE,
+    CONSTRAINT fk_reporte_reserva FOREIGN KEY (id_reserva) REFERENCES RESERVA(id_reserva) ON DELETE CASCADE
+);
+
+CREATE TABLE RESENA (
+    id_resena SERIAL PRIMARY KEY,
+    id_reserva INT UNIQUE NOT NULL,
+    estrellas INT CHECK (estrellas BETWEEN 1 AND 5), -- rating de 1 a 5
+    comentario TEXT,
+    fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    estado BOOLEAN DEFAULT FALSE,
+    verificado BOOLEAN DEFAULT FALSE,
+    CONSTRAINT fk_resena_reserva FOREIGN KEY (id_reserva) REFERENCES RESERVA(id_reserva) ON DELETE CASCADE
+);
+
+-- Tabla se_practica sin id, con clave primaria compuesta
+CREATE TABLE se_practica (
+    id_cancha INT NOT NULL,
+    id_disciplina INT NOT NULL,
+    frecuencia_practica VARCHAR(50),
+    CONSTRAINT pk_se_practica PRIMARY KEY (id_cancha, id_disciplina),
+    CONSTRAINT fk_se_practica_cancha FOREIGN KEY (id_cancha) REFERENCES CANCHA(id_cancha) ON DELETE CASCADE,
+    CONSTRAINT fk_se_practica_disciplina FOREIGN KEY (id_disciplina) REFERENCES DISCIPLINA(id_disciplina) ON DELETE CASCADE
+);
+
+-- Tabla participa_en sin id, con clave primaria compuesta
+CREATE TABLE participa_en (
+    id_deportista INT NOT NULL,
+    id_reserva INT NOT NULL,
+    fecha_reserva DATE,
+    CONSTRAINT pk_participa_en PRIMARY KEY (id_deportista, id_reserva),
+    CONSTRAINT fk_participa_deportista FOREIGN KEY (id_deportista) REFERENCES DEPORTISTA(id_deportista) ON DELETE CASCADE,
+    CONSTRAINT fk_participa_reserva FOREIGN KEY (id_reserva) REFERENCES RESERVA(id_reserva) ON DELETE CASCADE
+);
+
+
+=================================
+
+create table x_imagen(
+    id_imagen SERIAL PRIMARY key,
+    imagen text not null,
+    imagen_sec_1 varchar(200)
+)
+
+
