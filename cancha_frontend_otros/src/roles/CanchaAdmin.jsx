@@ -1,5 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import api from '../services/api';
+// Normaliza roles
+const getUserRoles = (u) => {
+  if (Array.isArray(u?.roles)) return u.roles.map(r => String(r).toUpperCase());
+  if (u?.role) return [String(u.role).toUpperCase()];
+  return [];
+};
+
+// Para este dashboard, prioriza ADMIN_ESP_DEP sobre ADMINISTRADOR
+const pickRoleForThisPage = (u) => {
+  const roles = getUserRoles(u);
+  if (roles.includes('ADMIN_ESP_DEP')) return 'ADMIN_ESP_DEP';
+  if (roles.includes('ADMINISTRADOR'))  return 'ADMINISTRADOR';
+  return 'DEFAULT';
+};
+
 
 // Configuración de permisos por rol
 const permissionsConfig = {
@@ -50,28 +65,32 @@ const CanchaAdmin = () => {
   const limit = 10;
   const [selectedFile, setSelectedFile] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
-  const [role, setRole] = useState(null);
+  const [role, setRole] = useState('DEFAULT');
   const [idAdminEspDep, setIdAdminEspDep] = useState(null);
 
   // Obtener el rol e id_persona (id_admin_esp_dep) desde localStorage
-  useEffect(() => {
-    const userData = localStorage.getItem('user');
-    if (userData) {
-      try {
-        const parsedUser = JSON.parse(userData);
-        setRole(parsedUser.role);
-        setIdAdminEspDep(parsedUser.id_persona);
-      } catch (error) {
-        console.error('Error al parsear datos del usuario:', error);
-        setError('Error al cargar datos del usuario');
-      }
-    } else {
-      setError('No se encontraron datos de usuario');
-    }
-  }, []);
+useEffect(() => {
+  const userData = localStorage.getItem('user');
+  if (!userData) {
+    setError('No se encontraron datos de usuario');
+    return;
+  }
+  try {
+    const u = JSON.parse(userData);
+    const effective = pickRoleForThisPage(u);
+    setRole(effective);
+    // Solo necesitamos id_admin_esp_dep cuando el rol efectivo es ADMIN_ESP_DEP
+    setIdAdminEspDep(effective === 'ADMIN_ESP_DEP' ? u.id_persona : null);
+  } catch (e) {
+    console.error('Error al parsear datos del usuario:', e);
+    setError('Error al cargar datos del usuario');
+  }
+}, []);
+
 
   // Obtener permisos según el rol
-  const permissions = role && permissionsConfig[role] ? permissionsConfig[role] : permissionsConfig.DEFAULT;
+const permissions = permissionsConfig[role] || permissionsConfig.DEFAULT;
+
 
   // Fetch espacios deportivos válidos
   useEffect(() => {
@@ -445,9 +464,9 @@ const CanchaAdmin = () => {
     );
   };
 
-  if (!role || !idAdminEspDep) {
-    return <p>Cargando permisos...</p>;
-  }
+ if (role === 'DEFAULT' || (role === 'ADMIN_ESP_DEP' && !idAdminEspDep)) {
+  return <p>Cargando permisos...</p>;
+}
 
   return (
     <div className="bg-white rounded-lg shadow p-6">

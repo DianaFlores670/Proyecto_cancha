@@ -1,20 +1,23 @@
 import React, { useState, useEffect } from 'react';
 import api from '../services/api';
 
+// --- Helpers de roles ---
+const getUserRoles = (u) => {
+  if (Array.isArray(u?.roles)) return u.roles.map(r => String(r?.rol ?? r).toUpperCase());
+  if (u?.role) return [String(u.role).toUpperCase()];
+  return [];
+};
+
+const pickRoleForThisPage = (u) => {
+  const roles = getUserRoles(u);
+  if (roles.includes('CLIENTE')) return 'CLIENTE';
+  return 'DEFAULT';
+};
+
 // Configuración de permisos por rol
 const permissionsConfig = {
-  CLIENTE: {
-    canView: true,
-    canCreate: true,
-    canEdit: true,
-    canDelete: true,
-  },
-  DEFAULT: {
-    canView: false,
-    canCreate: false,
-    canEdit: false,
-    canDelete: false,
-  },
+  CLIENTE: { canView: true, canCreate: true, canEdit: true, canDelete: true },
+  DEFAULT: { canView: false, canCreate: false, canEdit: false, canDelete: false },
 };
 
 const ReservaCliente = () => {
@@ -22,53 +25,69 @@ const ReservaCliente = () => {
   const [canchas, setCanchas] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+
   const [searchTerm, setSearchTerm] = useState('');
   const [filtro, setFiltro] = useState('');
+
   const [modalOpen, setModalOpen] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [viewMode, setViewMode] = useState(false);
   const [currentReserva, setCurrentReserva] = useState(null);
+
   const [formData, setFormData] = useState({
     fecha_reserva: '',
-    cupo: '',
+    cupo: '1',
+    id_cancha: '',
+    // Campos gestionados por backend (solo display)
     monto_total: '',
     saldo_pendiente: '',
     estado: '',
-    id_cancha: '',
   });
+
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const limit = 10;
-  const [role, setRole] = useState(null);
+
+  const [role, setRole] = useState('DEFAULT');
   const [idCliente, setIdCliente] = useState(null);
 
-  // Obtener el rol e id_cliente desde localStorage
+  // Cargar usuario y decidir rol/id_cliente
   useEffect(() => {
     const userData = localStorage.getItem('user');
-    if (userData) {
-      try {
-        const parsedUser = JSON.parse(userData);
-        setRole(parsedUser.role);
-        setIdCliente(parsedUser.id_persona);
-      } catch (error) {
-        console.error('Error al parsear datos del usuario:', error);
-        setError('Error al cargar datos del usuario');
-      }
-    } else {
+    if (!userData) {
       setError('No se encontraron datos de usuario');
+      return;
+    }
+    try {
+      const u = JSON.parse(userData);
+      const effective = pickRoleForThisPage(u);
+      setRole(effective);
+
+      // si en roles viene datos.id_cliente, úsalo; si no, fallback a id_persona
+      let idFromRoles = null;
+      if (Array.isArray(u?.roles)) {
+        const cl = u.roles.find(rr => String(rr?.rol ?? rr).toUpperCase() === 'CLIENTE');
+        idFromRoles = cl?.datos?.id_cliente ?? null;
+      }
+      const finalId = effective === 'CLIENTE' ? (idFromRoles ?? u.id_persona ?? null) : null;
+      setIdCliente(finalId);
+    } catch (e) {
+      console.error('Error al parsear datos del usuario:', e);
+      setError('Error al cargar datos del usuario');
     }
   }, []);
 
-  // Obtener permisos según el rol
-  const permissions = role && permissionsConfig[role] ? permissionsConfig[role] : permissionsConfig.DEFAULT;
+  const permissions = permissionsConfig[role] || permissionsConfig.DEFAULT;
 
-  // Fetch canchas disponibles
+  // Cargar canchas y (si hay id_cliente) también puede devolver reservas
   useEffect(() => {
     const fetchCanchas = async () => {
       try {
-        const response = await api.get('/reserva-cliente/datos-especificos');
-        if (response.data.exito) {
-          setCanchas(response.data.datos.canchas || []);
+        const resp = await api.get('/reserva-cliente/datos-especificos', {
+          params: idCliente ? { id_cliente: idCliente, limit: 5, offset: 0 } : {},
+        });
+        if (resp.data?.exito) {
+          setCanchas(resp.data?.datos?.canchas || []);
         }
       } catch (err) {
         console.error('Error al obtener canchas:', err);
@@ -76,11 +95,11 @@ const ReservaCliente = () => {
       }
     };
     fetchCanchas();
-  }, []);
+  }, [idCliente]);
 
-  // Fetch reservas con paginación y filtros
+  // Listado de reservas con paginación/filtros
   const fetchReservas = async (params = {}) => {
-    if (!idCliente) return;
+    if (role !== 'CLIENTE' || !idCliente) return;
     setLoading(true);
     setError(null);
     const offset = (page - 1) * limit;
@@ -94,11 +113,15 @@ const ReservaCliente = () => {
       } else {
         response = await api.get('/reserva-cliente/datos-especificos', { params: fullParams });
       }
-      if (response.data.exito) {
-        setReservas(response.data.datos.reservas);
-        setTotal(response.data.datos.paginacion.total);
+
+      if (response.data?.exito) {
+        // Filtro defensivo por si la API devolviera de más
+        let list = response.data.datos?.reservas || [];
+        list = list.filter(x => Number(x.id_cliente) === Number(idCliente));
+        setReservas(list);
+        setTotal(response.data.datos?.paginacion?.total ?? list.length);
       } else {
-        setError(response.data.mensaje);
+        setError(response.data?.mensaje || 'No fue posible obtener las reservas');
       }
     } catch (err) {
       const errorMessage = err.response?.data?.mensaje || 'Error de conexión al servidor';
@@ -111,27 +134,22 @@ const ReservaCliente = () => {
 
   useEffect(() => {
     fetchReservas();
-  }, [page, idCliente]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, idCliente, role]);
 
   const handleSearch = (e) => {
     e.preventDefault();
     setPage(1);
-    if (searchTerm.trim()) {
-      fetchReservas({ q: searchTerm });
-    } else {
-      fetchReservas();
-    }
+    if (searchTerm.trim()) fetchReservas({ q: searchTerm });
+    else fetchReservas();
   };
 
   const handleFiltroChange = (e) => {
     const tipo = e.target.value;
     setFiltro(tipo);
     setPage(1);
-    if (tipo) {
-      fetchReservas({ tipo });
-    } else {
-      fetchReservas();
-    }
+    if (tipo) fetchReservas({ tipo });
+    else fetchReservas();
   };
 
   const handleDelete = async (id) => {
@@ -141,10 +159,10 @@ const ReservaCliente = () => {
       const response = await api.delete(`/reserva-cliente/${id}`, {
         params: { id_cliente: idCliente },
       });
-      if (response.data.exito) {
+      if (response.data?.exito) {
         fetchReservas();
       } else {
-        alert(response.data.mensaje);
+        alert(response.data?.mensaje || 'No se pudo eliminar');
       }
     } catch (err) {
       const errorMessage = err.response?.data?.mensaje || 'Error de conexión al servidor';
@@ -159,11 +177,12 @@ const ReservaCliente = () => {
     setViewMode(false);
     setFormData({
       fecha_reserva: '',
-      cupo: '',
+      cupo: '1',
+      id_cancha: '',
+      // display-only
       monto_total: '',
       saldo_pendiente: '',
-      estado: '',
-      id_cancha: '',
+      estado: 'pendiente',
     });
     setCurrentReserva(null);
     setModalOpen(true);
@@ -175,22 +194,23 @@ const ReservaCliente = () => {
       const response = await api.get(`/reserva-cliente/dato-individual/${id}`, {
         params: { id_cliente: idCliente },
       });
-      if (response.data.exito) {
-        const reserva = response.data.datos.reserva;
+      if (response.data?.exito) {
+        const r = response.data.datos.reserva;
         setFormData({
-          fecha_reserva: reserva.fecha_reserva ? new Date(reserva.fecha_reserva).toISOString().split('T')[0] : '',
-          cupo: reserva.cupo || '',
-          monto_total: reserva.monto_total || '',
-          saldo_pendiente: reserva.saldo_pendiente || '',
-          estado: reserva.estado || '',
-          id_cancha: reserva.id_cancha || '',
+          fecha_reserva: r.fecha_reserva ? new Date(r.fecha_reserva).toISOString().split('T')[0] : '',
+          cupo: String(r.cupo ?? '1'),
+          id_cancha: String(r.id_cancha ?? ''),
+          // display-only
+          monto_total: r.monto_total ?? '',
+          saldo_pendiente: r.saldo_pendiente ?? '',
+          estado: r.estado ?? '',
         });
-        setCurrentReserva(reserva);
+        setCurrentReserva(r);
         setEditMode(true);
         setViewMode(false);
         setModalOpen(true);
       } else {
-        alert(response.data.mensaje);
+        alert(response.data?.mensaje || 'No se pudo cargar la reserva');
       }
     } catch (err) {
       const errorMessage = err.response?.data?.mensaje || 'Error de conexión al servidor';
@@ -205,22 +225,23 @@ const ReservaCliente = () => {
       const response = await api.get(`/reserva-cliente/dato-individual/${id}`, {
         params: { id_cliente: idCliente },
       });
-      if (response.data.exito) {
-        const reserva = response.data.datos.reserva;
+      if (response.data?.exito) {
+        const r = response.data.datos.reserva;
         setFormData({
-          fecha_reserva: reserva.fecha_reserva ? new Date(reserva.fecha_reserva).toISOString().split('T')[0] : '',
-          cupo: reserva.cupo || '',
-          monto_total: reserva.monto_total || '',
-          saldo_pendiente: reserva.saldo_pendiente || '',
-          estado: reserva.estado || '',
-          id_cancha: reserva.id_cancha || '',
+          fecha_reserva: r.fecha_reserva ? new Date(r.fecha_reserva).toISOString().split('T')[0] : '',
+          cupo: String(r.cupo ?? '1'),
+          id_cancha: String(r.id_cancha ?? ''),
+          // display-only
+          monto_total: r.monto_total ?? '',
+          saldo_pendiente: r.saldo_pendiente ?? '',
+          estado: r.estado ?? '',
         });
-        setCurrentReserva(reserva);
+        setCurrentReserva(r);
         setEditMode(false);
         setViewMode(true);
         setModalOpen(true);
       } else {
-        alert(response.data.mensaje);
+        alert(response.data?.mensaje || 'No se pudo cargar la reserva');
       }
     } catch (err) {
       const errorMessage = err.response?.data?.mensaje || 'Error de conexión al servidor';
@@ -238,7 +259,7 @@ const ReservaCliente = () => {
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    setFormData(prev => ({ ...prev, [name]: value }));
   };
 
   const handleSubmit = async (e) => {
@@ -246,74 +267,47 @@ const ReservaCliente = () => {
     if (viewMode || (!permissions.canCreate && !editMode) || (!permissions.canEdit && editMode)) return;
 
     try {
-      const filteredData = Object.fromEntries(
-        Object.entries(formData).filter(([key, value]) => {
-          const requiredFields = ['fecha_reserva', 'estado', 'id_cancha'];
-          if (requiredFields.includes(key)) return true;
-          return value !== '' && value !== null && value !== undefined;
-        })
-      );
+      // Payload solo con campos editables por cliente
+      const payload = {
+        fecha_reserva: formData.fecha_reserva,                         // "YYYY-MM-DD"
+        cupo: formData.cupo ? Number(formData.cupo) : null,
+        id_cancha: formData.id_cancha ? Number(formData.id_cancha) : null,
+        id_cliente: idCliente,
+      };
 
       // Validaciones
-      if (!filteredData.fecha_reserva) {
+      if (!payload.fecha_reserva) {
         setError('La fecha de reserva es obligatoria');
         return;
       }
-      if (new Date(filteredData.fecha_reserva).toString() === 'Invalid Date') {
+      if (new Date(payload.fecha_reserva).toString() === 'Invalid Date') {
         setError('La fecha de reserva no es válida');
         return;
       }
-      if (filteredData.cupo && (isNaN(filteredData.cupo) || filteredData.cupo <= 0)) {
+      if (payload.cupo !== null && (Number.isNaN(payload.cupo) || payload.cupo <= 0)) {
         setError('El cupo debe ser un número positivo');
         return;
       }
-      if (filteredData.monto_total && (isNaN(filteredData.monto_total) || filteredData.monto_total < 0)) {
-        setError('El monto total debe ser un número no negativo');
-        return;
-      }
-      if (filteredData.saldo_pendiente && (isNaN(filteredData.saldo_pendiente) || filteredData.saldo_pendiente < 0)) {
-        setError('El saldo pendiente debe ser un número no negativo');
-        return;
-      }
-      if (
-        filteredData.monto_total &&
-        filteredData.saldo_pendiente &&
-        Number(filteredData.saldo_pendiente) > Number(filteredData.monto_total)
-      ) {
-        setError('El saldo pendiente no puede ser mayor al monto total');
-        return;
-      }
-      const estadosValidos = ['pendiente', 'pagada', 'en_cuotas', 'cancelada'];
-      if (!filteredData.estado || !estadosValidos.includes(filteredData.estado)) {
-        setError(`El estado debe ser uno de: ${estadosValidos.join(', ')}`);
-        return;
-      }
-      if (!filteredData.id_cancha || !canchas.some((cancha) => cancha.id_cancha === parseInt(filteredData.id_cancha))) {
+      if (!payload.id_cancha || !canchas.some(c => Number(c.id_cancha) === Number(payload.id_cancha))) {
         setError('La cancha seleccionada no es válida');
         return;
       }
 
-      filteredData.id_cliente = idCliente;
-
       let response;
       if (editMode) {
-        console.log('📤 Enviando PATCH para actualizar reserva ID:', currentReserva.id_reserva);
-        response = await api.patch(`/reserva-cliente/${currentReserva.id_reserva}`, filteredData);
+        response = await api.patch(`/reserva-cliente/${currentReserva.id_reserva}`, payload);
       } else {
-        console.log('📤 Enviando POST para crear reserva...');
-        response = await api.post('/reserva-cliente/', filteredData);
+        response = await api.post('/reserva-cliente/', payload);
       }
 
-      if (response.data.exito) {
-        console.log('✅ Operación exitosa:', response.data.mensaje);
+      if (response.data?.exito) {
         closeModal();
         fetchReservas();
       } else {
-        alert('Error: ' + response.data.mensaje);
+        alert('Error: ' + (response.data?.mensaje || 'No se pudo guardar'));
       }
     } catch (err) {
-      console.error('❌ Error in handleSubmit:', err);
-      const errorMessage = err.response?.data?.mensaje || 'Error de conexión al servidor';
+      const errorMessage = err.response?.data?.mensaje || err.message || 'Error de conexión al servidor';
       setError(errorMessage);
       alert(`Error: ${errorMessage}`);
     }
@@ -325,7 +319,7 @@ const ReservaCliente = () => {
     }
   };
 
-  if (!role || !idCliente) {
+  if (role === 'DEFAULT' || !idCliente) {
     return <p>Cargando permisos...</p>;
   }
 
@@ -340,7 +334,7 @@ const ReservaCliente = () => {
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="🔍 Buscar por nombre, apellido, cancha o estado..."
+              placeholder="🔍 Buscar por cancha, fecha o estado..."
               className="border rounded-l px-4 py-2 w-full"
             />
             <button
@@ -404,9 +398,9 @@ const ReservaCliente = () => {
                     <td className="px-4 py-2">
                       {reserva.fecha_reserva ? new Date(reserva.fecha_reserva).toLocaleDateString() : '-'}
                     </td>
-                    <td className="px-4 py-2">{reserva.cupo || '-'}</td>
-                    <td className="px-4 py-2">{reserva.monto_total ? `$${reserva.monto_total}` : '-'}</td>
-                    <td className="px-4 py-2">{reserva.saldo_pendiente ? `$${reserva.saldo_pendiente}` : '-'}</td>
+                    <td className="px-4 py-2">{reserva.cupo ?? '-'}</td>
+                    <td className="px-4 py-2">{reserva.monto_total != null ? `$${reserva.monto_total}` : '-'}</td>
+                    <td className="px-4 py-2">{reserva.saldo_pendiente != null ? `$${reserva.saldo_pendiente}` : '-'}</td>
                     <td className="px-4 py-2">{reserva.estado || '-'}</td>
                     <td className="px-4 py-2 flex gap-2">
                       {permissions.canView && (
@@ -449,7 +443,7 @@ const ReservaCliente = () => {
               Anterior
             </button>
             <span className="px-4 py-2 bg-gray-100">
-              Página {page} de {Math.ceil(total / limit)}
+              Página {page} de {Math.ceil(total / limit) || 1}
             </span>
             <button
               onClick={() => handlePageChange(page + 1)}
@@ -481,6 +475,7 @@ const ReservaCliente = () => {
                   disabled={viewMode}
                 />
               </div>
+
               <div>
                 <label className="block text-sm font-medium mb-1">Cupo</label>
                 <input
@@ -493,49 +488,7 @@ const ReservaCliente = () => {
                   disabled={viewMode}
                 />
               </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Monto Total</label>
-                <input
-                  name="monto_total"
-                  value={formData.monto_total}
-                  onChange={handleInputChange}
-                  className="w-full border rounded px-3 py-2 bg-gray-100"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  disabled={viewMode}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Saldo Pendiente</label>
-                <input
-                  name="saldo_pendiente"
-                  value={formData.saldo_pendiente}
-                  onChange={handleInputChange}
-                  className="w-full border rounded px-3 py-2 bg-gray-100"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  disabled={viewMode}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Estado</label>
-                <select
-                  name="estado"
-                  value={formData.estado}
-                  onChange={handleInputChange}
-                  className="w-full border rounded px-3 py-2 bg-gray-100"
-                  required
-                  disabled={viewMode}
-                >
-                  <option value="">Seleccione un estado</option>
-                  <option value="pendiente">Pendiente</option>
-                  <option value="pagada">Pagada</option>
-                  <option value="en_cuotas">En Cuotas</option>
-                  <option value="cancelada">Cancelada</option>
-                </select>
-              </div>
+
               <div>
                 <label className="block text-sm font-medium mb-1">Cancha</label>
                 <select
@@ -554,6 +507,33 @@ const ReservaCliente = () => {
                   ))}
                 </select>
               </div>
+
+              {/* Campos solo de lectura para cliente */}
+              <div>
+                <label className="block text-sm font-medium mb-1">Monto Total</label>
+                <input
+                  value={formData.monto_total ?? ''}
+                  className="w-full border rounded px-3 py-2 bg-gray-100"
+                  disabled
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Saldo Pendiente</label>
+                <input
+                  value={formData.saldo_pendiente ?? ''}
+                  className="w-full border rounded px-3 py-2 bg-gray-100"
+                  disabled
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Estado</label>
+                <input
+                  value={formData.estado ?? ''}
+                  className="w-full border rounded px-3 py-2 bg-gray-100"
+                  disabled
+                />
+              </div>
+
               <div className="col-span-2 flex justify-end mt-4">
                 <button
                   type="button"

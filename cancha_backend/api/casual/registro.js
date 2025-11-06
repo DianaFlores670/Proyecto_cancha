@@ -82,13 +82,13 @@ const obtenerUsuarioPorId = async (id) => {
     const result = await pool.query(query, [id]);
 
     if (!result.rows[0]) return null;
-    
+
     // Obtener TODOS los roles del usuario
     const rolesUsuario = await obtenerRolesUsuario(id);
-    
+
     // Incluir roles disponibles
     const rolesDisponibles = obtenerRolesDisponibles();
-    
+
     return {
       ...result.rows[0],
       roles: rolesUsuario,  // ← Ahora es un array
@@ -112,19 +112,19 @@ const obtenerRolesUsuario = async (idUsuario) => {
     ];
 
     const roles = [];
-    
+
     for (const { tabla, rol } of tablasRoles) {
       const query = `SELECT * FROM ${tabla} WHERE id_${tabla} = $1`;
       const result = await pool.query(query, [idUsuario]);
       if (result.rows.length > 0) {
-        roles.push({ 
-          rol, 
+        roles.push({
+          rol,
           datos: result.rows[0],
           tabla: tabla
         });
       }
     }
-    
+
     return roles;
   } catch (error) {
     console.error('Error in obtenerRolesUsuario:', error);
@@ -239,40 +239,32 @@ const asignarRolEncargado = async (idUsuario, datos) => {
 
 
 
-async function loginUsuario(correo, contrasena) { 
-  const query = 'SELECT * FROM USUARIO WHERE correo = $1'; 
-  const result = await pool.query(query, [correo]); 
-  const usuario = result.rows[0]; 
-    
-  if (!usuario) throw new Error('Correo no encontrado'); 
+async function loginUsuario(correo, contrasena) {
+  const query = 'SELECT * FROM USUARIO WHERE correo = $1';
+  const result = await pool.query(query, [correo]);
+  const usuario = result.rows[0];
 
-  const isMatch = await bcrypt.compare(contrasena, usuario.contrasena); 
-  if (!isMatch) throw new Error('contrasena incorrecta'); 
+  if (!usuario) throw new Error('Correo no encontrado');
 
-  // Determinar el rol según las tablas relacionadas
-  let role = 'X'; // por defecto
+  const isMatch = await bcrypt.compare(contrasena, usuario.contrasena);
+  if (!isMatch) throw new Error('contrasena incorrecta');
 
-  const resAdmin = await pool.query('SELECT 1 FROM ADMINISTRADOR WHERE id_administrador=$1', [usuario.id_persona]);
-  if (resAdmin.rowCount > 0) role = 'ADMINISTRADOR';
-  
-  const resAdminEsp = await pool.query('SELECT 1 FROM ADMIN_ESP_DEP WHERE id_admin_esp_dep=$1', [usuario.id_persona]);
-  if (resAdminEsp.rowCount > 0) role = 'ADMIN_ESP_DEP';
-  
-  const resDeportista = await pool.query('SELECT 1 FROM DEPORTISTA WHERE id_deportista=$1', [usuario.id_persona]);
-  if (resDeportista.rowCount > 0) role = 'DEPORTISTA';
-  
-  const resControl = await pool.query('SELECT 1 FROM CONTROL WHERE id_control=$1', [usuario.id_persona]);
-  if (resControl.rowCount > 0) role = 'CONTROL';
-  
-  const resEncargado = await pool.query('SELECT 1 FROM ENCARGADO WHERE id_encargado=$1', [usuario.id_persona]);
-  if (resEncargado.rowCount > 0) role = 'ENCARGADO';
+  const roles = [];
+  const checks = [
+    { tabla: 'ADMINISTRADOR', rol: 'ADMINISTRADOR' },
+    { tabla: 'ADMIN_ESP_DEP', rol: 'ADMIN_ESP_DEP' },
+    { tabla: 'DEPORTISTA', rol: 'DEPORTISTA' },
+    { tabla: 'CONTROL', rol: 'CONTROL' },
+    { tabla: 'ENCARGADO', rol: 'ENCARGADO' },
+    { tabla: 'CLIENTE', rol: 'CLIENTE' },
+  ];
 
-  const resCliente = await pool.query('SELECT 1 FROM CLIENTE WHERE id_cliente=$1', [usuario.id_persona]);
-  if (resCliente.rowCount > 0) role = 'CLIENTE';
+  for (const { tabla, rol } of checks) {
+    const res = await pool.query(`SELECT 1 FROM ${tabla} WHERE id_${tabla.toLowerCase()}=$1`, [usuario.id_persona]);
+    if (res.rowCount > 0) roles.push(rol);
+  }
 
-  console.log(role);
-
-  return { 
+  return {
     id_persona: usuario.id_persona,
     nombre: usuario.nombre,
     usuario: usuario.usuario,
@@ -280,7 +272,7 @@ async function loginUsuario(correo, contrasena) {
     correo: usuario.correo,
     sexo: usuario.sexo,
     imagen_perfil: usuario.imagen_perfil,
-    role
+    roles
   };
 }
 
@@ -297,10 +289,10 @@ const crearUsuario = async (datosUsuario) => {
 
     // --- Validación y asignación de coordenadas ---
 
-      // Coordenadas aleatorias dentro del rango
-      const randomInRange = (min, max) => Math.random() * (max - min) + min;
-      let latitud = parseFloat(randomInRange(LAT_MIN, LAT_MAX).toFixed(6));
-      let longitud = parseFloat(randomInRange(LON_MIN, LON_MAX).toFixed(6));
+    // Coordenadas aleatorias dentro del rango
+    const randomInRange = (min, max) => Math.random() * (max - min) + min;
+    let latitud = parseFloat(randomInRange(LAT_MIN, LAT_MAX).toFixed(6));
+    let longitud = parseFloat(randomInRange(LON_MIN, LON_MAX).toFixed(6));
 
 
     // --- Validaciones adicionales ---
@@ -417,7 +409,7 @@ const actualizarUsuario = async (id, camposActualizar) => {
 
     // Retornar datos completos
     const usuarioCompleto = await obtenerUsuarioPorId(id);
-    return { 
+    return {
       ...usuarioCompleto
     };
   } catch (error) {
@@ -447,15 +439,15 @@ const login = async (req, res) => {
     const usuario = await loginUsuario(correo, contrasena);
     console.log(usuario.nombre, "logueado")
     const token = jwt.sign(
-      { id_persona: usuario.id_persona, role: usuario.role }, 
-      JWT_SECRET, 
+      { id_persona: usuario.id_persona, roles: usuario.roles },
+      JWT_SECRET,
       { expiresIn: '5h' }
     );
     console.log(`✅ [${req.method}] ejecutada con éxito.`, "url solicitada:", req.originalUrl);
     res.status(200).json(response(true, 'Login exitoso', { token, usuario }));
   } catch (error) {
     console.error('Error en login:', error.message);
-    
+
     if (error.message.includes('Correo no encontrado') || error.message.includes('contrasena incorrecta')) {
       return res.status(401).json(response(false, 'Credenciales inválidas'));
     }

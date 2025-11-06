@@ -50,20 +50,35 @@ const Cancha = () => {
   const limit = 10;
   const [selectedFile, setSelectedFile] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
-  const [role, setRole] = useState(null);
+  const [role, setRole] = useState('DEFAULT');
 
   // Obtener el rol del usuario desde localStorage
-  useEffect(() => {
-    const userData = localStorage.getItem('user');
-    if (userData) {
-      try {
-        const parsedUser = JSON.parse(userData);
-        setRole(parsedUser.role);
-      } catch (error) {
-        console.error('Error al parsear datos del usuario:', error);
-      }
-    }
-  }, []);
+useEffect(() => {
+  const userData = localStorage.getItem('user');
+  if (!userData) return;
+
+  try {
+    const u = JSON.parse(userData);
+
+    // 1) Normaliza a array en MAYÚSCULAS
+    const rolesArr = Array.isArray(u?.roles)
+      ? u.roles.map(r => String(r).toUpperCase())
+      : (u?.role ? [String(u.role).toUpperCase()] : []);
+
+    // 2) Elige un rol que exista en permissionsConfig, con prioridad
+    const keys = Object.keys(permissionsConfig);
+    const PRIORIDAD = ['ADMINISTRADOR']; // ajusta tu prioridad
+    const efectivo =
+      PRIORIDAD.find(r => rolesArr.includes(r) && keys.includes(r)) ||
+      rolesArr.find(r => keys.includes(r)) ||
+      'DEFAULT';
+
+    setRole(efectivo);
+  } catch (err) {
+    console.error('Error al parsear datos del usuario:', err);
+    setRole('DEFAULT');
+  }
+}, []);
 
   // Obtener permisos según el rol (o DEFAULT si no hay rol o no está definido)
   const permissions = role && permissionsConfig[role] ? permissionsConfig[role] : permissionsConfig.DEFAULT;

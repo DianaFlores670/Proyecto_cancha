@@ -1,20 +1,24 @@
 import React, { useState, useEffect } from 'react';
 import api from '../services/api';
 
+// --- Helpers de roles ---
+const getUserRoles = (u) => {
+  if (Array.isArray(u?.roles)) return u.roles.map(r => String(r?.rol ?? r).toUpperCase());
+  if (u?.role) return [String(u.role).toUpperCase()];
+  return [];
+};
+
+// Para este módulo priorizamos CLIENTE; si no lo tiene, bloqueamos.
+const pickRoleForThisPage = (u) => {
+  const roles = getUserRoles(u);
+  if (roles.includes('CLIENTE')) return 'CLIENTE';
+  return 'DEFAULT';
+};
+
 // Configuración de permisos por rol
 const permissionsConfig = {
-  CLIENTE: {
-    canView: true,
-    canCreate: true,
-    canEdit: true,
-    canDelete: true,
-  },
-  DEFAULT: {
-    canView: false,
-    canCreate: false,
-    canEdit: false,
-    canDelete: false,
-  },
+  CLIENTE: { canView: true, canCreate: true, canEdit: true, canDelete: true },
+  DEFAULT: { canView: false, canCreate: false, canEdit: false, canDelete: false },
 };
 
 const ResenaCliente = () => {
@@ -22,12 +26,15 @@ const ResenaCliente = () => {
   const [reservas, setReservas] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+
   const [searchTerm, setSearchTerm] = useState('');
   const [filtro, setFiltro] = useState('');
+
   const [modalOpen, setModalOpen] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [viewMode, setViewMode] = useState(false);
   const [currentResena, setCurrentResena] = useState(null);
+
   const [formData, setFormData] = useState({
     id_reserva: '',
     estrellas: '',
@@ -35,58 +42,69 @@ const ResenaCliente = () => {
     estado: false,
     verificado: false,
   });
+
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const limit = 10;
-  const [role, setRole] = useState(null);
+
+  const [role, setRole] = useState('DEFAULT');
   const [idCliente, setIdCliente] = useState(null);
 
-  // Obtener el rol e id_cliente desde localStorage
+  // Cargar usuario y decidir rol efectivo + id_cliente
   useEffect(() => {
     const userData = localStorage.getItem('user');
-    if (userData) {
-      try {
-        const parsedUser = JSON.parse(userData);
-        setRole(parsedUser.role);
-        setIdCliente(parsedUser.id_persona);
-      } catch (error) {
-        console.error('Error al parsear datos del usuario:', error);
-        setError('Error al cargar datos del usuario');
-      }
-    } else {
+    if (!userData) {
       setError('No se encontraron datos de usuario');
+      return;
+    }
+    try {
+      const u = JSON.parse(userData);
+      const effective = pickRoleForThisPage(u);
+      setRole(effective);
+
+      // Si tu estructura de roles trae un objeto con datos, usa ese id_cliente; si no, fallback a id_persona
+      let idFromRoles = null;
+      if (Array.isArray(u?.roles)) {
+        const cl = u.roles.find(rr => String(rr?.rol ?? rr).toUpperCase() === 'CLIENTE');
+        idFromRoles = cl?.datos?.id_cliente ?? null;
+      }
+      const finalId = effective === 'CLIENTE' ? (idFromRoles ?? u.id_persona ?? null) : null;
+      setIdCliente(finalId);
+    } catch (e) {
+      console.error('Error al parsear datos del usuario:', e);
+      setError('Error al cargar datos del usuario');
     }
   }, []);
 
-  // Obtener permisos según el rol
-  const permissions = role && permissionsConfig[role] ? permissionsConfig[role] : permissionsConfig.DEFAULT;
+  const permissions = permissionsConfig[role] || permissionsConfig.DEFAULT;
 
-  // Fetch reservas válidas del cliente
+  // Cargar Reservas disponibles para reseñar (o asociadas) y Reseñas del cliente
   useEffect(() => {
-    const fetchReservas = async () => {
-      if (!idCliente) return;
+    const load = async () => {
+      if (role !== 'CLIENTE' || !idCliente) return;
       try {
-        const response = await api.get('/resena-cliente/datos-especificos', {
-          params: { id_cliente: idCliente },
-        });
-        if (response.data.exito) {
-          setReservas(response.data.datos.reservas || []);
+        // Reservas disponibles / asociadas
+        const r1 = await api.get('/resena-cliente/datos-especificos', { params: { id_cliente: idCliente, limit, offset: 0 } });
+        if (r1.data?.exito) {
+          setReservas(r1.data?.datos?.reservas || []);
         }
       } catch (err) {
         console.error('Error al obtener reservas:', err);
         setError('Error al cargar reservas');
       }
     };
-    fetchReservas();
-  }, [idCliente]);
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [idCliente, role]);
 
-  // Fetch reseñas con paginación y filtros
   const fetchResenas = async (params = {}) => {
-    if (!idCliente) return;
+    if (role !== 'CLIENTE' || !idCliente) return;
     setLoading(true);
     setError(null);
     const offset = (page - 1) * limit;
-    const fullParams = { ...params, limit, offset, id_cliente: idCliente };
+    const baseParams = { limit, offset, id_cliente: idCliente };
+    const fullParams = { ...baseParams, ...params };
+
     try {
       let response;
       if (params.q) {
@@ -96,11 +114,15 @@ const ResenaCliente = () => {
       } else {
         response = await api.get('/resena-cliente/datos-especificos', { params: fullParams });
       }
+
       if (response.data.exito) {
-        setResenas(response.data.datos.resenas);
-        setTotal(response.data.datos.paginacion.total);
+        // Filtro defensivo por si acaso
+        let list = response.data.datos.resenas || [];
+        list = list.filter(x => Number(x.id_cliente) === Number(idCliente));
+        setResenas(list);
+        setTotal(response.data.datos.paginacion?.total ?? list.length);
       } else {
-        setError(response.data.mensaje);
+        setError(response.data.mensaje || 'No fue posible obtener las reseñas');
       }
     } catch (err) {
       const errorMessage = err.response?.data?.mensaje || 'Error de conexión al servidor';
@@ -113,40 +135,33 @@ const ResenaCliente = () => {
 
   useEffect(() => {
     fetchResenas();
-  }, [page, idCliente]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, idCliente, role]);
 
   const handleSearch = (e) => {
     e.preventDefault();
     setPage(1);
-    if (searchTerm.trim()) {
-      fetchResenas({ q: searchTerm });
-    } else {
-      fetchResenas();
-    }
+    if (searchTerm.trim()) fetchResenas({ q: searchTerm });
+    else fetchResenas();
   };
 
   const handleFiltroChange = (e) => {
     const tipo = e.target.value;
     setFiltro(tipo);
     setPage(1);
-    if (tipo) {
-      fetchResenas({ tipo });
-    } else {
-      fetchResenas();
-    }
+    if (tipo) fetchResenas({ tipo });
+    else fetchResenas();
   };
 
   const handleDelete = async (id) => {
     if (!permissions.canDelete) return;
     if (!window.confirm('¿Estás seguro de eliminar esta reseña?')) return;
     try {
-      const response = await api.delete(`/resena-cliente/${id}`, {
-        params: { id_cliente: idCliente },
-      });
+      const response = await api.delete(`/resena-cliente/${id}`, { params: { id_cliente: idCliente } });
       if (response.data.exito) {
         fetchResenas();
       } else {
-        alert(response.data.mensaje);
+        alert(response.data.mensaje || 'No se pudo eliminar');
       }
     } catch (err) {
       const errorMessage = err.response?.data?.mensaje || 'Error de conexión al servidor';
@@ -163,8 +178,8 @@ const ResenaCliente = () => {
       id_reserva: '',
       estrellas: '',
       comentario: '',
-      estado: false,
-      verificado: false,
+      estado: true,     // por defecto activa
+      verificado: false // el verificado típicamente lo haría el admin; lo dejamos false
     });
     setCurrentResena(null);
     setModalOpen(true);
@@ -173,24 +188,22 @@ const ResenaCliente = () => {
   const openEditModal = async (id) => {
     if (!permissions.canEdit) return;
     try {
-      const response = await api.get(`/resena-cliente/dato-individual/${id}`, {
-        params: { id_cliente: idCliente },
-      });
+      const response = await api.get(`/resena-cliente/dato-individual/${id}`, { params: { id_cliente: idCliente } });
       if (response.data.exito) {
-        const resena = response.data.datos.resena;
+        const r = response.data.datos.resena;
         setFormData({
-          id_reserva: resena.id_reserva || '',
-          estrellas: resena.estrellas || '',
-          comentario: resena.comentario || '',
-          estado: resena.estado || false,
-          verificado: resena.verificado || false,
+          id_reserva: String(r.id_reserva ?? ''),
+          estrellas: String(r.estrellas ?? ''),
+          comentario: r.comentario ?? '',
+          estado: !!r.estado,
+          verificado: !!r.verificado,
         });
-        setCurrentResena(resena);
+        setCurrentResena(r);
         setEditMode(true);
         setViewMode(false);
         setModalOpen(true);
       } else {
-        alert(response.data.mensaje);
+        alert(response.data.mensaje || 'No se pudo cargar la reseña');
       }
     } catch (err) {
       const errorMessage = err.response?.data?.mensaje || 'Error de conexión al servidor';
@@ -202,24 +215,22 @@ const ResenaCliente = () => {
   const openViewModal = async (id) => {
     if (!permissions.canView) return;
     try {
-      const response = await api.get(`/resena-cliente/dato-individual/${id}`, {
-        params: { id_cliente: idCliente },
-      });
+      const response = await api.get(`/resena-cliente/dato-individual/${id}`, { params: { id_cliente: idCliente } });
       if (response.data.exito) {
-        const resena = response.data.datos.resena;
+        const r = response.data.datos.resena;
         setFormData({
-          id_reserva: resena.id_reserva || '',
-          estrellas: resena.estrellas || '',
-          comentario: resena.comentario || '',
-          estado: resena.estado || false,
-          verificado: resena.verificado || false,
+          id_reserva: String(r.id_reserva ?? ''),
+          estrellas: String(r.estrellas ?? ''),
+          comentario: r.comentario ?? '',
+          estado: !!r.estado,
+          verificado: !!r.verificado,
         });
-        setCurrentResena(resena);
+        setCurrentResena(r);
         setEditMode(false);
         setViewMode(true);
         setModalOpen(true);
       } else {
-        alert(response.data.mensaje);
+        alert(response.data.mensaje || 'No se pudo cargar la reseña');
       }
     } catch (err) {
       const errorMessage = err.response?.data?.mensaje || 'Error de conexión al servidor';
@@ -237,10 +248,7 @@ const ResenaCliente = () => {
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: type === 'checkbox' ? checked : value,
-    }));
+    setFormData(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
   };
 
   const handleSubmit = async (e) => {
@@ -248,49 +256,45 @@ const ResenaCliente = () => {
     if (viewMode || (!permissions.canCreate && !editMode) || (!permissions.canEdit && editMode)) return;
 
     try {
-      const filteredData = Object.fromEntries(
-        Object.entries(formData).filter(([key, value]) => {
-          const requiredFields = ['id_reserva', 'estrellas'];
-          if (requiredFields.includes(key)) return true;
-          return value !== '' && value !== null && value !== undefined;
-        })
-      );
+      // Construir payload + coersiones numéricas
+      const payload = {
+        id_reserva: Number(formData.id_reserva),
+        estrellas: Number(formData.estrellas),
+        comentario: formData.comentario?.trim() || '',
+        estado: !!formData.estado,
+        verificado: !!formData.verificado,
+        id_cliente: idCliente,
+      };
 
       // Validaciones
-      if (!filteredData.id_reserva || isNaN(filteredData.id_reserva)) {
+      if (!payload.id_reserva || Number.isNaN(payload.id_reserva)) {
         setError('La reserva es obligatoria');
         return;
       }
-      if (!filteredData.estrellas || isNaN(filteredData.estrellas) || filteredData.estrellas < 1 || filteredData.estrellas > 5) {
+      if (!payload.estrellas || Number.isNaN(payload.estrellas) || payload.estrellas < 1 || payload.estrellas > 5) {
         setError('Las estrellas deben estar entre 1 y 5');
         return;
       }
-      if (filteredData.comentario && filteredData.comentario.length > 500) {
+      if (payload.comentario && payload.comentario.length > 500) {
         setError('El comentario no debe exceder los 500 caracteres');
         return;
       }
 
-      filteredData.id_cliente = idCliente;
-
       let response;
       if (editMode) {
-        console.log('📤 Enviando PATCH para actualizar reseña ID:', currentResena.id_resena);
-        response = await api.patch(`/resena-cliente/${currentResena.id_resena}`, filteredData);
+        response = await api.patch(`/resena-cliente/${currentResena.id_resena}`, payload);
       } else {
-        console.log('📤 Enviando POST para crear reseña...');
-        response = await api.post('/resena-cliente/', filteredData);
+        response = await api.post('/resena-cliente/', payload);
       }
 
       if (response.data.exito) {
-        console.log('✅ Operación exitosa:', response.data.mensaje);
         closeModal();
         fetchResenas();
       } else {
-        alert('Error: ' + response.data.mensaje);
+        alert('Error: ' + (response.data.mensaje || 'No se pudo guardar'));
       }
     } catch (err) {
-      console.error('❌ Error in handleSubmit:', err);
-      const errorMessage = err.response?.data?.mensaje || 'Error de conexión al servidor';
+      const errorMessage = err.response?.data?.mensaje || err.message || 'Error de conexión al servidor';
       setError(errorMessage);
       alert(`Error: ${errorMessage}`);
     }
@@ -302,7 +306,8 @@ const ResenaCliente = () => {
     }
   };
 
-  if (!role || !idCliente) {
+  // Estado de permisos
+  if (role === 'DEFAULT' || !idCliente) {
     return <p>Cargando permisos...</p>;
   }
 
@@ -423,7 +428,7 @@ const ResenaCliente = () => {
               Anterior
             </button>
             <span className="px-4 py-2 bg-gray-100">
-              Página {page} de {Math.ceil(total / limit)}
+              Página {page} de {Math.ceil(total / limit) || 1}
             </span>
             <button
               onClick={() => handlePageChange(page + 1)}
@@ -461,6 +466,7 @@ const ResenaCliente = () => {
                   ))}
                 </select>
               </div>
+
               <div>
                 <label className="block text-sm font-medium mb-1">Estrellas</label>
                 <input
@@ -475,6 +481,7 @@ const ResenaCliente = () => {
                   disabled={viewMode}
                 />
               </div>
+
               <div>
                 <label className="block text-sm font-medium mb-1">Estado</label>
                 <input
@@ -487,6 +494,7 @@ const ResenaCliente = () => {
                 />
                 <span className="ml-2">{formData.estado ? 'Activo' : 'Inactivo'}</span>
               </div>
+
               <div className="col-span-2">
                 <label className="block text-sm font-medium mb-1">Comentario</label>
                 <textarea
@@ -499,6 +507,7 @@ const ResenaCliente = () => {
                   disabled={viewMode}
                 />
               </div>
+
               <div className="col-span-2 flex justify-end mt-4">
                 <button
                   type="button"

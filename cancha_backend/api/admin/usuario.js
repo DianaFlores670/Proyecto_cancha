@@ -749,7 +749,7 @@ const crearUsuarioController = async (req, res) => {
     const datos = { ...req.body };
 
     // Validaciones básicas
-    const camposObligatorios = ['nombre', 'correo', 'usuario', 'contrasena'];
+    const camposObligatorios = ['correo', 'usuario', 'contrasena'];
     const faltantes = camposObligatorios.filter(campo => !datos[campo] || datos[campo].toString().trim() === '');
 
     if (faltantes.length > 0) {

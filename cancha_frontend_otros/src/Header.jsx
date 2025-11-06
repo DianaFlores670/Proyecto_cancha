@@ -554,15 +554,15 @@ const Header = () => {
                     aria-label="Abrir menú de usuario"
                   >
                     <span className="text-[#23475F] font-medium">
-                      {user.nombre.charAt(0)}
-                      {user.apellido.charAt(0)}
+                      {user?.nombre?.charAt(0) || "S"}
+                      {user?.apellido?.charAt(0) || "A"}
                     </span>
                   </div>
                 )}
                 {showMenu && (
                   <div className="absolute right-0 mt-2 w-48 bg-[#FFFFFF] rounded-lg shadow-lg z-50">
                     <div className="px-4 py-2 text-[#23475F] font-medium border-b border-gray-200">
-                      {user.nombre} {user.apellido}
+                      {user?.nombre || "Sin nombre"} {user?.apellido || "Sin apellido"}
                     </div>
                     <button
                       onClick={openProfileModal}

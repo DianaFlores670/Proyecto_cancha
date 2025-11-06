@@ -1,5 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import api from '../services/api';
+// Normaliza roles desde localStorage
+const getUserRoles = (u) => {
+  if (Array.isArray(u?.roles)) return u.roles.map(r => String(r).toUpperCase());
+  if (u?.role) return [String(u.role).toUpperCase()];
+  return [];
+};
+
+// Para esta página prioriza CONTROL; si no, ADMINISTRADOR; si no, DEFAULT
+const pickRoleForThisPage = (u) => {
+  const roles = getUserRoles(u);
+  if (roles.includes('CONTROL')) return 'CONTROL';
+  if (roles.includes('ADMINISTRADOR')) return 'ADMINISTRADOR';
+  return 'DEFAULT';
+};
 
 // Configuración de permisos por rol
 const permissionsConfig = {
@@ -44,26 +58,30 @@ const QRControl = () => {
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const limit = 10;
-  const [role, setRole] = useState(null);
+  const [role, setRole] = useState('DEFAULT');
   const [idControl, setIdControl] = useState(null);
 
   // Obtener rol e id_control desde localStorage
-  useEffect(() => {
-    const userData = localStorage.getItem('user');
-    if (userData) {
-      try {
-        const parsedUser = JSON.parse(userData);
-        setRole(parsedUser.role);
-        setIdControl(parsedUser.id_persona);
-        setFormData(prev => ({ ...prev, id_control: parsedUser.id_persona }));
-      } catch (error) {
-        console.error('Error al parsear datos del usuario:', error);
-        setError('Error al cargar datos del usuario');
-      }
-    } else {
-      setError('No se encontraron datos de usuario');
-    }
-  }, []);
+useEffect(() => {
+  const userData = localStorage.getItem('user');
+  if (!userData) { setError('No se encontraron datos de usuario'); return; }
+
+  try {
+    const u = JSON.parse(userData);
+    const effective = pickRoleForThisPage(u);
+    setRole(effective);
+
+    // Solo necesitamos id_control si el rol efectivo es CONTROL
+    const idCtrl = effective === 'CONTROL' ? u.id_persona : null;
+    setIdControl(idCtrl);
+
+    // Pre-cargar el form con id_control solo para CONTROL
+    setFormData(prev => ({ ...prev, id_control: idCtrl || '' }));
+  } catch (e) {
+    console.error('Error al parsear datos del usuario:', e);
+    setError('Error al cargar datos del usuario');
+  }
+}, []);
 
   // Obtener permisos según el rol
   const permissions = role && permissionsConfig[role] ? permissionsConfig[role] : permissionsConfig.DEFAULT;
@@ -316,9 +334,10 @@ const QRControl = () => {
     }
   };
 
-  if (!role || !idControl) {
-    return <p>Cargando permisos...</p>;
-  }
+if (role === 'DEFAULT' || (role === 'CONTROL' && !idControl)) {
+  return <p>Cargando permisos...</p>;
+}
+
 
   return (
     <div className="bg-white rounded-lg shadow p-6">

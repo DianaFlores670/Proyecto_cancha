@@ -1,38 +1,41 @@
 import React, { useState, useEffect } from 'react';
 import api from '../services/api';
 
-// Configuración de permisos por rol
+// --- Helpers de roles ---
+const getUserRoles = (u) => {
+  if (Array.isArray(u?.roles)) return u.roles.map(r => String(r?.rol ?? r).toUpperCase());
+  if (u?.role) return [String(u.role).toUpperCase()];
+  return [];
+};
+
+// Para este dashboard, prioriza ENCARGADO sobre ADMINISTRADOR
+const pickRoleForThisPage = (u) => {
+  const roles = getUserRoles(u);
+  if (roles.includes('ENCARGADO')) return 'ENCARGADO';
+  if (roles.includes('ADMINISTRADOR')) return 'ADMINISTRADOR';
+  return 'DEFAULT';
+};
+
+// Permisos por rol (este dashboard está pensado para ENCARGADO)
 const permissionsConfig = {
-  ADMINISTRADOR: {
-    canView: true,
-    canCreate: true,
-    canEdit: true,
-    canDelete: true,
-  },
-  ENCARGADO: {
-    canView: true,
-    canCreate: true,
-    canEdit: true,
-    canDelete: true,
-  },
-  DEFAULT: {
-    canView: false,
-    canCreate: false,
-    canEdit: false,
-    canDelete: false,
-  },
+  ADMINISTRADOR: { canView: true, canCreate: true, canEdit: true, canDelete: true },
+  ENCARGADO:     { canView: true, canCreate: true, canEdit: true, canDelete: true },
+  DEFAULT:       { canView: false, canCreate: false, canEdit: false, canDelete: false },
 };
 
 const ReporteEncargado = () => {
   const [reportes, setReportes] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+  const [loading, setLoading]   = useState(false);
+  const [error, setError]       = useState(null);
+
   const [searchTerm, setSearchTerm] = useState('');
-  const [filtro, setFiltro] = useState('');
+  const [filtro, setFiltro]         = useState('');
+
   const [modalOpen, setModalOpen] = useState(false);
-  const [editMode, setEditMode] = useState(false);
-  const [viewMode, setViewMode] = useState(false);
+  const [editMode, setEditMode]   = useState(false);
+  const [viewMode, setViewMode]   = useState(false);
   const [currentReporte, setCurrentReporte] = useState(null);
+
   const [formData, setFormData] = useState({
     detalle: '',
     sugerencia: '',
@@ -40,40 +43,58 @@ const ReporteEncargado = () => {
     verificado: false,
     id_encargado: '',
   });
+
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const limit = 10;
-  const [role, setRole] = useState(null);
+
+  const [role, setRole] = useState('DEFAULT');
   const [idEncargado, setIdEncargado] = useState(null);
 
-  // Obtener rol e id_encargado desde localStorage
+  // --- Cargar usuario y decidir rol efectivo e id_encargado ---
   useEffect(() => {
     const userData = localStorage.getItem('user');
-    if (userData) {
-      try {
-        const parsedUser = JSON.parse(userData);
-        setRole(parsedUser.role);
-        setIdEncargado(parsedUser.id_persona);
-        setFormData(prev => ({ ...prev, id_encargado: parsedUser.id_persona }));
-      } catch (error) {
-        console.error('Error al parsear datos del usuario:', error);
-        setError('Error al cargar datos del usuario');
-      }
-    } else {
+    if (!userData) {
       setError('No se encontraron datos de usuario');
+      return;
+    }
+    try {
+      const u = JSON.parse(userData);
+      const effective = pickRoleForThisPage(u);
+      setRole(effective);
+
+      // Intenta obtener id_encargado desde roles (si estructura avanzada) o usa id_persona como fallback
+      let idFromRoles = null;
+      if (Array.isArray(u?.roles)) {
+        const enc = u.roles.find(rr => String(rr?.rol ?? rr).toUpperCase() === 'ENCARGADO');
+        idFromRoles = enc?.datos?.id_encargado ?? null;
+      }
+      const finalId = effective === 'ENCARGADO' ? (idFromRoles ?? u.id_persona ?? null) : null;
+      setIdEncargado(finalId);
+      if (effective === 'ENCARGADO') {
+        setFormData(prev => ({ ...prev, id_encargado: finalId || '' }));
+      }
+    } catch (e) {
+      console.error('Error al parsear datos del usuario:', e);
+      setError('Error al cargar datos del usuario');
     }
   }, []);
 
-  // Obtener permisos según el rol
-  const permissions = role && permissionsConfig[role] ? permissionsConfig[role] : permissionsConfig.DEFAULT;
+  const permissions = permissionsConfig[role] || permissionsConfig.DEFAULT;
 
-  // Fetch reportes de incidencia
+  // --- Fetch reportes (siempre filtrados por el encargado en este dashboard) ---
   const fetchReportes = async (params = {}) => {
-    if (!idEncargado) return;
+    // Este dashboard funciona para ENCARGADO: requiere su id
+    if (role === 'ENCARGADO' && !idEncargado) return;
+
     setLoading(true);
     setError(null);
     const offset = (page - 1) * limit;
-    const fullParams = { ...params, limit, offset, id_encargado: idEncargado };
+
+    // Solo incluimos id_encargado cuando estamos como ENCARGADO
+    const baseParams = { limit, offset, ...(role === 'ENCARGADO' ? { id_encargado: idEncargado } : {}) };
+    const fullParams = { ...baseParams, ...params };
+
     try {
       let response;
       if (params.q) {
@@ -83,11 +104,17 @@ const ReporteEncargado = () => {
       } else {
         response = await api.get('/reporte-encargado/datos-especificos', { params: fullParams });
       }
+
       if (response.data.exito) {
-        setReportes(response.data.datos.reportes);
-        setTotal(response.data.datos.paginacion.total);
+        let list = response.data.datos.reportes || [];
+        // Filtro defensivo en front por si el backend no aplica el filtro (hardening visual)
+        if (role === 'ENCARGADO' && idEncargado != null) {
+          list = list.filter(r => Number(r.id_encargado) === Number(idEncargado));
+        }
+        setReportes(list);
+        setTotal(response.data.datos.paginacion?.total ?? list.length);
       } else {
-        setError(response.data.mensaje);
+        setError(response.data.mensaje || 'No fue posible obtener los reportes');
       }
     } catch (err) {
       const errorMessage = err.response?.data?.mensaje || 'Error de conexión al servidor';
@@ -100,40 +127,34 @@ const ReporteEncargado = () => {
 
   useEffect(() => {
     fetchReportes();
-  }, [page, idEncargado]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, idEncargado, role]);
 
   const handleSearch = (e) => {
     e.preventDefault();
     setPage(1);
-    if (searchTerm.trim()) {
-      fetchReportes({ q: searchTerm });
-    } else {
-      fetchReportes();
-    }
+    if (searchTerm.trim()) fetchReportes({ q: searchTerm });
+    else fetchReportes();
   };
 
   const handleFiltroChange = (e) => {
     const tipo = e.target.value;
     setFiltro(tipo);
     setPage(1);
-    if (tipo) {
-      fetchReportes({ tipo });
-    } else {
-      fetchReportes();
-    }
+    if (tipo) fetchReportes({ tipo });
+    else fetchReportes();
   };
 
   const handleDelete = async (id) => {
     if (!permissions.canDelete) return;
     if (!window.confirm('¿Estás seguro de eliminar este reporte de incidencia?')) return;
     try {
-      const response = await api.delete(`/reporte-encargado/${id}`, {
-        params: { id_encargado: idEncargado }
-      });
+      const params = role === 'ENCARGADO' ? { id_encargado: idEncargado } : {};
+      const response = await api.delete(`/reporte-encargado/${id}`, { params });
       if (response.data.exito) {
         fetchReportes();
       } else {
-        alert(response.data.mensaje);
+        alert(response.data.mensaje || 'No se pudo eliminar');
       }
     } catch (err) {
       const errorMessage = err.response?.data?.mensaje || 'Error de conexión al servidor';
@@ -151,7 +172,7 @@ const ReporteEncargado = () => {
       sugerencia: '',
       id_reserva: '',
       verificado: false,
-      id_encargado: idEncargado || '',
+      id_encargado: role === 'ENCARGADO' ? (idEncargado || '') : '',
     });
     setCurrentReporte(null);
     setModalOpen(true);
@@ -160,24 +181,23 @@ const ReporteEncargado = () => {
   const openEditModal = async (id) => {
     if (!permissions.canEdit) return;
     try {
-      const response = await api.get(`/reporte-encargado/dato-individual/${id}`, {
-        params: { id_encargado: idEncargado }
-      });
+      const params = role === 'ENCARGADO' ? { id_encargado: idEncargado } : {};
+      const response = await api.get(`/reporte-encargado/dato-individual/${id}`, { params });
       if (response.data.exito) {
-        const reporte = response.data.datos.reporte;
+        const r = response.data.datos.reporte;
         setFormData({
-          detalle: reporte.detalle || '',
-          sugerencia: reporte.sugerencia || '',
-          id_reserva: reporte.id_reserva.toString(),
-          verificado: reporte.verificado,
-          id_encargado: reporte.id_encargado.toString(),
+          detalle: r.detalle || '',
+          sugerencia: r.sugerencia || '',
+          id_reserva: String(r.id_reserva ?? ''),
+          verificado: !!r.verificado,
+          id_encargado: String(r.id_encargado ?? (role === 'ENCARGADO' ? idEncargado : '')),
         });
-        setCurrentReporte(reporte);
+        setCurrentReporte(r);
         setEditMode(true);
         setViewMode(false);
         setModalOpen(true);
       } else {
-        alert(response.data.mensaje);
+        alert(response.data.mensaje || 'No se pudo cargar el reporte');
       }
     } catch (err) {
       const errorMessage = err.response?.data?.mensaje || 'Error de conexión al servidor';
@@ -189,24 +209,23 @@ const ReporteEncargado = () => {
   const openViewModal = async (id) => {
     if (!permissions.canView) return;
     try {
-      const response = await api.get(`/reporte-encargado/dato-individual/${id}`, {
-        params: { id_encargado: idEncargado }
-      });
+      const params = role === 'ENCARGADO' ? { id_encargado: idEncargado } : {};
+      const response = await api.get(`/reporte-encargado/dato-individual/${id}`, { params });
       if (response.data.exito) {
-        const reporte = response.data.datos.reporte;
+        const r = response.data.datos.reporte;
         setFormData({
-          detalle: reporte.detalle || '',
-          sugerencia: reporte.sugerencia || '',
-          id_reserva: reporte.id_reserva.toString(),
-          verificado: reporte.verificado,
-          id_encargado: reporte.id_encargado.toString(),
+          detalle: r.detalle || '',
+          sugerencia: r.sugerencia || '',
+          id_reserva: String(r.id_reserva ?? ''),
+          verificado: !!r.verificado,
+          id_encargado: String(r.id_encargado ?? (role === 'ENCARGADO' ? idEncargado : '')),
         });
-        setCurrentReporte(reporte);
+        setCurrentReporte(r);
         setEditMode(false);
         setViewMode(true);
         setModalOpen(true);
       } else {
-        alert(response.data.mensaje);
+        alert(response.data.mensaje || 'No se pudo cargar el reporte');
       }
     } catch (err) {
       const errorMessage = err.response?.data?.mensaje || 'Error de conexión al servidor';
@@ -224,10 +243,7 @@ const ReporteEncargado = () => {
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: type === 'checkbox' ? checked : value,
-    }));
+    setFormData(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
   };
 
   const handleSubmit = async (e) => {
@@ -235,42 +251,43 @@ const ReporteEncargado = () => {
     if (viewMode || (!permissions.canCreate && !editMode) || (!permissions.canEdit && editMode)) return;
 
     try {
-      let response;
+      const required = ['id_reserva'];
       const filteredData = Object.fromEntries(
-        Object.entries(formData).filter(([key, value]) => {
-          const requiredFields = ['id_reserva', 'id_encargado'];
-          if (requiredFields.includes(key)) return true;
-          return value !== '' && value !== null && value !== undefined;
-        })
+        Object.entries(formData).filter(([key, val]) =>
+          required.includes(key) ? true : val !== '' && val !== null && val !== undefined
+        )
       );
 
-      // Validaciones
+      // Forzar id_encargado del contexto cuando rol es ENCARGADO (servidor debe validar también)
+      if (role === 'ENCARGADO') {
+        filteredData.id_encargado = idEncargado;
+      }
+
+      // Validaciones mínimas
       if (!filteredData.id_reserva || isNaN(filteredData.id_reserva)) {
         setError('El ID de la reserva es obligatorio y debe ser un número');
         return;
       }
-      if (typeof filteredData.verificado !== 'boolean') {
-        setError('El campo verificado debe ser un valor booleano');
+      if (typeof (filteredData.verificado ?? formData.verificado) !== 'boolean') {
+        setError('El campo verificado debe ser booleano');
         return;
       }
 
+      let response;
       if (editMode) {
-        console.log('📤 Enviando PATCH para actualizar reporte ID:', currentReporte.id_reporte);
+        // En edición bloqueamos mover a otra reserva desde el UI; el backend debería reforzarlo
         response = await api.patch(`/reporte-encargado/${currentReporte.id_reporte}`, filteredData);
       } else {
-        console.log('📤 Enviando POST para crear reporte...');
         response = await api.post('/reporte-encargado/', filteredData);
       }
 
       if (response.data.exito) {
-        console.log('✅ Operación exitosa:', response.data.mensaje);
         closeModal();
         fetchReportes();
       } else {
-        alert('Error: ' + response.data.mensaje);
+        alert('Error: ' + (response.data.mensaje || 'No se pudo guardar'));
       }
     } catch (err) {
-      console.error('❌ Error in handleSubmit:', err);
       const errorMessage = err.response?.data?.mensaje || err.message || 'Error de conexión al servidor';
       setError(errorMessage);
       alert(`Error: ${errorMessage}`);
@@ -283,7 +300,8 @@ const ReporteEncargado = () => {
     }
   };
 
-  if (!role || !idEncargado) {
+  // Estado de carga inicial/control de permisos
+  if (role === 'DEFAULT' || (role === 'ENCARGADO' && !idEncargado)) {
     return <p>Cargando permisos...</p>;
   }
 
@@ -360,15 +378,15 @@ const ReporteEncargado = () => {
                     <td className="px-4 py-2">{(page - 1) * limit + index + 1}</td>
                     <td className="px-4 py-2">{`${reporte.cliente_nombre} ${reporte.cliente_apellido}`}</td>
                     <td className="px-4 py-2">{reporte.cancha_nombre}</td>
-                    <td className="px-4 py-2 max-w-xs truncate" title={reporte.detalle}>
+                    <td className="px-4 py-2 max-w-xs truncate" title={reporte.detalle || ''}>
                       {reporte.detalle || '-'}
                     </td>
                     <td className="px-4 py-2">
-                      <span className={`px-2 py-1 rounded-full text-xs ${
-                        reporte.verificado 
-                          ? 'bg-green-100 text-green-800' 
-                          : 'bg-red-100 text-red-800'
-                      }`}>
+                      <span
+                        className={`px-2 py-1 rounded-full text-xs ${
+                          reporte.verificado ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                        }`}
+                      >
                         {reporte.verificado ? 'Sí' : 'No'}
                       </span>
                     </td>
@@ -413,7 +431,7 @@ const ReporteEncargado = () => {
               Anterior
             </button>
             <span className="px-4 py-2 bg-gray-100">
-              Página {page} de {Math.ceil(total / limit)}
+              Página {page} de {Math.ceil(total / limit) || 1}
             </span>
             <button
               onClick={() => handlePageChange(page + 1)}
@@ -430,7 +448,11 @@ const ReporteEncargado = () => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-8 max-w-4xl w-full max-h-[90vh] overflow-y-auto">
             <h3 className="text-xl font-semibold mb-4">
-              {viewMode ? 'Ver Datos de Reporte de Incidencia' : editMode ? 'Editar Reporte de Incidencia' : 'Crear Reporte de Incidencia'}
+              {viewMode
+                ? 'Ver Datos de Reporte de Incidencia'
+                : editMode
+                ? 'Editar Reporte de Incidencia'
+                : 'Crear Reporte de Incidencia'}
             </h3>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
@@ -443,7 +465,8 @@ const ReporteEncargado = () => {
                     className="w-full border rounded px-3 py-2 bg-gray-100"
                     type="number"
                     required
-                    disabled={viewMode}
+                    // Bloquea cambiar la reserva en edición para no “mover” reportes
+                    disabled={viewMode || editMode}
                   />
                 </div>
                 <div>
@@ -458,6 +481,7 @@ const ReporteEncargado = () => {
                   />
                 </div>
               </div>
+
               <div>
                 <label className="block text-sm font-medium mb-1">Detalle</label>
                 <textarea
@@ -469,6 +493,7 @@ const ReporteEncargado = () => {
                   disabled={viewMode}
                 />
               </div>
+
               <div>
                 <label className="block text-sm font-medium mb-1">Sugerencia</label>
                 <textarea
@@ -480,6 +505,7 @@ const ReporteEncargado = () => {
                   disabled={viewMode}
                 />
               </div>
+
               {currentReporte && (
                 <div className="grid grid-cols-2 gap-4">
                   <div>
@@ -508,6 +534,7 @@ const ReporteEncargado = () => {
                   </div>
                 </div>
               )}
+
               <div className="flex justify-end mt-4 space-x-2">
                 <button
                   type="button"

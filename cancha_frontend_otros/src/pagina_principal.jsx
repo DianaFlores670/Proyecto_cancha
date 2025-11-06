@@ -23,6 +23,8 @@ import Participa_En from './pages/Participa_En';
 // importa por roles
 import QRControl from './roles/QRControl';
 import ReporteEncargado from './roles/ReporteEncargado';
+import EspacioDeportivoAdmin from './roles/EspacioDeportivoAdmin';
+import CanchaAdmin from './roles/CanchaAdmin';
 
 // Configuración de rutas para cada rol
 const roleRoutesConfig = {
@@ -48,8 +50,8 @@ const roleRoutesConfig = {
     { id: 'participa_en', label: 'Participa En', icon: '👥', path: 'participa-en', component: Participa_En },
   ],
   ADMIN_ESP_DEP: [
-    { id: 'espacio_deportivo', label: 'Espacio Deportivo', icon: '🏟️', path: 'espacio-deportivo', component: Espacio_Deportivo },
-    { id: 'cancha', label: 'Cancha', icon: '🎾', path: 'cancha', component: Cancha },
+    { id: 'espacio_deportivo', label: 'Espacio Deportivo', icon: '🏟️', path: 'espacio-deportivo', component: EspacioDeportivoAdmin },
+    { id: 'cancha', label: 'Cancha', icon: '🎾', path: 'cancha', component: CanchaAdmin },
     { id: 'disciplina', label: 'Disciplina', icon: '🥋', path: 'disciplina', component: Disciplina },
     { id: 'reserva', label: 'Reserva', icon: '📅', path: 'reserva', component: Reserva },
     { id: 'reserva_horario', label: 'Reserva Horario', icon: '⏰', path: 'reserva-horario', component: Reserva_Horario },
@@ -70,6 +72,28 @@ const roleRoutesConfig = {
 
   ],
 };
+
+// Roles que tienen rutas en tu config (panel)
+const PANEL_ROLES = Object.keys(roleRoutesConfig);
+
+// Prioridad para elegir el rol efectivo cuando hay varios
+const ROLE_PRIORITY = ['ADMINISTRADOR', 'ADMIN_ESP_DEP', 'ENCARGADO', 'CONTROL'];
+
+// Soporta {role:'X'} (viejo) o {roles:['X','Y']} (nuevo)
+const getUserRoles = (u) => {
+  if (Array.isArray(u?.roles)) return u.roles.map(r => String(r).toUpperCase());
+  if (u?.role) return [String(u.role).toUpperCase()];
+  return [];
+};
+
+// Toma solo roles que existen en roleRoutesConfig y elige 1 por prioridad
+const pickEffectiveRole = (u) => {
+  const roles = getUserRoles(u).filter(r => PANEL_ROLES.includes(r));
+  if (roles.length === 0) return null;
+  for (const r of ROLE_PRIORITY) if (roles.includes(r)) return r;
+  return roles[0]; // fallback: el primero válido
+};
+
 
 const Header = ({ title, toggleSidebar, isSidebarOpen }) => {
   return (
@@ -127,11 +151,10 @@ const Sidebar = ({ routes, onPageChange, currentPage, onLogout, user, isSidebarO
               onPageChange(item.id, item.label);
               toggleSidebar();
             }}
-            className={`w-full flex items-center px-6 py-3 text-left transition-colors duration-200 ${
-              currentPage === item.id
+            className={`w-full flex items-center px-6 py-3 text-left transition-colors duration-200 ${currentPage === item.id
                 ? 'bg-[#01CD6C] text-white border-r-2 border-[#23475F]'
                 : 'text-[#23475F] hover:bg-[#01CD6C] hover:text-white'
-            }`}
+              }`}
           >
             <span className="text-lg mr-3">{item.icon}</span>
             <span className="font-medium">{item.label}</span>
@@ -169,20 +192,24 @@ const PaginaPrincipal = () => {
       setUser(parsedUser);
       setIsAuthenticated(true);
 
-      const roleRoutes = roleRoutesConfig[parsedUser.role] || [];
+      const effectiveRole = pickEffectiveRole(parsedUser);
+      const roleRoutes = effectiveRole ? roleRoutesConfig[effectiveRole] : [];
       setRoutes(roleRoutes);
 
-      // Sincronizar currentPage y pageTitle con la ruta actual
       const currentPath = location.pathname.replace('/administrador/', '');
-      const currentRoute = roleRoutes.find((route) => route.path === currentPath) || roleRoutes[0];
-      
+      const currentRoute = roleRoutes.find(r => r.path === currentPath) || roleRoutes[0];
+
       if (currentRoute) {
         setCurrentPage(currentRoute.id);
         setPageTitle(currentRoute.label);
+      } else if (roleRoutes[0]) {
+        setCurrentPage(roleRoutes[0].id);
+        setPageTitle(roleRoutes[0].label);
+        navigate(`/administrador/${roleRoutes[0].path}`);
       } else {
-        setCurrentPage(roleRoutes[0]?.id || '');
-        setPageTitle(roleRoutes[0]?.label || 'Dashboard');
-        navigate(`/administrador/${roleRoutes[0]?.path || ''}`);
+        setCurrentPage('');
+        setPageTitle('Dashboard');
+        // Opcional: navigate('/'); si quieres sacarlo del panel cuando no hay rol de panel
       }
     } catch (error) {
       console.error('Error parsing user data:', error);
@@ -223,7 +250,7 @@ const PaginaPrincipal = () => {
 
   return (
     <div className="flex h-screen bg-[#FFFFFF] overflow-hidden">
-      {routes.length > 0 && user?.role !== 'CLIENTE' && user?.role !== 'DEPORTISTA' && (
+      {routes.length > 0 && (
         <Sidebar
           routes={routes}
           onPageChange={handlePageChange}
@@ -234,7 +261,7 @@ const PaginaPrincipal = () => {
           toggleSidebar={toggleSidebar}
         />
       )}
-      <div className={`flex-1 flex flex-col min-w-0 ${isSidebarOpen && user?.role !== 'CLIENTE' && user?.role !== 'DEPORTISTA' ? 'ml-64' : 'ml-0'} transition-all duration-300`}>
+      <div className={`flex-1 flex flex-col min-w-0 ${isSidebarOpen && routes.length > 0 ? 'ml-64' : 'ml-0'} transition-all duration-300`}>
         <Header title={pageTitle} toggleSidebar={toggleSidebar} isSidebarOpen={isSidebarOpen} />
         <main className="flex-1 p-6 overflow-auto">
           <Routes>
@@ -259,7 +286,7 @@ const PaginaPrincipal = () => {
           </Routes>
         </main>
       </div>
-      {isSidebarOpen && user?.role !== 'CLIENTE' && user?.role !== 'DEPORTISTA' && (
+      {isSidebarOpen && routes.length > 0 && (
         <div
           className="fixed inset-0 bg-black bg-opacity-50 z-40"
           onClick={toggleSidebar}
