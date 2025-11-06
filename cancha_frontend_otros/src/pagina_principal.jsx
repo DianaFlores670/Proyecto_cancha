@@ -81,10 +81,11 @@ const ROLE_PRIORITY = ['ADMINISTRADOR', 'ADMIN_ESP_DEP', 'ENCARGADO', 'CONTROL']
 
 // Soporta {role:'X'} (viejo) o {roles:['X','Y']} (nuevo)
 const getUserRoles = (u) => {
-  if (Array.isArray(u?.roles)) return u.roles.map(r => String(r).toUpperCase());
+  if (Array.isArray(u?.roles)) return u.roles.map(r => String(r?.rol ?? r).toUpperCase());
   if (u?.role) return [String(u.role).toUpperCase()];
   return [];
 };
+
 
 // Toma solo roles que existen en roleRoutesConfig y elige 1 por prioridad
 const pickEffectiveRole = (u) => {
@@ -190,6 +191,8 @@ const PaginaPrincipal = () => {
     try {
       const parsedUser = JSON.parse(userData);
       setUser(parsedUser);
+
+      
       setIsAuthenticated(true);
 
       const effectiveRole = pickEffectiveRole(parsedUser);
@@ -221,6 +224,29 @@ const PaginaPrincipal = () => {
       setLoading(false); // Finaliza la carga siempre
     }
   }, [navigate, location.pathname]);
+
+  // 👇 pega esto debajo del useEffect que setea user/routes y hace navigate según ruta
+useEffect(() => {
+  // espera a que el primer efecto termine
+  if (loading) return;
+
+  const isAdminPath = location.pathname.startsWith('/administrador');
+  if (!isAdminPath) return;
+
+  const userData = localStorage.getItem('user');
+  if (!userData) return;
+
+  const parsed = JSON.parse(userData);
+  const roles = getUserRoles(parsed);
+  const hasPanelRole = roles.some(r => PANEL_ROLES.includes(r));
+
+  if (!hasPanelRole) {
+    // redirige a la vista pública o perfil del cliente
+    navigate('/espacios-deportivos', { replace: true });
+    // o si tienes una ruta de perfil: navigate('/mi-perfil', { replace: true });
+  }
+}, [loading, location.pathname, navigate]);
+
 
   const handlePageChange = (page, title) => {
     setCurrentPage(page);
