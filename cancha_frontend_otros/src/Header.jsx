@@ -481,13 +481,11 @@ const Header = () => {
   return (
     <>
       <div
-        className={`fixed top-0 left-0 w-full bg-[#FFFFFF] p-6 z-50 shadow-sm transition-transform duration-300 ${
-          isHeaderVisible ? 'translate-y-0' : '-translate-y-full'
-        }`}
+        className="fixed top-0 left-0 w-full bg-[#0F2634] px-6 py-2 z-50 shadow-sm transition-transform duration-300"
       >
         <div className="max-w-7xl mx-auto flex justify-between items-center">
           {/* Logo and Title Section */}
-          <div className="bg-[#FFFFFF] rounded-2xl shadow-sm p-2 border border-[#23475F]/20">
+          <div className="bg-[#0F2634] rounded-2xl shadow-sm p-2 border border-[#23475F]/20">
             <div className="flex items-center gap-4">
               {company && company.logo_imagen && (
                 <Link to="/" className="group relative">
@@ -505,7 +503,7 @@ const Header = () => {
               )}
               {company && (
                 <div>
-                  <h2 className="text-4xl font-bold text-[#0F2634] mb-2">{company.nombre_sistema}</h2>
+                  <h2 className="text-3xl font-bold text-[#01cd6c] mb-2">{company.nombre_sistema}</h2>
                 </div>
               )}
             </div>
@@ -515,14 +513,14 @@ const Header = () => {
           <div className="flex items-center gap-4">
             <Link
               to="/espacios-deportivos"
-              className="bg-[#01CD6C] hover:bg-[#00b359] text-[#FFFFFF] font-semibold py-3 px-6 rounded-lg shadow-lg transition-all duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-[#01CD6C] focus:ring-opacity-50"
+              className="bg-[#01CD6C] hover:bg-[#00b359] text-[#FFFFFF] font-semibold py-2 px-3 rounded-lg shadow-lg transition-all duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-[#01CD6C] focus:ring-opacity-50"
               aria-label="Ir a Espacios Deportivos"
             >
               Espacios Deportivos
             </Link>
             <Link
               to="/canchas"
-              className="bg-[#01CD6C] hover:bg-[#00b359] text-[#FFFFFF] font-semibold py-3 px-6 rounded-lg shadow-lg transition-all duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-[#01CD6C] focus:ring-opacity-50"
+              className="bg-[#01CD6C] hover:bg-[#00b359] text-[#FFFFFF] font-semibold py-2 px-3 rounded-lg shadow-lg transition-all duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-[#01CD6C] focus:ring-opacity-50"
               aria-label="Ir a Canchas"
             >
               Canchas
@@ -530,7 +528,7 @@ const Header = () => {
             {!isLoggedIn && (
               <button
                 onClick={() => setShowRegisterModal(true)}
-                className="bg-[#01CD6C] hover:bg-[#00b359] text-[#FFFFFF] font-semibold py-3 px-6 rounded-lg shadow-lg transition-all duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-[#01CD6C] focus:ring-opacity-50"
+                className="bg-[#01CD6C] hover:bg-[#00b359] text-[#FFFFFF] font-semibold py-2 px-3 rounded-lg shadow-lg transition-all duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-[#01CD6C] focus:ring-opacity-50"
                 aria-label="Registrarse"
               >
                 Registrarse
@@ -588,7 +586,7 @@ const Header = () => {
             ) : (
               <button
                 onClick={() => setShowLoginModal(true)}
-                className="bg-[#01CD6C] hover:bg-[#00b359] text-[#FFFFFF] font-semibold py-3 px-6 rounded-lg shadow-lg transition-all duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-[#01CD6C] focus:ring-opacity-50"
+                className="bg-[#01CD6C] hover:bg-[#00b359] text-[#FFFFFF] font-semibold py-2 px-3 rounded-lg shadow-lg transition-all duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-[#01CD6C] focus:ring-opacity-50"
                 aria-label="Iniciar sesión"
               >
                 Iniciar Sesión
