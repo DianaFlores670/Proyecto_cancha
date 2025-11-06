@@ -1,6 +1,33 @@
+/* eslint-disable no-unused-vars */
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import api from './services/api';
+
+const formatRole = (v) => {
+  const s = (v || '').toString().replace(/[_-]+/g, ' ').trim();
+  return s ? s.replace(/\b\w/g, c => c.toUpperCase()) : 'Sin rol';
+};
+
+const formatValue = (v) => {
+  if (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(v)) {
+    try {
+      return new Date(v).toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' });
+    } catch { /* noop */ }
+  }
+  return String(v ?? '');
+};
+
+const normalizeUser = (u) => {
+  const roles = Array.isArray(u?.roles)
+    ? u.roles.map(r => ({
+      rol: r?.rol ?? '',
+      tabla: r?.tabla ?? '',
+      datos: typeof r?.datos === 'object' && r?.datos !== null ? r.datos : {}
+    }))
+    : [];
+  return { ...u, roles };
+};
+
 
 const Header = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -28,7 +55,6 @@ const Header = () => {
   const [company, setCompany] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [isHeaderVisible, setIsHeaderVisible] = useState(true);
   const [lastScrollY, setLastScrollY] = useState(0);
   const [user, setUser] = useState(null);
   const [showMenu, setShowMenu] = useState(false);
@@ -65,30 +91,33 @@ const Header = () => {
   // Check login status and load user data
   useEffect(() => {
     const token = localStorage.getItem('token');
-    const userData = localStorage.getItem('user');
+    const raw = localStorage.getItem('user');
     setIsLoggedIn(!!token);
-    if (userData) {
+    if (raw) {
       try {
-        const parsedUser = JSON.parse(userData);
-        setUser(parsedUser);
+        const parsed = JSON.parse(raw);
+        const normalized = normalizeUser(parsed);
+        setUser(normalized);
         setFormData({
-          nombre: parsedUser.nombre || '',
-          apellido: parsedUser.apellido || '',
-          correo: parsedUser.correo || '',
-          usuario: parsedUser.usuario || '',
-          telefono: parsedUser.telefono || '',
-          sexo: parsedUser.sexo || '',
-          imagen_perfil: parsedUser.imagen_perfil || '',
-          latitud: parsedUser.latitud || '',
-          longitud: parsedUser.longitud || '',
-          datos_especificos: parsedUser.datos_rol || {},
+          nombre: normalized.nombre || '',
+          apellido: normalized.apellido || '',
+          correo: normalized.correo || '',
+          usuario: normalized.usuario || '',
+          telefono: normalized.telefono || '',
+          sexo: normalized.sexo || '',
+          imagen_perfil: normalized.imagen_perfil || '',
+          latitud: normalized.latitud || '',
+          longitud: normalized.longitud || '',
+          // muestra por defecto los datos del PRIMER rol
+          datos_especificos: normalized.roles?.[0]?.datos || {},
         });
-        setImagePreview(parsedUser.imagen_perfil ? getImageUrl(parsedUser.imagen_perfil) : null);
-      } catch (err) {
-        console.error('Error parsing user data:', err);
+        setImagePreview(normalized.imagen_perfil ? getImageUrl(normalized.imagen_perfil) : null);
+      } catch (e) {
+        console.error('Error parsing user from LS:', e);
       }
     }
   }, []);
+
 
   // Fetch company data
   useEffect(() => {
@@ -110,11 +139,11 @@ const Header = () => {
   const handleScroll = useCallback(() => {
     const currentScrollY = window.scrollY;
     if (currentScrollY <= 0) {
-      setIsHeaderVisible(true);
+      //setIsHeaderVisible(true);
     } else if (currentScrollY > lastScrollY) {
-      setIsHeaderVisible(false);
+      //setIsHeaderVisible(false);
     } else {
-      setIsHeaderVisible(true);
+      //setIsHeaderVisible(true);
     }
     setLastScrollY(currentScrollY);
   }, [lastScrollY]);
@@ -151,34 +180,33 @@ const Header = () => {
       const data = response.data;
 
       if (data.success && data.data.token && data.data.usuario) {
+        const normalized = normalizeUser(data.data.usuario);
         localStorage.setItem('token', data.data.token);
-        localStorage.setItem('user', JSON.stringify(data.data.usuario));
+        localStorage.setItem('user', JSON.stringify(normalized));
         setIsLoggedIn(true);
-        setUser(data.data.usuario);
+        setUser(normalized);
         setFormData({
-          nombre: data.data.usuario.nombre || '',
-          apellido: data.data.usuario.apellido || '',
-          correo: data.data.usuario.correo || '',
-          usuario: data.data.usuario.usuario || '',
-          telefono: data.data.usuario.telefono || '',
-          sexo: data.data.usuario.sexo || '',
-          imagen_perfil: data.data.usuario.imagen_perfil || '',
-          latitud: data.data.usuario.latitud || '',
-          longitud: data.data.usuario.longitud || '',
-          datos_especificos: data.data.usuario.datos_rol || {},
+          nombre: normalized.nombre || '',
+          apellido: normalized.apellido || '',
+          correo: normalized.correo || '',
+          usuario: normalized.usuario || '',
+          telefono: normalized.telefono || '',
+          sexo: normalized.sexo || '',
+          imagen_perfil: normalized.imagen_perfil || '',
+          latitud: normalized.latitud || '',
+          longitud: normalized.longitud || '',
+          datos_especificos: normalized.roles?.[0]?.datos || {},
         });
-        setImagePreview(data.data.usuario.imagen_perfil ? getImageUrl(data.data.usuario.imagen_perfil) : null);
-        setLoginLoading(false);
-        setShowLoginModal(false);
-        setCorreo('');
-        setContrasena('');
+        setImagePreview(normalized.imagen_perfil ? getImageUrl(normalized.imagen_perfil) : null);
 
-        const userRole = data.data.usuario.role;
-        if (userRole === 'CLIENTE' || userRole === 'DEPORTISTA') {
+        // navegación según roles (ahora es array y en minúsculas)
+        const roleSet = new Set((normalized.roles ?? []).map(r => (r.rol || '').toUpperCase()));
+        if (roleSet.has('CLIENTE') || roleSet.has('DEPORTISTA')) {
           navigate('/espacios-deportivos');
         } else {
           navigate('/administrador');
         }
+
       } else {
         setLoginError('Respuesta del servidor inválida. Intenta de nuevo.');
         setLoginLoading(false);
@@ -186,7 +214,7 @@ const Header = () => {
     } catch (err) {
       setLoginError(
         err.response?.data?.message ||
-          'Error al iniciar sesión. Verifica tus credenciales.'
+        'Error al iniciar sesión. Verifica tus credenciales.'
       );
       setLoginLoading(false);
     }
@@ -284,20 +312,28 @@ const Header = () => {
       const response = await api.get(`/usuario/dato-individual/${user.id_persona}`);
       if (response.data.exito) {
         const userData = response.data.datos.usuario;
+        const normalized = normalizeUser(userData);
+
+        // <-- CAMBIO CLAVE PARA ROLES -->
+        setUser(normalized);
+        localStorage.setItem('user', JSON.stringify(normalized));
+        // --------------------------------
+
         setFormData({
-          nombre: userData.nombre || '',
-          apellido: userData.apellido || '',
-          correo: userData.correo || '',
-          usuario: userData.usuario || '',
-          telefono: userData.telefono || '',
-          sexo: userData.sexo || '',
-          imagen_perfil: userData.imagen_perfil || '',
-          latitud: userData.latitud || '',
-          longitud: userData.longitud || '',
-          datos_especificos: userData.datos_rol || {},
-          fecha_creacion: userData.fecha_creacion ? new Date(userData.fecha_creacion).toISOString().split('T')[0] : '',
+          nombre: normalized.nombre || '',
+          apellido: normalized.apellido || '',
+          correo: normalized.correo || '',
+          usuario: normalized.usuario || '',
+          telefono: normalized.telefono || '',
+          sexo: normalized.sexo || '',
+          imagen_perfil: normalized.imagen_perfil || '',
+          latitud: normalized.latitud || '',
+          longitud: normalized.longitud || '',
+          datos_especificos: normalized.roles?.[0]?.datos || {},
+          fecha_creacion: normalized.fecha_creacion ? new Date(normalized.fecha_creacion).toISOString().split('T')[0] : '',
         });
-        setImagePreview(userData.imagen_perfil ? getImageUrl(userData.imagen_perfil) : null);
+        setImagePreview(normalized.imagen_perfil ? getImageUrl(normalized.imagen_perfil) : null);
+
         setShowProfileModal(true);
       } else {
         setProfileError(response.data.mensaje);
@@ -316,20 +352,28 @@ const Header = () => {
       const response = await api.get(`/usuario/dato-individual/${user.id_persona}`);
       if (response.data.exito) {
         const userData = response.data.datos.usuario;
+        const normalized = normalizeUser(userData);
+
+        // <-- CAMBIO CLAVE PARA ROLES -->
+        setUser(normalized);
+        localStorage.setItem('user', JSON.stringify(normalized));
+        // --------------------------------
+
         setFormData({
-          nombre: userData.nombre || '',
-          apellido: userData.apellido || '',
-          correo: userData.correo || '',
-          usuario: userData.usuario || '',
-          telefono: userData.telefono || '',
-          sexo: userData.sexo || '',
-          imagen_perfil: userData.imagen_perfil || '',
-          latitud: userData.latitud || '',
-          longitud: userData.longitud || '',
-          datos_especificos: userData.datos_rol || {},
-          fecha_creacion: userData.fecha_creacion ? new Date(userData.fecha_creacion).toISOString().split('T')[0] : '',
+          nombre: normalized.nombre || '',
+          apellido: normalized.apellido || '',
+          correo: normalized.correo || '',
+          usuario: normalized.usuario || '',
+          telefono: normalized.telefono || '',
+          sexo: normalized.sexo || '',
+          imagen_perfil: normalized.imagen_perfil || '',
+          latitud: normalized.latitud || '',
+          longitud: normalized.longitud || '',
+          datos_especificos: normalized.roles?.[0]?.datos || {},
+          fecha_creacion: normalized.fecha_creacion ? new Date(normalized.fecha_creacion).toISOString().split('T')[0] : '',
         });
-        setImagePreview(userData.imagen_perfil ? getImageUrl(userData.imagen_perfil) : null);
+        setImagePreview(normalized.imagen_perfil ? getImageUrl(normalized.imagen_perfil) : null);
+
         setSelectedFile(null);
         setPasswordData({ nueva_contrasena: '', confirmar_contrasena: '' });
         setShowEditProfileModal(true);
@@ -536,47 +580,55 @@ const Header = () => {
             )}
             {isLoggedIn && user ? (
               <div className="relative" ref={menuRef}>
-                {user.imagen_perfil ? (
-                  <img
-                    src={getImageUrl(user.imagen_perfil)}
-                    alt="Foto de perfil"
-                    className="h-16 w-16 object-cover rounded-full border-4 border-[#0F2634] cursor-pointer"
-                    onError={handleImageError}
-                    onClick={toggleMenu}
-                    aria-label="Abrir menú de usuario"
-                  />
-                ) : (
-                  <div
-                    className="h-10 w-10 bg-gray-200 rounded-sm border-2 border-blue-500 flex items-center justify-center cursor-pointer"
-                    onClick={toggleMenu}
-                    aria-label="Abrir menú de usuario"
-                  >
-                    <span className="text-[#23475F] font-medium">
-                      {user?.nombre?.charAt(0) || "S"}
-                      {user?.apellido?.charAt(0) || "A"}
-                    </span>
-                  </div>
-                )}
+                <button
+                  type="button"
+                  onClick={toggleMenu}
+                  className="flex items-center gap-3 rounded-full focus:outline-none focus:ring-2 focus:ring-[#01CD6C]/60"
+                  aria-haspopup="menu"
+                  aria-expanded={showMenu}
+                  aria-label="Abrir menú de usuario"
+                >
+                  {user.imagen_perfil ? (
+                    <img
+                      src={getImageUrl(user.imagen_perfil)}
+                      alt="Foto de perfil"
+                      onError={handleImageError}
+                      className="h-10 w-10 md:h-12 md:w-12 object-cover rounded-full ring-2 ring-white/10"
+                    />
+                  ) : (
+                    <div className="h-10 w-10 md:h-12 md:w-12 bg-white/10 text-white rounded-full flex items-center justify-center ring-2 ring-white/10">
+                      <span className="font-semibold">
+                        {(user?.nombre?.charAt(0) ?? 'S').toUpperCase()}
+                        {(user?.apellido?.charAt(0) ?? 'A').toUpperCase()}
+                      </span>
+                    </div>
+                  )}
+
+                  <span className="text-white font-medium md:max-w-[12rem] truncate pr-2">
+                    {user?.nombre ?? 'Nombre'}
+                  </span>
+                </button>
+
                 {showMenu && (
-                  <div className="absolute right-0 mt-2 w-48 bg-[#FFFFFF] rounded-lg shadow-lg z-50">
-                    <div className="px-4 py-2 text-[#23475F] font-medium border-b border-gray-200">
-                      {user?.nombre || "Sin nombre"} {user?.apellido || "Sin apellido"}
+                  <div className="absolute right-0 mt-2 w-56 bg-[#FFFFFF] rounded-lg shadow-lg z-50">
+                    <div className="px-4 py-3 text-[#23475F] font-medium border-b border-gray-200">
+                      {user?.nombre || 'Sin nombre'} {user?.apellido || 'Sin apellido'}
                     </div>
                     <button
                       onClick={openProfileModal}
-                      className="block w-full text-left px-4 py-2 text-[#23475F] hover:bg-[#01CD6C] hover:text-[#FFFFFF] transition-colors duration-200"
+                      className="block w-full text-left px-4 py-2 text-[#23475F] hover:bg-[#01CD6C] hover:text-white transition-colors duration-200"
                     >
                       Mi Perfil
                     </button>
                     <button
                       onClick={openEditProfileModal}
-                      className="block w-full text-left px-4 py-2 text-[#23475F] hover:bg-[#01CD6C] hover:text-[#FFFFFF] transition-colors duration-200"
+                      className="block w-full text-left px-4 py-2 text-[#23475F] hover:bg-[#01CD6C] hover:text-white transition-colors duration-200"
                     >
                       Editar Mi Perfil
                     </button>
                     <button
                       onClick={handleLogout}
-                      className="w-full text-left px-4 py-2 text-[#23475F] hover:bg-[#A31621] hover:text-[#FFFFFF] transition-colors duration-200"
+                      className="w-full text-left px-4 py-2 text-[#23475F] hover:bg-[#A31621] hover:text-white transition-colors duration-200"
                     >
                       Cerrar Sesión
                     </button>
@@ -586,12 +638,13 @@ const Header = () => {
             ) : (
               <button
                 onClick={() => setShowLoginModal(true)}
-                className="bg-[#01CD6C] hover:bg-[#00b359] text-[#FFFFFF] font-semibold py-2 px-3 rounded-lg shadow-lg transition-all duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-[#01CD6C] focus:ring-opacity-50"
+                className="bg-[#01CD6C] hover:bg-[#00b359] text-white font-semibold py-2 px-3 rounded-lg shadow-lg transition-all duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-[#01CD6C] focus:ring-opacity-50"
                 aria-label="Iniciar sesión"
               >
                 Iniciar Sesión
               </button>
             )}
+
           </div>
         </div>
       </div>
@@ -645,9 +698,8 @@ const Header = () => {
               <button
                 onClick={handleLogin}
                 disabled={loginLoading}
-                className={`w-full py-2 px-4 bg-[#01CD6C] text-[#FFFFFF] rounded-md hover:bg-[#00b359] focus:outline-none focus:ring-2 focus:ring-[#23475F] ${
-                  loginLoading ? 'opacity-50 cursor-not-allowed' : ''
-                }`}
+                className={`w-full py-2 px-4 bg-[#01CD6C] text-[#FFFFFF] rounded-md hover:bg-[#00b359] focus:outline-none focus:ring-2 focus:ring-[#23475F] ${loginLoading ? 'opacity-50 cursor-not-allowed' : ''
+                  }`}
                 aria-label="Iniciar sesión"
               >
                 {loginLoading ? 'Cargando...' : 'Iniciar Sesión'}
@@ -780,9 +832,8 @@ const Header = () => {
               <button
                 onClick={handleRegister}
                 disabled={registerLoading}
-                className={`w-full py-2 px-4 bg-[#01CD6C] text-[#FFFFFF] rounded-md hover:bg-[#00b359] focus:outline-none focus:ring-2 focus:ring-[#23475F] ${
-                  registerLoading ? 'opacity-50 cursor-not-allowed' : ''
-                }`}
+                className={`w-full py-2 px-4 bg-[#01CD6C] text-[#FFFFFF] rounded-md hover:bg-[#00b359] focus:outline-none focus:ring-2 focus:ring-[#23475F] ${registerLoading ? 'opacity-50 cursor-not-allowed' : ''
+                  }`}
                 aria-label="Registrarse"
               >
                 {registerLoading ? 'Cargando...' : 'Registrarse'}
@@ -803,7 +854,7 @@ const Header = () => {
             >
               &times;
             </button>
-            
+
             {/* Profile Header */}
             <div className="text-center mb-8">
               <div className="relative inline-block">
@@ -824,18 +875,19 @@ const Header = () => {
                 {formData.nombre} {formData.apellido}
               </h2>
               <p className="text-[#666] text-lg">{formData.usuario}</p>
-              
+
               {/* Role Badges */}
               <div className="flex justify-center flex-wrap gap-2 mt-3">
-                {user?.roles?.map((rolObj, index) => (
+                {(user?.roles ?? []).map((r, i) => (
                   <span
-                    key={index}
+                    key={`${r.tabla || r.rol || 'rol'}-${i}`}
                     className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-gradient-to-r from-[#01CD6C] to-[#23475F] text-white font-medium shadow-sm"
                   >
-                    {rolObj.rol.charAt(0).toUpperCase() + rolObj.rol.slice(1)}
+                    {formatRole(r.rol)}
                   </span>
                 ))}
               </div>
+
             </div>
 
             {profileError ? (
@@ -964,7 +1016,7 @@ const Header = () => {
             >
               &times;
             </button>
-            
+
             {/* Modal Header */}
             <div className="text-center mb-8">
               <div className="relative inline-block mb-4">
@@ -1165,9 +1217,8 @@ const Header = () => {
                 </button>
                 <button
                   type="submit"
-                  className={`px-6 py-2 bg-gradient-to-r from-[#01CD6C] to-[#00b359] text-white rounded-lg hover:from-[#00b359] hover:to-[#01CD6C] transition-all duration-200 font-semibold shadow-lg flex items-center justify-center gap-2 ${
-                    editProfileLoading ? 'opacity-50 cursor-not-allowed' : 'hover:shadow-lg transform hover:scale-105'
-                  }`}
+                  className={`px-6 py-2 bg-gradient-to-r from-[#01CD6C] to-[#00b359] text-white rounded-lg hover:from-[#00b359] hover:to-[#01CD6C] transition-all duration-200 font-semibold shadow-lg flex items-center justify-center gap-2 ${editProfileLoading ? 'opacity-50 cursor-not-allowed' : 'hover:shadow-lg transform hover:scale-105'
+                    }`}
                   disabled={editProfileLoading}
                 >
                   {editProfileLoading ? (
