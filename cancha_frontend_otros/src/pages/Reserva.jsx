@@ -1,38 +1,40 @@
+/* eslint-disable no-empty */
 import React, { useState, useEffect } from 'react';
 import api from '../services/api';
 
-// Configuración de permisos por rol
 const permissionsConfig = {
-  ADMINISTRADOR: {
-    canView: true,
-    canCreate: true,
-    canEdit: true,
-    canDelete: true,
-  },
-  ADMIN_ESP_DEP: {
-    canView: true,
-    canCreate: true,
-    canEdit: true,
-    canDelete: true,
-  },
-  CONTROL: {
-    canView: true,
-    canCreate: false,
-    canEdit: false,
-    canDelete: false,
-  },
-  ENCARGADO: {
-    canView: true,
-    canCreate: false,
-    canEdit: false,
-    canDelete: false,
-  },
-  DEFAULT: {
-    canView: false,
-    canCreate: false,
-    canEdit: false,
-    canDelete: false,
-  },
+  ADMINISTRADOR: { canView: true, canCreate: true, canEdit: true, canDelete: true },
+  ADMIN_ESP_DEP: { canView: true, canCreate: true, canEdit: true, canDelete: true },
+  CONTROL: { canView: true, canCreate: false, canEdit: false, canDelete: false },
+  ENCARGADO: { canView: true, canCreate: false, canEdit: false, canDelete: false },
+  DEFAULT: { canView: false, canCreate: false, canEdit: false, canDelete: false },
+};
+
+const getEffectiveRole = () => {
+  const keys = Object.keys(permissionsConfig);
+  const bag = new Set();
+  try {
+    const u = JSON.parse(localStorage.getItem('user') || '{}');
+    const arr = Array.isArray(u?.roles) ? u.roles : [];
+    for (const r of arr) {
+      if (typeof r === 'string') bag.add(r);
+      else if (r && typeof r === 'object') ['rol','role','nombre','name'].forEach(k => { if (r[k]) bag.add(r[k]); });
+    }
+    if (bag.size === 0 && u?.role) bag.add(u.role);
+  } catch {}
+  const tok = localStorage.getItem('token');
+  if (bag.size === 0 && tok && tok.split('.').length === 3) {
+    try {
+      const payload = JSON.parse(atob(tok.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')));
+      const t = Array.isArray(payload?.roles) ? payload.roles : (payload?.rol ? [payload.rol] : []);
+      t.forEach(v => bag.add(v));
+    } catch {}
+  }
+  const norm = Array.from(bag).map(v => String(v || '').trim().toUpperCase().replace(/\s+/g,'_'));
+  const map = v => v === 'ADMIN' ? 'ADMINISTRADOR' : v;
+  const norm2 = norm.map(map);
+  const prio = ['ADMINISTRADOR','ADMIN_ESP_DEP','CONTROL','ENCARGADO'];
+  return prio.find(r => norm2.includes(r) && keys.includes(r)) || norm2.find(r => keys.includes(r)) || 'DEFAULT';
 };
 
 const Reserva = () => {
@@ -58,123 +60,82 @@ const Reserva = () => {
   });
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
-  const [role, setRole] = useState('DEFAULT');
   const limit = 10;
+  const [role, setRole] = useState(() => getEffectiveRole());
 
-  // Obtener el rol del usuario desde localStorage
-useEffect(() => {
-  const userData = localStorage.getItem('user');
-  if (!userData) return;
+  useEffect(() => {
+    const sync = () => setRole(getEffectiveRole());
+    window.addEventListener('storage', sync);
+    window.addEventListener('auth-changed', sync);
+    window.addEventListener('focus', sync);
+    return () => {
+      window.removeEventListener('storage', sync);
+      window.removeEventListener('auth-changed', sync);
+      window.removeEventListener('focus', sync);
+    };
+  }, []);
 
-  try {
-    const u = JSON.parse(userData);
+  useEffect(() => { setError(null); }, [role]);
 
-    // 1) Normaliza a array en MAYÚSCULAS
-    const rolesArr = Array.isArray(u?.roles)
-      ? u.roles.map(r => String(r).toUpperCase())
-      : (u?.role ? [String(u.role).toUpperCase()] : []);
-
-    // 2) Elige un rol que exista en permissionsConfig, con prioridad
-    const keys = Object.keys(permissionsConfig);
-    const PRIORIDAD = ['ADMINISTRADOR']; // ajusta tu prioridad
-    const efectivo =
-      PRIORIDAD.find(r => rolesArr.includes(r) && keys.includes(r)) ||
-      rolesArr.find(r => keys.includes(r)) ||
-      'DEFAULT';
-
-    setRole(efectivo);
-  } catch (err) {
-    console.error('Error al parsear datos del usuario:', err);
-    setRole('DEFAULT');
-  }
-}, []);
-
-  // Obtener permisos según el rol (o DEFAULT si no hay rol o no está definido)
   const permissions = role && permissionsConfig[role] ? permissionsConfig[role] : permissionsConfig.DEFAULT;
 
-  // Fetch clientes y canchas válidas al cargar el componente
   useEffect(() => {
     const fetchClientes = async () => {
       try {
         const response = await api.get('/cliente/datos-especificos');
-        if (response.data.exito) {
-          setClientes(response.data.datos.clientes || []);
-        } else {
-          console.log('Error al obtener clientes:', response.data.mensaje);
-          setError(response.data.mensaje);
-        }
+        if (response.data?.exito) setClientes(response.data.datos.clientes || []);
+        else setError(response.data?.mensaje || 'Error al obtener clientes');
       } catch (err) {
-        console.log('Error en fetchClientes:', { error: err.message, stack: err.stack });
-        setError(err.response?.data?.mensaje || 'Error al obtener clientes');
+        setError(err.response?.data?.mensaje || 'Error de conexion al obtener clientes');
       }
     };
-
     const fetchCanchas = async () => {
       try {
         const response = await api.get('/cancha/datos-especificos');
-        if (response.data.exito) {
-          setCanchas(response.data.datos.canchas || []);
-        } else {
-          console.log('Error al obtener canchas:', response.data.mensaje);
-          setError(response.data.mensaje);
-        }
+        if (response.data?.exito) setCanchas(response.data.datos.canchas || []);
+        else setError(response.data?.mensaje || 'Error al obtener canchas');
       } catch (err) {
-        console.log('Error en fetchCanchas:', { error: err.message, stack: err.stack });
-        setError(err.response?.data?.mensaje || 'Error al obtener canchas');
+        setError(err.response?.data?.mensaje || 'Error de conexion al obtener canchas');
       }
     };
-
-    fetchClientes();
-    fetchCanchas();
-  }, []);
+    if (permissions.canView) {
+      fetchClientes();
+      fetchCanchas();
+    }
+  }, [role]);
 
   const fetchReservas = async (params = {}) => {
+    if (!permissions.canView) { setError('No tienes permisos para ver reservas'); return; }
     setLoading(true);
     setError(null);
     const offset = (page - 1) * limit;
     const fullParams = { ...params, limit, offset };
     try {
       let response;
-      if (params.q) {
-        response = await api.get('/reserva/buscar', { params: fullParams });
-      } else if (params.tipo) {
-        response = await api.get('/reserva/filtro', { params: fullParams });
+      if (params.q) response = await api.get('/reserva/buscar', { params: fullParams });
+      else if (params.tipo) response = await api.get('/reserva/filtro', { params: fullParams });
+      else response = await api.get('/reserva/datos-especificos', { params: fullParams });
+      if (response.data?.exito) {
+        setReservas(response.data.datos.reservas || []);
+        setTotal(response.data.datos.paginacion?.total || 0);
       } else {
-        response = await api.get('/reserva/datos-especificos', { params: fullParams });
-      }
-      if (response.data.exito) {
-        setReservas(response.data.datos.reservas);
-        setTotal(response.data.datos.paginacion.total);
-      } else {
-        console.log('Error al obtener reservas:', response.data.mensaje);
-        setError(response.data.mensaje);
+        setError(response.data?.mensaje || 'Error al cargar reservas');
       }
     } catch (err) {
-      console.log('Error en fetchReservas:', { error: err.message, stack: err.stack, params: fullParams });
-      const errorMessage = err.response?.data?.mensaje || 'Error de conexión al servidor';
-      setError(errorMessage);
+      setError(err.response?.data?.mensaje || 'Error de conexion al servidor');
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    if (permissions.canView) {
-      fetchReservas();
-    } else {
-      setError('No tienes permisos para ver las reservas');
-    }
-  }, [page, permissions]);
+  useEffect(() => { if (role) fetchReservas(); }, [page, role]);
 
   const handleSearch = (e) => {
     e.preventDefault();
     if (!permissions.canView) return;
     setPage(1);
-    if (searchTerm.trim()) {
-      fetchReservas({ q: searchTerm });
-    } else {
-      fetchReservas();
-    }
+    if (searchTerm.trim()) fetchReservas({ q: searchTerm });
+    else fetchReservas();
   };
 
   const handleFiltroChange = (e) => {
@@ -182,27 +143,19 @@ useEffect(() => {
     const tipo = e.target.value;
     setFiltro(tipo);
     setPage(1);
-    if (tipo) {
-      fetchReservas({ tipo });
-    } else {
-      fetchReservas();
-    }
+    if (tipo) fetchReservas({ tipo });
+    else fetchReservas();
   };
 
   const handleDelete = async (id) => {
     if (!permissions.canDelete) return;
-    if (!window.confirm('¿Estás seguro de eliminar esta reserva?')) return;
+    if (!window.confirm('Estas seguro de eliminar esta reserva?')) return;
     try {
       const response = await api.delete(`/reserva/${id}`);
-      if (response.data.exito) {
-        fetchReservas();
-      } else {
-        setError(response.data.mensaje);
-      }
+      if (response.data?.exito) fetchReservas();
+      else setError(response.data?.mensaje || 'No se pudo eliminar');
     } catch (err) {
-      console.log('Error en handleDelete:', { error: err.message, stack: err.stack, id });
-      const errorMessage = err.response?.data?.mensaje || 'Error de conexión al servidor';
-      setError(errorMessage);
+      setError(err.response?.data?.mensaje || 'Error de conexion al servidor');
     }
   };
 
@@ -227,29 +180,26 @@ useEffect(() => {
     if (!permissions.canEdit) return;
     try {
       const response = await api.get(`/reserva/dato-individual/${id}`);
-      if (response.data.exito) {
-        const reserva = response.data.datos.reserva;
+      if (response.data?.exito) {
+        const r = response.data.datos.reserva;
         setFormData({
-          fecha_reserva: reserva.fecha_reserva ? new Date(reserva.fecha_reserva).toISOString().split('T')[0] : '',
-          cupo: reserva.cupo || '',
-          monto_total: reserva.monto_total || '',
-          saldo_pendiente: reserva.saldo_pendiente || '',
-          estado: reserva.estado || 'pendiente',
-          id_cliente: reserva.id_cliente ? String(reserva.id_cliente) : '',
-          id_cancha: reserva.id_cancha ? String(reserva.id_cancha) : ''
+          fecha_reserva: r.fecha_reserva ? new Date(r.fecha_reserva).toISOString().split('T')[0] : '',
+          cupo: r.cupo || '',
+          monto_total: r.monto_total || '',
+          saldo_pendiente: r.saldo_pendiente || '',
+          estado: r.estado || 'pendiente',
+          id_cliente: r.id_cliente ? String(r.id_cliente) : '',
+          id_cancha: r.id_cancha ? String(r.id_cancha) : ''
         });
-        setCurrentReserva(reserva);
+        setCurrentReserva(r);
         setEditMode(true);
         setViewMode(false);
         setModalOpen(true);
       } else {
-        console.log('Error al obtener reserva para edición:', response.data.mensaje);
-        setError(response.data.mensaje);
+        setError(response.data?.mensaje || 'No se pudo cargar la reserva');
       }
     } catch (err) {
-      console.log('Error en openEditModal:', { error: err.message, stack: err.stack, id });
-      const errorMessage = err.response?.data?.mensaje || 'Error de conexión al servidor';
-      setError(errorMessage);
+      setError(err.response?.data?.mensaje || 'Error de conexion al servidor');
     }
   };
 
@@ -257,29 +207,26 @@ useEffect(() => {
     if (!permissions.canView) return;
     try {
       const response = await api.get(`/reserva/dato-individual/${id}`);
-      if (response.data.exito) {
-        const reserva = response.data.datos.reserva;
+      if (response.data?.exito) {
+        const r = response.data.datos.reserva;
         setFormData({
-          fecha_reserva: reserva.fecha_reserva ? new Date(reserva.fecha_reserva).toISOString().split('T')[0] : '',
-          cupo: reserva.cupo || '',
-          monto_total: reserva.monto_total || '',
-          saldo_pendiente: reserva.saldo_pendiente || '',
-          estado: reserva.estado || 'pendiente',
-          id_cliente: reserva.id_cliente ? String(reserva.id_cliente) : '',
-          id_cancha: reserva.id_cancha ? String(reserva.id_cancha) : ''
+          fecha_reserva: r.fecha_reserva ? new Date(r.fecha_reserva).toISOString().split('T')[0] : '',
+          cupo: r.cupo || '',
+          monto_total: r.monto_total || '',
+          saldo_pendiente: r.saldo_pendiente || '',
+          estado: r.estado || 'pendiente',
+          id_cliente: r.id_cliente ? String(r.id_cliente) : '',
+          id_cancha: r.id_cancha ? String(r.id_cancha) : ''
         });
-        setCurrentReserva(reserva);
+        setCurrentReserva(r);
         setEditMode(false);
         setViewMode(true);
         setModalOpen(true);
       } else {
-        console.log('Error al obtener reserva para visualización:', response.data.mensaje);
-        setError(response.data.mensaje);
+        setError(response.data?.mensaje || 'No se pudo cargar la reserva');
       }
     } catch (err) {
-      console.log('Error en openViewModal:', { error: err.message, stack: err.stack, id });
-      const errorMessage = err.response?.data?.mensaje || 'Error de conexión al servidor';
-      setError(errorMessage);
+      setError(err.response?.data?.mensaje || 'Error de conexion al servidor');
     }
   };
 
@@ -299,7 +246,7 @@ useEffect(() => {
     e.preventDefault();
     if (viewMode || (!permissions.canCreate && !editMode) || (!permissions.canEdit && editMode)) return;
     try {
-      const filteredData = {
+      const filtered = {
         fecha_reserva: formData.fecha_reserva,
         estado: formData.estado,
         id_cliente: formData.id_cliente ? parseInt(formData.id_cliente) : undefined,
@@ -308,90 +255,39 @@ useEffect(() => {
         monto_total: formData.monto_total ? parseFloat(formData.monto_total) : undefined,
         saldo_pendiente: formData.saldo_pendiente ? parseFloat(formData.saldo_pendiente) : undefined
       };
-
-      // Validaciones frontend
-      if (!filteredData.fecha_reserva) {
-        console.log('Error: La fecha de reserva es obligatoria');
-        setError('La fecha de reserva es obligatoria');
-        return;
-      }
-      const fechaReserva = new Date(filteredData.fecha_reserva);
-      if (isNaN(fechaReserva.getTime())) {
-        console.log('Error: La fecha de reserva no es válida');
-        setError('La fecha de reserva no es válida');
-        return;
-      }
-      if (filteredData.cupo && (isNaN(filteredData.cupo) || filteredData.cupo <= 0)) {
-        console.log('Error: El cupo debe ser un número positivo');
-        setError('El cupo debe ser un número positivo');
-        return;
-      }
-      if (filteredData.monto_total && (isNaN(filteredData.monto_total) || filteredData.monto_total < 0)) {
-        console.log('Error: El monto total debe ser un número no negativo');
-        setError('El monto total debe ser un número no negativo');
-        return;
-      }
-      if (filteredData.saldo_pendiente && (isNaN(filteredData.saldo_pendiente) || filteredData.saldo_pendiente < 0)) {
-        console.log('Error: El saldo pendiente debe ser un número no negativo');
-        setError('El saldo pendiente debe ser un número no negativo');
-        return;
-      }
-      if (filteredData.monto_total && filteredData.saldo_pendiente && filteredData.saldo_pendiente > filteredData.monto_total) {
-        console.log('Error: El saldo pendiente no puede ser mayor al monto total');
-        setError('El saldo pendiente no puede ser mayor al monto total');
-        return;
-      }
-      const estadosValidos = ['pendiente', 'pagada', 'en_cuotas', 'cancelada'];
-      if (!estadosValidos.includes(filteredData.estado)) {
-        console.log('Error: Estado inválido', filteredData.estado);
-        setError(`El estado debe ser uno de: ${estadosValidos.join(', ')}`);
-        return;
-      }
-      if (!filteredData.id_cliente || !clientes.some(cliente => cliente.id_cliente === filteredData.id_cliente)) {
-        console.log('Error: Cliente inválido', filteredData.id_cliente);
-        setError('El cliente seleccionado no es válido');
-        return;
-      }
-      if (!filteredData.id_cancha || !canchas.some(cancha => cancha.id_cancha === filteredData.id_cancha)) {
-        console.log('Error: Cancha inválida', filteredData.id_cancha);
-        setError('La cancha seleccionada no es válida');
-        return;
-      }
+      if (!filtered.fecha_reserva) { setError('La fecha de reserva es obligatoria'); return; }
+      const f = new Date(filtered.fecha_reserva);
+      if (isNaN(f.getTime())) { setError('La fecha de reserva no es valida'); return; }
+      if (filtered.cupo && (isNaN(filtered.cupo) || filtered.cupo <= 0)) { setError('El cupo debe ser numero positivo'); return; }
+      if (filtered.monto_total && (isNaN(filtered.monto_total) || filtered.monto_total < 0)) { setError('El monto total debe ser numero no negativo'); return; }
+      if (filtered.saldo_pendiente && (isNaN(filtered.saldo_pendiente) || filtered.saldo_pendiente < 0)) { setError('El saldo pendiente debe ser numero no negativo'); return; }
+      if (filtered.monto_total && filtered.saldo_pendiente && filtered.saldo_pendiente > filtered.monto_total) { setError('El saldo pendiente no puede ser mayor al monto total'); return; }
+      const estadosValidos = ['pendiente','pagada','en_cuotas','cancelada'];
+      if (!estadosValidos.includes(filtered.estado)) { setError('Estado invalido'); return; }
+      if (!filtered.id_cliente || !clientes.some(c => c.id_cliente === filtered.id_cliente)) { setError('Cliente invalido'); return; }
+      if (!filtered.id_cancha || !canchas.some(ca => ca.id_cancha === filtered.id_cancha)) { setError('Cancha invalida'); return; }
 
       let response;
-      if (editMode) {
-        response = await api.patch(`/reserva/${currentReserva.id_reserva}`, filteredData);
-      } else {
-        response = await api.post('/reserva/', filteredData);
-      }
-      if (response.data.exito) {
-        closeModal();
-        fetchReservas();
-      } else {
-        console.log('Error en la respuesta del servidor:', response.data.mensaje);
-        setError(response.data.mensaje);
-      }
+      if (editMode) response = await api.patch(`/reserva/${currentReserva.id_reserva}`, filtered);
+      else response = await api.post('/reserva/', filtered);
+
+      if (response.data?.exito) { closeModal(); fetchReservas(); }
+      else setError(response.data?.mensaje || 'No se pudo guardar');
     } catch (err) {
-      console.log('Error en handleSubmit:', { error: err.message, stack: err.stack, formData });
-      const errorMessage = err.response?.data?.mensaje || 'Error de conexión al servidor';
-      setError(errorMessage);
+      setError(err.response?.data?.mensaje || 'Error de conexion al servidor');
     }
   };
 
   const handlePageChange = (newPage) => {
-    if (newPage >= 1 && newPage <= Math.ceil(total / limit)) {
-      setPage(newPage);
-    }
+    if (newPage >= 1 && newPage <= Math.ceil(total / limit)) setPage(newPage);
   };
 
-  if (!role) {
-    return <p>Cargando permisos...</p>;
-  }
+  if (!role) return <p>Cargando permisos...</p>;
 
   return (
     <div className="bg-white rounded-lg shadow p-6">
-      <h2 className="text-xl font-semibold mb-4">Gestión de Reservas</h2>
-      
+      <h2 className="text-xl font-semibold mb-4">Gestion de Reservas</h2>
+
       <div className="flex flex-col lg:flex-row gap-3 mb-6">
         <div className="flex-1">
           <form onSubmit={handleSearch} className="flex">
@@ -399,7 +295,7 @@ useEffect(() => {
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="🔍 Cliente, cancha, estado..."
+              placeholder="Buscar por cliente, cancha, estado"
               className="border rounded-l px-3 py-2 w-full text-sm"
               disabled={!permissions.canView}
             />
@@ -408,7 +304,7 @@ useEffect(() => {
               className="bg-blue-500 text-white px-3 py-2 rounded-r hover:bg-blue-600 whitespace-nowrap text-sm"
               disabled={!permissions.canView}
             >
-              🔎 Buscar
+              Buscar
             </button>
           </form>
         </div>
@@ -420,19 +316,18 @@ useEffect(() => {
             className="border rounded px-3 py-2 flex-1 text-sm"
             disabled={!permissions.canView}
           >
-            <option value="">📋 Todos</option>
-            <option value="fecha">📅 Fecha</option>
-            <option value="monto">💰 Monto</option>
-            <option value="estado">🟢 Estado</option>
+            <option value="">Sin filtro</option>
+            <option value="fecha">Fecha</option>
+            <option value="monto">Monto</option>
+            <option value="estado">Estado</option>
           </select>
 
           {permissions.canCreate && (
             <button
               onClick={openCreateModal}
-              className="bg-green-500 text-white px-3 py-2 rounded hover:bg-green-600 whitespace-nowrap text-sm flex items-center gap-1"
+              className="bg-green-500 text-white px-3 py-2 rounded hover:bg-green-600 whitespace-nowrap text-sm"
             >
-              <span>📅</span>
-              <span>Crear</span>
+              Crear
             </button>
           )}
         </div>
@@ -507,7 +402,7 @@ useEffect(() => {
               Anterior
             </button>
             <span className="px-4 py-2 bg-gray-100">
-              Página {page} de {Math.ceil(total / limit)}
+              Pagina {page} de {Math.ceil(total / limit)}
             </span>
             <button
               onClick={() => handlePageChange(page + 1)}
@@ -538,9 +433,9 @@ useEffect(() => {
                   disabled={viewMode}
                 >
                   <option value="">Seleccione un cliente</option>
-                  {clientes.map(cliente => (
-                    <option key={cliente.id_cliente} value={cliente.id_cliente}>
-                      {cliente.nombre} {cliente.apellido}
+                  {clientes.map(c => (
+                    <option key={c.id_cliente} value={c.id_cliente}>
+                      {c.nombre} {c.apellido}
                     </option>
                   ))}
                 </select>
@@ -556,9 +451,9 @@ useEffect(() => {
                   disabled={viewMode}
                 >
                   <option value="">Seleccione una cancha</option>
-                  {canchas.map(cancha => (
-                    <option key={cancha.id_cancha} value={cancha.id_cancha}>
-                      {cancha.nombre}
+                  {canchas.map(ca => (
+                    <option key={ca.id_cancha} value={ca.id_cancha}>
+                      {ca.nombre}
                     </option>
                   ))}
                 </select>

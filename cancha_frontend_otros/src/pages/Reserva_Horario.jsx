@@ -1,32 +1,39 @@
+/* eslint-disable no-empty */
 import React, { useState, useEffect } from 'react';
 import api from '../services/api';
 
-// Configuración de permisos por rol
 const permissionsConfig = {
-  ADMINISTRADOR: {
-    canView: true,
-    canCreate: true,
-    canEdit: true,
-    canDelete: true,
-  },
-  ADMIN_ESP_DEP: {
-    canView: true,
-    canCreate: true,
-    canEdit: true,
-    canDelete: true,
-  },
-  ENCARGADO: {
-    canView: true,
-    canCreate: false,
-    canEdit: false,
-    canDelete: false,
-  },
-  DEFAULT: {
-    canView: false,
-    canCreate: false,
-    canEdit: false,
-    canDelete: false,
-  },
+  ADMINISTRADOR: { canView: true, canCreate: true, canEdit: true, canDelete: true },
+  ADMIN_ESP_DEP: { canView: true, canCreate: true, canEdit: true, canDelete: true },
+  ENCARGADO: { canView: true, canCreate: false, canEdit: false, canDelete: false },
+  DEFAULT: { canView: false, canCreate: false, canEdit: false, canDelete: false },
+};
+
+const getEffectiveRole = () => {
+  const keys = Object.keys(permissionsConfig);
+  const bag = new Set();
+  try {
+    const u = JSON.parse(localStorage.getItem('user') || '{}');
+    const arr = Array.isArray(u?.roles) ? u.roles : [];
+    for (const r of arr) {
+      if (typeof r === 'string') bag.add(r);
+      else if (r && typeof r === 'object') ['rol','role','nombre','name'].forEach(k => { if (r[k]) bag.add(r[k]); });
+    }
+    if (bag.size === 0 && u?.role) bag.add(u.role);
+  } catch {}
+  const tok = localStorage.getItem('token');
+  if (bag.size === 0 && tok && tok.split('.').length === 3) {
+    try {
+      const payload = JSON.parse(atob(tok.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')));
+      const t = Array.isArray(payload?.roles) ? payload.roles : (payload?.rol ? [payload.rol] : []);
+      t.forEach(v => bag.add(v));
+    } catch {}
+  }
+  const norm = Array.from(bag).map(v => String(v || '').trim().toUpperCase().replace(/\s+/g,'_'));
+  const map = v => v === 'ADMIN' ? 'ADMINISTRADOR' : v;
+  const norm2 = norm.map(map);
+  const prio = ['ADMINISTRADOR','ADMIN_ESP_DEP','ENCARGADO'];
+  return prio.find(r => norm2.includes(r) && keys.includes(r)) || norm2.find(r => keys.includes(r)) || 'DEFAULT';
 };
 
 const ReservaHorario = () => {
@@ -50,97 +57,67 @@ const ReservaHorario = () => {
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const limit = 10;
-  const [role, setRole] = useState('DEFAULT');
+  const [role, setRole] = useState(() => getEffectiveRole());
 
-  // Obtener el rol del usuario desde localStorage
-useEffect(() => {
-  const userData = localStorage.getItem('user');
-  if (!userData) return;
+  useEffect(() => {
+    const sync = () => setRole(getEffectiveRole());
+    window.addEventListener('storage', sync);
+    window.addEventListener('auth-changed', sync);
+    window.addEventListener('focus', sync);
+    return () => {
+      window.removeEventListener('storage', sync);
+      window.removeEventListener('auth-changed', sync);
+      window.removeEventListener('focus', sync);
+    };
+  }, []);
 
-  try {
-    const u = JSON.parse(userData);
-
-    // 1) Normaliza a array en MAYÚSCULAS
-    const rolesArr = Array.isArray(u?.roles)
-      ? u.roles.map(r => String(r).toUpperCase())
-      : (u?.role ? [String(u.role).toUpperCase()] : []);
-
-    // 2) Elige un rol que exista en permissionsConfig, con prioridad
-    const keys = Object.keys(permissionsConfig);
-    const PRIORIDAD = ['ADMINISTRADOR']; // ajusta tu prioridad
-    const efectivo =
-      PRIORIDAD.find(r => rolesArr.includes(r) && keys.includes(r)) ||
-      rolesArr.find(r => keys.includes(r)) ||
-      'DEFAULT';
-
-    setRole(efectivo);
-  } catch (err) {
-    console.error('Error al parsear datos del usuario:', err);
-    setRole('DEFAULT');
-  }
-}, []);
-
-  // Obtener permisos según el rol (o DEFAULT si no hay rol o no está definido)
   const permissions = role && permissionsConfig[role] ? permissionsConfig[role] : permissionsConfig.DEFAULT;
 
-  // Fetch reservas válidas al cargar el componente
   useEffect(() => {
     const fetchReservas = async () => {
       try {
         const response = await api.get('/reserva/datos-especificos');
-        if (response.data.exito) {
-          setReservas(response.data.datos.reservas || []);
-        }
+        if (response.data?.exito) setReservas(response.data.datos.reservas || []);
+        else setError(response.data?.mensaje || 'Error al obtener reservas');
       } catch (err) {
-        console.error('Error al obtener reservas:', err);
+        setError(err.response?.data?.mensaje || 'Error de conexion al obtener reservas');
       }
     };
-
-    fetchReservas();
-  }, []);
+    if (permissions.canView) fetchReservas();
+  }, [role]);
 
   const fetchHorarios = async (params = {}) => {
+    if (!permissions.canView) { setError('No tienes permisos para ver los datos'); return; }
     setLoading(true);
     setError(null);
     const offset = (page - 1) * limit;
     const fullParams = { ...params, limit, offset };
     try {
       let response;
-      if (params.q) {
-        response = await api.get('/reserva_horario/buscar', { params: fullParams });
-      } else if (params.tipo) {
-        response = await api.get('/reserva_horario/filtro', { params: fullParams });
+      if (params.q) response = await api.get('/reserva_horario/buscar', { params: fullParams });
+      else if (params.tipo) response = await api.get('/reserva_horario/filtro', { params: fullParams });
+      else response = await api.get('/reserva_horario/datos-especificos', { params: fullParams });
+      if (response.data?.exito) {
+        setHorarios(response.data.datos.horarios || []);
+        setTotal(response.data.datos.paginacion?.total || 0);
       } else {
-        response = await api.get('/reserva_horario/datos-especificos', { params: fullParams });
-      }
-      if (response.data.exito) {
-        setHorarios(response.data.datos.horarios);
-        setTotal(response.data.datos.paginacion.total);
-      } else {
-        setError(response.data.mensaje);
+        setError(response.data?.mensaje || 'Error al cargar horarios');
       }
     } catch (err) {
-      const errorMessage = err.response?.data?.mensaje || 'Error de conexión al servidor';
-      setError(errorMessage);
-      console.error(err);
+      setError(err.response?.data?.mensaje || 'Error de conexion al servidor');
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    fetchHorarios();
-  }, [page]);
+  useEffect(() => { fetchHorarios(); }, [page, role]);
 
   const handleSearch = (e) => {
     e.preventDefault();
     setPage(1);
     setFiltro('');
-    if (searchTerm.trim()) {
-      fetchHorarios({ q: searchTerm });
-    } else {
-      fetchHorarios();
-    }
+    if (searchTerm.trim()) fetchHorarios({ q: searchTerm });
+    else fetchHorarios();
   };
 
   const handleFiltroChange = (e) => {
@@ -148,96 +125,78 @@ useEffect(() => {
     setFiltro(tipo);
     setPage(1);
     setSearchTerm('');
-    if (tipo) {
-      fetchHorarios({ tipo });
-    } else {
-      fetchHorarios();
-    }
+    if (tipo) fetchHorarios({ tipo });
+    else fetchHorarios();
   };
 
   const handleDelete = async (id) => {
-    if (!permissions.canDelete) return; // Verificar permiso
-    if (!window.confirm('¿Estás seguro de eliminar este horario de reserva?')) return;
+    if (!permissions.canDelete) return;
+    if (!window.confirm('Estas seguro de eliminar este horario de reserva?')) return;
     try {
       const response = await api.delete(`/reserva_horario/${id}`);
-      if (response.data.exito) {
-        fetchHorarios();
-      } else {
-        alert(response.data.mensaje);
-      }
+      if (response.data?.exito) fetchHorarios();
+      else setError(response.data?.mensaje || 'No se pudo eliminar');
     } catch (err) {
-      const errorMessage = err.response?.data?.mensaje || 'Error de conexión al servidor';
-      setError(errorMessage);
-      console.error(err);
+      setError(err.response?.data?.mensaje || 'Error de conexion al servidor');
     }
   };
 
   const openCreateModal = () => {
-    if (!permissions.canCreate) return; // Verificar permiso
+    if (!permissions.canCreate) return;
     setEditMode(false);
     setViewMode(false);
-    setFormData({
-      id_reserva: '',
-      fecha: '',
-      hora_inicio: '',
-      hora_fin: '',
-      monto: ''
-    });
+    setFormData({ id_reserva: '', fecha: '', hora_inicio: '', hora_fin: '', monto: '' });
     setCurrentHorario(null);
     setModalOpen(true);
   };
 
   const openEditModal = async (id) => {
-    if (!permissions.canEdit) return; // Verificar permiso
+    if (!permissions.canEdit) return;
     try {
       const response = await api.get(`/reserva_horario/dato-individual/${id}`);
-      if (response.data.exito) {
-        const horario = response.data.datos.horario;
+      if (response.data?.exito) {
+        const h = response.data.datos.horario;
         setFormData({
-          id_reserva: horario.id_reserva || '',
-          fecha: horario.fecha ? new Date(horario.fecha).toISOString().split('T')[0] : '',
-          hora_inicio: horario.hora_inicio || '',
-          hora_fin: horario.hora_fin || '',
-          monto: horario.monto || ''
+          id_reserva: h.id_reserva || '',
+          fecha: h.fecha ? new Date(h.fecha).toISOString().split('T')[0] : '',
+          hora_inicio: h.hora_inicio || '',
+          hora_fin: h.hora_fin || '',
+          monto: h.monto || ''
         });
-        setCurrentHorario(horario);
+        setCurrentHorario(h);
         setEditMode(true);
         setViewMode(false);
         setModalOpen(true);
       } else {
-        alert(response.data.mensaje);
+        setError(response.data?.mensaje || 'No se pudo cargar el registro');
       }
     } catch (err) {
-      const errorMessage = err.response?.data?.mensaje || 'Error de conexión al servidor';
-      setError(errorMessage);
-      console.error(err);
+      setError(err.response?.data?.mensaje || 'Error de conexion al servidor');
     }
   };
 
   const openViewModal = async (id) => {
-    if (!permissions.canView) return; // Verificar permiso
+    if (!permissions.canView) return;
     try {
       const response = await api.get(`/reserva_horario/dato-individual/${id}`);
-      if (response.data.exito) {
-        const horario = response.data.datos.horario;
+      if (response.data?.exito) {
+        const h = response.data.datos.horario;
         setFormData({
-          id_reserva: horario.id_reserva || '',
-          fecha: horario.fecha ? new Date(horario.fecha).toISOString().split('T')[0] : '',
-          hora_inicio: horario.hora_inicio || '',
-          hora_fin: horario.hora_fin || '',
-          monto: horario.monto || ''
+          id_reserva: h.id_reserva || '',
+          fecha: h.fecha ? new Date(h.fecha).toISOString().split('T')[0] : '',
+          hora_inicio: h.hora_inicio || '',
+          hora_fin: h.hora_fin || '',
+          monto: h.monto || ''
         });
-        setCurrentHorario(horario);
+        setCurrentHorario(h);
         setEditMode(false);
         setViewMode(true);
         setModalOpen(true);
       } else {
-        alert(response.data.mensaje);
+        setError(response.data?.mensaje || 'No se pudo cargar el registro');
       }
     } catch (err) {
-      const errorMessage = err.response?.data?.mensaje || 'Error de conexión al servidor';
-      setError(errorMessage);
-      console.error(err);
+      setError(err.response?.data?.mensaje || 'Error de conexion al servidor');
     }
   };
 
@@ -253,85 +212,52 @@ useEffect(() => {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
+  const toTimeWithSeconds = (t) => (t && t.length === 5) ? `${t}:00` : t;
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (viewMode || (!permissions.canCreate && !editMode) || (!permissions.canEdit && editMode)) return; // Verificar permisos
+    if (viewMode || (!permissions.canCreate && !editMode) || (!permissions.canEdit && editMode)) return;
     try {
+      const filtered = {
+        id_reserva: formData.id_reserva ? parseInt(formData.id_reserva) : undefined,
+        fecha: formData.fecha || undefined,
+        hora_inicio: toTimeWithSeconds(formData.hora_inicio || ''),
+        hora_fin: toTimeWithSeconds(formData.hora_fin || ''),
+        monto: formData.monto !== '' ? parseFloat(formData.monto) : undefined
+      };
+      if (!filtered.id_reserva || !reservas.some(r => r.id_reserva === filtered.id_reserva)) { setError('La reserva seleccionada no es valida'); return; }
+      if (!filtered.fecha) { setError('La fecha es obligatoria'); return; }
+      const f = new Date(filtered.fecha);
+      if (isNaN(f.getTime())) { setError('La fecha no es valida'); return; }
+      const re = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9](:[0-5][0-9])?$/;
+      if (!filtered.hora_inicio || !re.test(filtered.hora_inicio)) { setError('Hora inicio invalida'); return; }
+      if (!filtered.hora_fin || !re.test(filtered.hora_fin)) { setError('Hora fin invalida'); return; }
+      const hi = new Date(`1970-01-01T${toTimeWithSeconds(filtered.hora_inicio)}Z`);
+      const hf = new Date(`1970-01-01T${toTimeWithSeconds(filtered.hora_fin)}Z`);
+      if (hi >= hf) { setError('La hora de inicio debe ser anterior a la hora de fin'); return; }
+      if (filtered.monto !== undefined && (isNaN(filtered.monto) || filtered.monto < 0)) { setError('El monto debe ser numero no negativo'); return; }
+
       let response;
-      const filteredData = Object.fromEntries(
-        Object.entries(formData).filter(([key, value]) => {
-          const requiredFields = ['id_reserva', 'fecha', 'hora_inicio', 'hora_fin'];
-          if (requiredFields.includes(key)) return true;
-          return value !== '' && value !== null && value !== undefined;
-        })
-      );
+      if (editMode) response = await api.patch(`/reserva_horario/${currentHorario.id_horario}`, filtered);
+      else response = await api.post('/reserva_horario/', filtered);
 
-      // Validaciones frontend
-      if (!filteredData.id_reserva || !reservas.some(reserva => reserva.id_reserva === parseInt(filteredData.id_reserva))) {
-        setError('La reserva seleccionada no es válida');
-        return;
-      }
-      if (!filteredData.fecha) {
-        setError('La fecha es obligatoria');
-        return;
-      }
-      const fecha = new Date(filteredData.fecha);
-      if (isNaN(fecha.getTime())) {
-        setError('La fecha no es válida');
-        return;
-      }
-      const validarHora = (hora) => /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]$/.test(hora);
-      if (!filteredData.hora_inicio || !validarHora(filteredData.hora_inicio)) {
-        setError('La hora de inicio no es válida (formato HH:MM:SS)');
-        return;
-      }
-      if (!filteredData.hora_fin || !validarHora(filteredData.hora_fin)) {
-        setError('La hora de fin no es válida (formato HH:MM:SS)');
-        return;
-      }
-      const horaInicio = new Date(`1970-01-01T${filteredData.hora_inicio}Z`);
-      const horaFin = new Date(`1970-01-01T${filteredData.hora_fin}Z`);
-      if (horaInicio >= horaFin) {
-        setError('La hora de inicio debe ser anterior a la hora de fin');
-        return;
-      }
-      if (filteredData.monto && (isNaN(filteredData.monto) || filteredData.monto < 0)) {
-        setError('El monto debe ser un número positivo');
-        return;
-      }
-
-      if (editMode) {
-        response = await api.patch(`/reserva_horario/${currentHorario.id_horario}`, filteredData);
-      } else {
-        response = await api.post('/reserva_horario/', filteredData);
-      }
-      if (response.data.exito) {
-        closeModal();
-        fetchHorarios();
-      } else {
-        alert(response.data.mensaje);
-      }
+      if (response.data?.exito) { closeModal(); fetchHorarios(); }
+      else setError(response.data?.mensaje || 'No se pudo guardar');
     } catch (err) {
-      const errorMessage = err.response?.data?.mensaje || 'Error de conexión al servidor';
-      setError(errorMessage);
-      console.error(err);
+      setError(err.response?.data?.mensaje || 'Error de conexion al servidor');
     }
   };
 
   const handlePageChange = (newPage) => {
-    if (newPage >= 1 && newPage <= Math.ceil(total / limit)) {
-      setPage(newPage);
-    }
+    if (newPage >= 1 && newPage <= Math.ceil(total / limit)) setPage(newPage);
   };
 
-  if (!role) {
-    return <p>Cargando permisos...</p>;
-  }
+  if (!role) return <p>Cargando permisos...</p>;
 
   return (
     <div className="bg-white rounded-lg shadow p-6">
-      <h2 className="text-xl font-semibold mb-4">Gestión de Horarios de Reserva</h2>
-      
+      <h2 className="text-xl font-semibold mb-4">Gestion de Horarios de Reserva</h2>
+
       <div className="flex flex-col xl:flex-row gap-4 mb-6 items-stretch">
         <div className="flex-1">
           <form onSubmit={handleSearch} className="flex h-full">
@@ -339,14 +265,14 @@ useEffect(() => {
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="🔍 Buscar por cliente o cancha..."
+              placeholder="Buscar por cliente o cancha"
               className="border rounded-l px-4 py-2 w-full"
             />
             <button 
               type="submit" 
               className="bg-blue-500 text-white px-4 py-2 rounded-r hover:bg-blue-600 whitespace-nowrap"
             >
-              🔎 Buscar
+              Buscar
             </button>
           </form>
         </div>
@@ -357,26 +283,25 @@ useEffect(() => {
             onChange={handleFiltroChange}
             className="border rounded px-3 py-2 flex-1 sm:min-w-[160px]"
           >
-            <option value="">📋 Todos - Sin filtro</option>
-            <option value="fecha">📅 Ordenar por fecha</option>
-            <option value="hora">⏰ Ordenar por hora</option>
-            <option value="monto">💰 Ordenar por monto</option>
+            <option value="">Todos - Sin filtro</option>
+            <option value="fecha">Ordenar por fecha</option>
+            <option value="hora">Ordenar por hora</option>
+            <option value="monto">Ordenar por monto</option>
           </select>
 
           {permissions.canCreate && (
             <button
               onClick={openCreateModal}
-              className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 whitespace-nowrap sm:w-auto w-full flex items-center justify-center gap-2"
+              className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 whitespace-nowrap sm:w-auto w-full"
             >
-              <span>⏰</span>
-              <span>Crear Horario</span>
+              Crear Horario
             </button>
           )}
         </div>
       </div>
 
       {loading ? (
-        <p>Cargando horarios de reserva...</p>
+        <p>Cargando horarios...</p>
       ) : error ? (
         <p className="text-red-500">{error}</p>
       ) : (
@@ -444,7 +369,7 @@ useEffect(() => {
               Anterior
             </button>
             <span className="px-4 py-2 bg-gray-100">
-              Página {page} de {Math.ceil(total / limit)}
+              Pagina {page} de {Math.ceil(total / limit)}
             </span>
             <button
               onClick={() => handlePageChange(page + 1)}

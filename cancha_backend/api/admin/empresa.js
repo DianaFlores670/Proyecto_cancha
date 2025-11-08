@@ -22,7 +22,7 @@ const respuesta = (exito, mensaje, datos = null) => ({
 const obtenerDatosEspecificos = async (limite = 10, offset = 0) => {
   try {
     const queryDatos = `
-      SELECT e.id_empresa, e.fecha_registrado, e.nombre_sistema, e.correo_empresa, e.telefono, e.direccion, 
+      SELECT e.id_empresa, e.fecha_registrado, e.nombre_sistema, e.correo_empresa, e.telefonos, e.direccion, 
              e.imagen_hero, a.id_administrador, p.nombre AS admin_nombre, p.apellido AS admin_apellido
       FROM empresa e
       JOIN administrador a ON e.id_administrador = a.id_administrador
@@ -59,7 +59,7 @@ const obtenerEmpresasFiltradas = async (tipoFiltro, limite = 10, offset = 0) => 
     const orden = ordenesPermitidas[tipoFiltro] || ordenesPermitidas.default;
 
     const queryDatos = `
-      SELECT e.id_empresa, e.fecha_registrado, e.nombre_sistema, e.correo_empresa, e.telefono, e.direccion, 
+      SELECT e.id_empresa, e.fecha_registrado, e.nombre_sistema, e.correo_empresa, e.telefonos, e.direccion, 
              a.id_administrador, p.nombre AS admin_nombre, p.apellido AS admin_apellido
       FROM empresa e
       JOIN administrador a ON e.id_administrador = a.id_administrador
@@ -89,7 +89,7 @@ const obtenerEmpresasFiltradas = async (tipoFiltro, limite = 10, offset = 0) => 
 const buscarEmpresas = async (texto, limite = 10, offset = 0) => {
   try {
     const queryDatos = `
-      SELECT e.id_empresa, e.fecha_registrado, e.nombre_sistema, e.correo_empresa, e.telefono, e.direccion, 
+      SELECT e.id_empresa, e.fecha_registrado, e.nombre_sistema, e.correo_empresa, e.telefonos, e.direccion, 
              a.id_administrador, p.nombre AS admin_nombre, p.apellido AS admin_apellido
       FROM empresa e
       JOIN administrador a ON e.id_administrador = a.id_administrador
@@ -183,7 +183,7 @@ const crearEmpresa = async (datosEmpresa) => {
         imagen_1, imagen_2, imagen_3, titulo_1, titulo_2, titulo_3, 
         descripcion_1, descripcion_2, descripcion_3, mision, vision, 
         nuestro_objetivo, objetivo_1, objetivo_2, objetivo_3, quienes_somos, 
-        correo_empresa, telefono, direccion, id_administrador, imagen_hero
+        correo_empresa, telefonos, direccion, id_administrador, imagen_hero
       ) 
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26)
       RETURNING *
@@ -212,7 +212,7 @@ const crearEmpresa = async (datosEmpresa) => {
       datosEmpresa.objetivo_3 || null,
       datosEmpresa.quienes_somos || null,
       datosEmpresa.correo_empresa || null,
-      datosEmpresa.telefono || null,
+      datosEmpresa.telefonos || null,
       datosEmpresa.direccion || null,
       datosEmpresa.id_administrador,
       datosEmpresa.imagen_hero || null
@@ -236,7 +236,7 @@ const actualizarEmpresa = async (id, camposActualizar) => {
       'imagen_1', 'imagen_2', 'imagen_3', 'titulo_1', 'titulo_2', 'titulo_3',
       'descripcion_1', 'descripcion_2', 'descripcion_3', 'mision', 'vision',
       'nuestro_objetivo', 'objetivo_1', 'objetivo_2', 'objetivo_3', 'quienes_somos',
-      'correo_empresa', 'telefono', 'direccion', 'id_administrador', 'imagen_hero'
+      'correo_empresa', 'telefonos', 'direccion', 'id_administrador', 'imagen_hero'
     ];
 
     const campos = Object.keys(camposActualizar).filter(key => 

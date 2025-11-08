@@ -1,26 +1,41 @@
+/* eslint-disable no-empty */
+/* eslint-disable no-unused-vars */
 import React, { useState, useEffect } from 'react';
 import api from '../services/api';
 
-// Configuración de permisos por rol
 const permissionsConfig = {
-  ADMINISTRADOR: {
-    canView: true,
-    canCreate: true,
-    canEdit: true,
-    canDelete: true,
-  },
-  ADMIN_ESP_DEP: {
-    canView: false,
-    canCreate: false,
-    canEdit: false,
-    canDelete: false,
-  },
-  DEFAULT: {
-    canView: false,
-    canCreate: false,
-    canEdit: false,
-    canDelete: false,
-  },
+  ADMINISTRADOR: { canView: true, canCreate: true, canEdit: true, canDelete: true },
+  ADMIN_ESP_DEP: { canView: false, canCreate: false, canEdit: false, canDelete: false },
+  DEFAULT: { canView: false, canCreate: false, canEdit: false, canDelete: false },
+};
+
+const getEffectiveRole = () => {
+  const keys = Object.keys(permissionsConfig);
+  const bag = new Set();
+  try {
+    const u = JSON.parse(localStorage.getItem('user') || '{}');
+    const arr = Array.isArray(u?.roles) ? u.roles : [];
+    for (const r of arr) {
+      if (typeof r === 'string') bag.add(r);
+      else if (r && typeof r === 'object') {
+        ['rol','role','nombre','name'].forEach(k => { if (r[k]) bag.add(r[k]); });
+      }
+    }
+    if (bag.size === 0 && u?.role) bag.add(u.role);
+  } catch {}
+  const tok = localStorage.getItem('token');
+  if (bag.size === 0 && tok && tok.split('.').length === 3) {
+    try {
+      const payload = JSON.parse(atob(tok.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')));
+      const t = Array.isArray(payload?.roles) ? payload.roles : (payload?.rol ? [payload.rol] : []);
+      t.forEach(v => bag.add(v));
+    } catch {}
+  }
+  const norm = Array.from(bag).map(v => String(v || '').trim().toUpperCase().replace(/\s+/g,'_'));
+  const map = v => v === 'ADMIN' ? 'ADMINISTRADOR' : v;
+  const norm2 = norm.map(map);
+  const prio = ['ADMINISTRADOR','ADMIN_ESP_DEP'];
+  return prio.find(r => norm2.includes(r) && keys.includes(r)) || norm2.find(r => keys.includes(r)) || 'DEFAULT';
 };
 
 const Usuario = () => {
@@ -33,11 +48,11 @@ const Usuario = () => {
   const [editMode, setEditMode] = useState(false);
   const [viewMode, setViewMode] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
-  const [role, setRole] = useState('DEFAULT');
+  const [role, setRole] = useState(() => getEffectiveRole());
   const rolesDisponibles = [
     { valor: 'cliente', etiqueta: 'Cliente' },
     { valor: 'administrador', etiqueta: 'Administrador' },
-    { valor: 'admin_esp_dep', etiqueta: 'Administrado Espacio Deportivo' },
+    { valor: 'admin_esp_dep', etiqueta: 'Administrador Espacio Deportivo' },
     { valor: 'deportista', etiqueta: 'Deportista' },
     { valor: 'control', etiqueta: 'Control' },
     { valor: 'encargado', etiqueta: 'Encargado' }
@@ -62,41 +77,24 @@ const Usuario = () => {
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const limit = 10;
-
   const sexosPermitidos = ['masculino', 'femenino'];
-
   const [selectedFile, setSelectedFile] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
 
-  // Obtener el rol del usuario desde localStorage
-useEffect(() => {
-  const userData = localStorage.getItem('user');
-  if (!userData) return;
+  useEffect(() => {
+    const sync = () => setRole(getEffectiveRole());
+    window.addEventListener('storage', sync);
+    window.addEventListener('auth-changed', sync);
+    window.addEventListener('focus', sync);
+    return () => {
+      window.removeEventListener('storage', sync);
+      window.removeEventListener('auth-changed', sync);
+      window.removeEventListener('focus', sync);
+    };
+  }, []);
 
-  try {
-    const u = JSON.parse(userData);
+  useEffect(() => { setError(null); }, [role]);
 
-    // 1) Normaliza a array en MAYÚSCULAS
-    const rolesArr = Array.isArray(u?.roles)
-      ? u.roles.map(r => String(r).toUpperCase())
-      : (u?.role ? [String(u.role).toUpperCase()] : []);
-
-    // 2) Elige un rol que exista en permissionsConfig, con prioridad
-    const keys = Object.keys(permissionsConfig);
-    const PRIORIDAD = ['ADMINISTRADOR']; // ajusta tu prioridad
-    const efectivo =
-      PRIORIDAD.find(r => rolesArr.includes(r) && keys.includes(r)) ||
-      rolesArr.find(r => keys.includes(r)) ||
-      'DEFAULT';
-
-    setRole(efectivo);
-  } catch (err) {
-    console.error('Error al parsear datos del usuario:', err);
-    setRole('DEFAULT');
-  }
-}, []);
-
-  // Obtener permisos según el rol (o DEFAULT si no hay rol o no está definido)
   const permissions = role && permissionsConfig[role] ? permissionsConfig[role] : permissionsConfig.DEFAULT;
 
   const getImageUrl = (path) => {
@@ -128,11 +126,10 @@ useEffect(() => {
         setUsuarios(response.data.datos.usuarios);
         setTotal(response.data.datos.paginacion.total);
       } else {
-        setError(response.data.mensaje);
+        setError(response.data.mensaje || 'Error al cargar usuarios');
       }
     } catch (err) {
-      console.error('Error in fetchUsuarios:', err);
-      const errorMessage = err.response?.data?.mensaje || 'Error de conexión al servidor';
+      const errorMessage = err.response?.data?.mensaje || 'Error de conexion al servidor';
       setError(errorMessage);
     } finally {
       setLoading(false);
@@ -140,9 +137,7 @@ useEffect(() => {
   };
 
   useEffect(() => {
-    if (role) {
-      fetchUsuarios();
-    }
+    if (role) fetchUsuarios();
   }, [page, role]);
 
   const handleSearch = (e) => {
@@ -161,26 +156,22 @@ useEffect(() => {
     const tipo = e.target.value;
     setFiltro(tipo);
     setPage(1);
-    if (tipo) {
-      fetchUsuarios({ tipo });
-    } else {
-      fetchUsuarios();
-    }
+    if (tipo) fetchUsuarios({ tipo });
+    else fetchUsuarios();
   };
 
   const handleDelete = async (id) => {
     if (!permissions.canDelete) return;
-    if (!window.confirm('¿Estás seguro de eliminar este usuario?')) return;
+    if (!window.confirm('Estas seguro de eliminar este usuario?')) return;
     try {
       const response = await api.delete(`/usuario/${id}`);
       if (response.data.exito) {
         fetchUsuarios();
       } else {
-        setError(response.data.mensaje);
+        setError(response.data.mensaje || 'No se pudo eliminar');
       }
     } catch (err) {
-      console.error('Error in handleDelete:', err);
-      const errorMessage = err.response?.data?.mensaje || 'Error de conexión al servidor';
+      const errorMessage = err.response?.data?.mensaje || 'Error de conexion al servidor';
       setError(errorMessage);
     }
   };
@@ -200,6 +191,7 @@ useEffect(() => {
       latitud: '',
       longitud: '',
       contrasena: '',
+      fecha_creacion: '',
       rol: '',
       rol_agregar: '',
       rol_eliminar: '',
@@ -241,11 +233,10 @@ useEffect(() => {
         setViewMode(false);
         setModalOpen(true);
       } else {
-        setError(response.data.mensaje);
+        setError(response.data.mensaje || 'No se pudo cargar el usuario');
       }
     } catch (err) {
-      console.error('Error in openEditModal:', err);
-      const errorMessage = err.response?.data?.mensaje || 'Error de conexión al servidor';
+      const errorMessage = err.response?.data?.mensaje || 'Error de conexion al servidor';
       setError(errorMessage);
     }
   };
@@ -280,11 +271,10 @@ useEffect(() => {
         setViewMode(true);
         setModalOpen(true);
       } else {
-        setError(response.data.mensaje);
+        setError(response.data.mensaje || 'No se pudo cargar el usuario');
       }
     } catch (err) {
-      console.error('Error in openViewModal:', err);
-      const errorMessage = err.response?.data?.mensaje || 'Error de conexión al servidor';
+      const errorMessage = err.response?.data?.mensaje || 'Error de conexion al servidor';
       setError(errorMessage);
     }
   };
@@ -322,11 +312,8 @@ useEffect(() => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (viewMode || (!permissions.canCreate && !editMode) || (!permissions.canEdit && editMode)) return;
-
     try {
       const data = new FormData();
-      
-      // Campos básicos (solo enviar si tienen valor)
       const campos = {
         nombre: formData.nombre,
         apellido: formData.apellido,
@@ -337,96 +324,52 @@ useEffect(() => {
         latitud: formData.latitud || '',
         longitud: formData.longitud || '',
       };
-
-      // Agregar campos que no estén vacíos
       Object.entries(campos).forEach(([key, value]) => {
-        if (value !== '' && value !== null && value !== undefined) {
-          data.append(key, value);
-        }
+        if (value !== '' && value !== null && value !== undefined) data.append(key, value);
       });
-      
-      // Datos específicos como string JSON (solo si hay datos)
       if (formData.datos_especificos && Object.keys(formData.datos_especificos).length > 0) {
         data.append('datos_especificos', JSON.stringify(formData.datos_especificos));
       }
-      
-      // Archivo de imagen
-      if (selectedFile) {
-        data.append('imagen_perfil', selectedFile);
-        console.log('📸 Archivo seleccionado:', selectedFile.name);
-      }
-      
-      // Configuración de headers para multipart
-      const config = {
-        headers: {
-          'Content-Type': 'multipart/form-data'
-        }
-      };
+      if (selectedFile) data.append('imagen_perfil', selectedFile);
+      const config = { headers: { 'Content-Type': 'multipart/form-data' } };
 
       if (!editMode) {
-        // Para CREAR
-        if (formData.contrasena) {
-          data.append('contrasena', formData.contrasena);
-        }
-        if (formData.rol_agregar) {
-          data.append('rol_agregar', formData.rol_agregar);
-        }
-        
-        console.log('📤 Enviando POST para crear usuario...');
+        if (formData.contrasena) data.append('contrasena', formData.contrasena);
+        if (formData.rol_agregar) data.append('rol_agregar', formData.rol_agregar);
         const response = await api.post('/usuario/', data, config);
         if (response.data.exito) {
-          console.log('✅ Operación exitosa:', response.data.mensaje);
           closeModal();
           fetchUsuarios();
         } else {
-          setError(response.data.mensaje);
+          setError(response.data.mensaje || 'No se pudo crear');
         }
       } else {
-        // Para ACTUALIZAR
-        if (formData.rol_agregar) {
-          data.append('rol_agregar', formData.rol_agregar);
-        }
-        if (formData.rol_eliminar) {
-          data.append('rol_eliminar', formData.rol_eliminar);
-        }
-        
-        console.log('📤 Enviando PATCH para actualizar usuario ID:', currentUser.id_persona);
-        console.log('📦 Datos enviados:');
-        for (let [key, value] of data.entries()) {
-          console.log(`   ${key}:`, key === 'imagen_perfil' ? `[File: ${value.name}]` : value);
-        }
-        
+        if (formData.rol_agregar) data.append('rol_agregar', formData.rol_agregar);
+        if (formData.rol_eliminar) data.append('rol_eliminar', formData.rol_eliminar);
         const response = await api.patch(`/usuario/${currentUser.id_persona}`, data, config);
         if (response.data.exito) {
-          console.log('✅ Operación exitosa:', response.data.mensaje);
           closeModal();
           fetchUsuarios();
         } else {
-          setError(response.data.mensaje);
+          setError(response.data.mensaje || 'No se pudo actualizar');
         }
       }
     } catch (err) {
-      console.error('❌ Error in handleSubmit:', err);
-      console.error('❌ Detalles del error:', err.response?.data);
-      const errorMessage = err.response?.data?.mensaje || err.message || 'Error de conexión al servidor';
+      const errorMessage = err.response?.data?.mensaje || err.message || 'Error de conexion al servidor';
       setError(errorMessage);
     }
   };
 
   const handlePageChange = (newPage) => {
-    if (newPage >= 1 && newPage <= Math.ceil(total / limit)) {
-      setPage(newPage);
-    }
+    if (newPage >= 1 && newPage <= Math.ceil(total / limit)) setPage(newPage);
   };
 
-  if (!role) {
-    return <p>Cargando permisos...</p>;
-  }
+  if (!role) return <p>Cargando permisos...</p>;
 
   return (
     <div className="bg-white rounded-lg shadow p-6">
-      <h2 className="text-xl font-semibold mb-4">Gestión de Usuarios</h2>
-      
+      <h2 className="text-xl font-semibold mb-4">Gestion de Usuarios</h2>
+
       <div className="flex flex-col xl:flex-row gap-4 mb-6 items-stretch">
         <div className="flex-1">
           <form onSubmit={handleSearch} className="flex h-full">
@@ -434,16 +377,16 @@ useEffect(() => {
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="🔍 Buscar por nombre, apellido, correo, usuario o teléfono..."
+              placeholder="Buscar por nombre, apellido, correo, usuario o telefono"
               className="border rounded-l px-4 py-2 w-full"
               disabled={!permissions.canView}
             />
-            <button 
-              type="submit" 
+            <button
+              type="submit"
               className="bg-blue-500 text-white px-4 py-2 rounded-r hover:bg-blue-600 whitespace-nowrap"
               disabled={!permissions.canView}
             >
-              🔎 Buscar
+              Buscar
             </button>
           </form>
         </div>
@@ -455,10 +398,10 @@ useEffect(() => {
             className="border rounded px-3 py-2 flex-1 sm:min-w-[180px]"
             disabled={!permissions.canView}
           >
-            <option value="">📋 Todos - Sin filtro</option>
-            <option value="nombre">👤 Ordenar por nombre</option>
-            <option value="fecha">📅 Ordenar por fecha</option>
-            <option value="correo">📧 Ordenar por correo</option>
+            <option value="">Todos</option>
+            <option value="nombre">Ordenar por nombre</option>
+            <option value="fecha">Ordenar por fecha</option>
+            <option value="correo">Ordenar por correo</option>
           </select>
 
           {permissions.canCreate && (
@@ -466,7 +409,7 @@ useEffect(() => {
               onClick={openCreateModal}
               className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 whitespace-nowrap sm:w-auto w-full flex items-center justify-center gap-2"
             >
-              <span>➕</span>
+              <span>+</span>
               <span>Crear Usuario</span>
             </button>
           )}
@@ -505,7 +448,7 @@ useEffect(() => {
                           onClick={() => openViewModal(usuario.id_persona)}
                           className="text-green-500 hover:text-green-700 mr-2"
                         >
-                          Ver Datos
+                          Ver
                         </button>
                       )}
                       {permissions.canEdit && (
@@ -540,7 +483,7 @@ useEffect(() => {
               Anterior
             </button>
             <span className="px-4 py-2 bg-gray-100">
-              Página {page} de {Math.ceil(total / limit)}
+              Pagina {page} de {Math.ceil(total / limit)}
             </span>
             <button
               onClick={() => handlePageChange(page + 1)}
@@ -606,7 +549,7 @@ useEffect(() => {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Teléfono</label>
+                <label className="block text-sm font-medium mb-1">Telefono</label>
                 <input
                   name="telefono"
                   value={formData.telefono}
@@ -633,11 +576,11 @@ useEffect(() => {
               <div className="col-span-2">
                 <label className="block text-sm font-medium mb-1">Imagen de Perfil</label>
                 {imagePreview ? (
-                  <img 
-                    src={imagePreview} 
-                    alt="Perfil" 
+                  <img
+                    src={imagePreview}
+                    alt="Perfil"
                     className="w-32 h-32 object-cover rounded mb-2"
-                    onError={(e) => console.error('Error loading image:', e.target.src, ' - Check path or server')}
+                    onError={(e) => {}}
                   />
                 ) : viewMode ? (
                   <p className="text-gray-500">No hay imagen de perfil</p>
@@ -678,7 +621,7 @@ useEffect(() => {
               </div>
               {!editMode && !viewMode && (
                 <div className="col-span-2">
-                  <label className="block text-sm font-medium mb-1">Contraseña</label>
+                  <label className="block text-sm font-medium mb-1">Contrasena</label>
                   <input
                     name="contrasena"
                     value={formData.contrasena || ''}
@@ -686,13 +629,12 @@ useEffect(() => {
                     className="w-full border rounded px-3 py-2 bg-gray-100"
                     type="password"
                   />
-                  <p className="text-xs text-gray-500 mt-1">Opcional: si no se proporciona, se asignará '123456' por defecto.</p>
+                  <p className="text-xs text-gray-500 mt-1">Opcional</p>
                 </div>
               )}
-
               {(editMode || viewMode) && (
                 <div>
-                  <label className="block text-sm font-medium mb-1">Fecha de Creación</label>
+                  <label className="block text-sm font-medium mb-1">Fecha de Creacion</label>
                   <input
                     name="fecha_creacion"
                     value={formData.fecha_creacion}
@@ -703,19 +645,17 @@ useEffect(() => {
                   <p className="text-xs text-gray-500 mt-1">Solo lectura</p>
                 </div>
               )}
-
               <div className="col-span-2 border-t pt-4 mt-4">
                 <h4 className="text-lg font-medium mb-3">
-                  {editMode ? 'Gestión de Roles' : viewMode ? 'Roles Asignados' : 'Asignar Rol Inicial'}
+                  {editMode ? 'Gestion de Roles' : viewMode ? 'Roles Asignados' : 'Asignar Rol Inicial'}
                 </h4>
-                
                 {editMode ? (
                   <>
                     <div className="mb-4">
                       <label className="block text-sm font-medium mb-2">Roles Actuales</label>
                       <div className="flex flex-wrap gap-2">
                         {currentUser?.roles?.map((rolObj, index) => (
-                          <span 
+                          <span
                             key={index}
                             className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-blue-100 text-blue-800"
                           >
@@ -723,15 +663,12 @@ useEffect(() => {
                             <button
                               type="button"
                               onClick={() => {
-                                setFormData(prev => ({
-                                  ...prev,
-                                  rol_eliminar: rolObj.rol
-                                }));
+                                setFormData(prev => ({ ...prev, rol_eliminar: rolObj.rol }));
                               }}
                               className="ml-2 text-red-500 hover:text-red-700"
                               disabled={viewMode || !permissions.canEdit}
                             >
-                              ×
+                              x
                             </button>
                           </span>
                         ))}
@@ -740,7 +677,6 @@ useEffect(() => {
                         )}
                       </div>
                     </div>
-                    
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <label className="block text-sm font-medium mb-1">Agregar Nuevo Rol</label>
@@ -751,18 +687,15 @@ useEffect(() => {
                           className="w-full border rounded px-3 py-2 bg-gray-100"
                           disabled={viewMode || !permissions.canEdit}
                         >
-                          <option value="">Seleccionar rol para agregar...</option>
+                          <option value="">Seleccionar rol</option>
                           {rolesDisponibles
                             .filter(rol => !currentUser?.roles?.some(r => r.rol === rol.valor))
                             .map(rol => (
-                              <option key={rol.valor} value={rol.valor}>
-                                {rol.etiqueta}
-                              </option>
+                              <option key={rol.valor} value={rol.valor}>{rol.etiqueta}</option>
                             ))
                           }
                         </select>
                       </div>
-                      
                       <div>
                         <label className="block text-sm font-medium mb-1">Eliminar Rol</label>
                         <select
@@ -772,7 +705,7 @@ useEffect(() => {
                           className="w-full border rounded px-3 py-2 bg-gray-100"
                           disabled={viewMode || !permissions.canEdit}
                         >
-                          <option value="">Seleccionar rol para eliminar...</option>
+                          <option value="">Seleccionar rol</option>
                           {currentUser?.roles?.map(rolObj => (
                             <option key={rolObj.rol} value={rolObj.rol}>
                               {rolesDisponibles.find(r => r.valor === rolObj.rol)?.etiqueta || rolObj.rol}
@@ -787,7 +720,7 @@ useEffect(() => {
                     <label className="block text-sm font-medium mb-2">Roles Actuales</label>
                     <div className="flex flex-wrap gap-2">
                       {currentUser?.roles?.map((rolObj, index) => (
-                        <span 
+                        <span
                           key={index}
                           className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-blue-100 text-blue-800"
                         >
@@ -807,29 +740,21 @@ useEffect(() => {
                       value={formData.rol_agregar || ''}
                       onChange={handleInputChange}
                       className="w-full border rounded px-3 py-2 bg-gray-100"
-                      disabled={viewMode || !permissions.canCreate}
                     >
-                      <option value="">Seleccionar rol inicial (opcional)...</option>
+                      <option value="">Seleccionar rol inicial</option>
                       {rolesDisponibles.map(rol => (
-                        <option key={rol.valor} value={rol.valor}>
-                          {rol.etiqueta}
-                        </option>
+                        <option key={rol.valor} value={rol.valor}>{rol.etiqueta}</option>
                       ))}
                     </select>
-                    <p className="text-xs text-gray-500 mt-1">
-                      Puedes agregar más roles después de crear el usuario
-                    </p>
+                    <p className="text-xs text-gray-500 mt-1">Puedes agregar mas roles despues</p>
                   </div>
                 )}
-                
                 {formData.rol_agregar && (
                   <div className="mt-4 p-4 bg-gray-50 rounded">
-                    <h5 className="font-medium mb-3">Datos específicos para {rolesDisponibles.find(r => r.valor === formData.rol_agregar)?.etiqueta}</h5>
-                    {/* Aquí van los campos específicos según el rol seleccionado */}
+                    <h5 className="font-medium mb-3">Datos especificos para {rolesDisponibles.find(r => r.valor === formData.rol_agregar)?.etiqueta}</h5>
                   </div>
                 )}
               </div>
-
               <div className="col-span-2 flex justify-end mt-4">
                 <button
                   type="button"

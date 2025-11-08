@@ -1,20 +1,40 @@
+/* eslint-disable no-empty */
 import React, { useState, useEffect } from 'react';
 import api from '../services/api';
 
-// Configuración de permisos por rol
 const permissionsConfig = {
-  ADMINISTRADOR: {
-    canView: true,
-    canCreate: true,
-    canEdit: true,
-    canDelete: true,
-  },
-  DEFAULT: {
-    canView: false,
-    canCreate: false,
-    canEdit: false,
-    canDelete: false,
-  },
+  ADMINISTRADOR: { canView: true, canCreate: true, canEdit: true, canDelete: true },
+  ADMIN_ESP_DEP: { canView: true, canCreate: false, canEdit: false, canDelete: false },
+  DEFAULT: { canView: false, canCreate: false, canEdit: false, canDelete: false },
+};
+
+const getEffectiveRole = () => {
+  const keys = Object.keys(permissionsConfig);
+  const bag = new Set();
+  try {
+    const u = JSON.parse(localStorage.getItem('user') || '{}');
+    const arr = Array.isArray(u?.roles) ? u.roles : [];
+    for (const r of arr) {
+      if (typeof r === 'string') bag.add(r);
+      else if (r && typeof r === 'object') {
+        ['rol','role','nombre','name'].forEach(k => { if (r[k]) bag.add(r[k]); });
+      }
+    }
+    if (bag.size === 0 && u?.role) bag.add(u.role);
+  } catch {}
+  const tok = localStorage.getItem('token');
+  if (bag.size === 0 && tok && tok.split('.').length === 3) {
+    try {
+      const payload = JSON.parse(atob(tok.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')));
+      const t = Array.isArray(payload?.roles) ? payload.roles : (payload?.rol ? [payload.rol] : []);
+      t.forEach(v => bag.add(v));
+    } catch {}
+  }
+  const norm = Array.from(bag).map(v => String(v || '').trim().toUpperCase().replace(/\s+/g,'_'));
+  const map = v => v === 'ADMIN' ? 'ADMINISTRADOR' : v;
+  const norm2 = norm.map(map);
+  const prio = ['ADMINISTRADOR','ADMIN_ESP_DEP'];
+  return prio.find(r => norm2.includes(r) && keys.includes(r)) || norm2.find(r => keys.includes(r)) || 'DEFAULT';
 };
 
 const AdminEspDep = () => {
@@ -40,41 +60,29 @@ const AdminEspDep = () => {
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const limit = 10;
-  const [role, setRole] = useState('DEFAULT');
+  const [role, setRole] = useState(() => getEffectiveRole());
 
-  // Obtener el rol del usuario desde localStorage
   useEffect(() => {
-  const userData = localStorage.getItem('user');
-  if (!userData) return;
+    const sync = () => setRole(getEffectiveRole());
+    window.addEventListener('storage', sync);
+    window.addEventListener('auth-changed', sync);
+    window.addEventListener('focus', sync);
+    return () => {
+      window.removeEventListener('storage', sync);
+      window.removeEventListener('auth-changed', sync);
+      window.removeEventListener('focus', sync);
+    };
+  }, []);
 
-  try {
-    const u = JSON.parse(userData);
+  useEffect(() => { setError(null); }, [role]);
 
-    // 1) Normaliza a array en MAYÚSCULAS
-    const rolesArr = Array.isArray(u?.roles)
-      ? u.roles.map(r => String(r).toUpperCase())
-      : (u?.role ? [String(u.role).toUpperCase()] : []);
-
-    // 2) Elige un rol que exista en permissionsConfig, con prioridad
-    const keys = Object.keys(permissionsConfig);
-    const PRIORIDAD = ['ADMINISTRADOR']; // ajusta tu prioridad
-    const efectivo =
-      PRIORIDAD.find(r => rolesArr.includes(r) && keys.includes(r)) ||
-      rolesArr.find(r => keys.includes(r)) ||
-      'DEFAULT';
-
-    setRole(efectivo);
-  } catch (err) {
-    console.error('Error al parsear datos del usuario:', err);
-    setRole('DEFAULT');
-  }
-}, []);
-
-
-  // Obtener permisos según el rol (o DEFAULT si no hay rol o no está definido)
   const permissions = role && permissionsConfig[role] ? permissionsConfig[role] : permissionsConfig.DEFAULT;
 
   const fetchAdministradores = async (params = {}) => {
+    if (!permissions.canView) {
+      setError('No tienes permisos para ver los administradores especiales');
+      return;
+    }
     setLoading(true);
     setError(null);
     const offset = (page - 1) * limit;
@@ -92,61 +100,55 @@ const AdminEspDep = () => {
         setAdministradores(response.data.datos.administradores);
         setTotal(response.data.datos.paginacion.total);
       } else {
-        setError(response.data.mensaje);
+        setError(response.data.mensaje || 'Error al cargar administradores especiales');
       }
     } catch (err) {
-      const errorMessage = err.response?.data?.mensaje || 'Error de conexión al servidor';
+      const errorMessage = err.response?.data?.mensaje || 'Error de conexion al servidor';
       setError(errorMessage);
-      console.error(err);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchAdministradores();
-  }, [page]);
+    if (role) fetchAdministradores();
+  }, [page, role]);
 
   const handleSearch = (e) => {
     e.preventDefault();
+    if (!permissions.canView) return;
     setPage(1);
-    if (searchTerm.trim()) {
-      fetchAdministradores({ q: searchTerm });
-    } else {
-      fetchAdministradores();
-    }
+    if (searchTerm.trim()) fetchAdministradores({ q: searchTerm });
+    else fetchAdministradores();
   };
 
   const handleFiltroChange = (e) => {
+    if (!permissions.canView) return;
     const tipo = e.target.value;
     setFiltro(tipo);
     setPage(1);
-    if (tipo) {
-      fetchAdministradores({ tipo });
-    } else {
-      fetchAdministradores();
-    }
+    if (tipo) fetchAdministradores({ tipo });
+    else fetchAdministradores();
   };
 
   const handleDelete = async (id) => {
-    if (!permissions.canDelete) return; // Verificar permiso
-    if (!window.confirm('¿Estás seguro de eliminar este administrador especial?')) return;
+    if (!permissions.canDelete) return;
+    if (!window.confirm('Estas seguro de eliminar este administrador especial?')) return;
     try {
       const response = await api.delete(`/admin_esp_dep/${id}`);
       if (response.data.exito) {
         fetchAdministradores();
       } else {
-        alert(response.data.mensaje);
+        setError(response.data.mensaje || 'No se pudo eliminar');
       }
     } catch (err) {
-      const errorMessage = err.response?.data?.mensaje || 'Error de conexión al servidor';
+      const errorMessage = err.response?.data?.mensaje || 'Error de conexion al servidor';
       setError(errorMessage);
-      console.error(err);
     }
   };
 
   const openCreateModal = () => {
-    if (!permissions.canCreate) return; // Verificar permiso
+    if (!permissions.canCreate) return;
     setEditMode(false);
     setViewMode(false);
     setFormData({
@@ -164,7 +166,7 @@ const AdminEspDep = () => {
   };
 
   const openEditModal = async (id) => {
-    if (!permissions.canEdit) return; // Verificar permiso
+    if (!permissions.canEdit) return;
     try {
       const response = await api.get(`/admin_esp_dep/dato-individual/${id}`);
       if (response.data.exito) {
@@ -184,17 +186,16 @@ const AdminEspDep = () => {
         setViewMode(false);
         setModalOpen(true);
       } else {
-        alert(response.data.mensaje);
+        setError(response.data.mensaje || 'No se pudo cargar el administrador especial');
       }
     } catch (err) {
-      const errorMessage = err.response?.data?.mensaje || 'Error de conexión al servidor';
+      const errorMessage = err.response?.data?.mensaje || 'Error de conexion al servidor';
       setError(errorMessage);
-      console.error(err);
     }
   };
 
   const openViewModal = async (id) => {
-    if (!permissions.canView) return; // Verificar permiso
+    if (!permissions.canView) return;
     try {
       const response = await api.get(`/admin_esp_dep/dato-individual/${id}`);
       if (response.data.exito) {
@@ -214,12 +215,11 @@ const AdminEspDep = () => {
         setViewMode(true);
         setModalOpen(true);
       } else {
-        alert(response.data.mensaje);
+        setError(response.data.mensaje || 'No se pudo cargar el administrador especial');
       }
     } catch (err) {
-      const errorMessage = err.response?.data?.mensaje || 'Error de conexión al servidor';
+      const errorMessage = err.response?.data?.mensaje || 'Error de conexion al servidor';
       setError(errorMessage);
-      console.error(err);
     }
   };
 
@@ -232,10 +232,7 @@ const AdminEspDep = () => {
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: type === 'checkbox' ? checked : value,
-    }));
+    setFormData(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
   };
 
   const handleSubmit = async (e) => {
@@ -251,7 +248,6 @@ const AdminEspDep = () => {
           return value !== '' && value !== null && value !== undefined;
         })
       );
-
       if (editMode) {
         response = await api.patch(`/admin_esp_dep/${currentAdmin.id_admin_esp_dep}`, filteredData);
       } else {
@@ -261,24 +257,21 @@ const AdminEspDep = () => {
         closeModal();
         fetchAdministradores();
       } else {
-        alert(response.data.mensaje);
+        setError(response.data.mensaje || 'No se pudo guardar');
       }
     } catch (err) {
-      const errorMessage = err.response?.data?.mensaje || 'Error de conexión al servidor';
+      const errorMessage = err.response?.data?.mensaje || 'Error de conexion al servidor';
       setError(errorMessage);
-      console.error(err);
     }
   };
 
   const handlePageChange = (newPage) => {
-    if (newPage >= 1 && newPage <= Math.ceil(total / limit)) {
-      setPage(newPage);
-    }
+    if (newPage >= 1 && newPage <= Math.ceil(total / limit)) setPage(newPage);
   };
 
   return (
     <div className="bg-white rounded-lg shadow p-6">
-      <h2 className="text-xl font-semibold mb-4">Gestión de Administradores Especiales</h2>
+      <h2 className="text-xl font-semibold mb-4">Gestion de Administradores Especiales</h2>
 
       <div className="flex flex-col xl:flex-row gap-4 mb-6 items-stretch">
         <div className="flex-1">
@@ -287,14 +280,16 @@ const AdminEspDep = () => {
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="🔍 Buscar por nombre, apellido, correo o dirección..."
+              placeholder="Buscar por nombre, apellido, correo o direccion"
               className="border rounded-l px-4 py-2 w-full"
+              disabled={!permissions.canView}
             />
             <button
               type="submit"
               className="bg-blue-500 text-white px-4 py-2 rounded-r hover:bg-blue-600 whitespace-nowrap"
+              disabled={!permissions.canView}
             >
-              🔎 Buscar
+              Buscar
             </button>
           </form>
         </div>
@@ -304,11 +299,12 @@ const AdminEspDep = () => {
             value={filtro}
             onChange={handleFiltroChange}
             className="border rounded px-3 py-2 flex-1 sm:min-w-[180px]"
+            disabled={!permissions.canView}
           >
-            <option value="">📋 Sin filtro</option>
-            <option value="nombre">👤 Por nombre</option>
-            <option value="fecha">📅 Por fecha</option>
-            <option value="correo">📧 Por correo</option>
+            <option value="">Todos</option>
+            <option value="nombre">Por nombre</option>
+            <option value="fecha">Por fecha</option>
+            <option value="correo">Por correo</option>
           </select>
 
           {permissions.canCreate && (
@@ -316,7 +312,7 @@ const AdminEspDep = () => {
               onClick={openCreateModal}
               className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 whitespace-nowrap sm:w-auto w-full flex items-center justify-center gap-2"
             >
-              <span>➕</span>
+              <span>+</span>
               <span>Crear Administrador Especial</span>
             </button>
           )}
@@ -337,7 +333,7 @@ const AdminEspDep = () => {
                   <th className="px-4 py-2 text-left">Nombre</th>
                   <th className="px-4 py-2 text-left">Apellido</th>
                   <th className="px-4 py-2 text-left">Correo</th>
-                  <th className="px-4 py-2 text-left">Dirección</th>
+                  <th className="px-4 py-2 text-left">Direccion</th>
                   <th className="px-4 py-2 text-left">Estado</th>
                   <th className="px-4 py-2 text-left">Acciones</th>
                 </tr>
@@ -352,9 +348,7 @@ const AdminEspDep = () => {
                     <td className="px-4 py-2">{admin.direccion || '-'}</td>
                     <td className="px-4 py-2">
                       <span
-                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                          admin.estado ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                        }`}
+                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${admin.estado ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}
                       >
                         {admin.estado ? 'Activo' : 'Inactivo'}
                       </span>
@@ -365,7 +359,7 @@ const AdminEspDep = () => {
                           onClick={() => openViewModal(admin.id_admin_esp_dep)}
                           className="text-green-500 hover:text-green-700 mr-2"
                         >
-                          Ver Datos
+                          Ver
                         </button>
                       )}
                       {permissions.canEdit && (
@@ -400,7 +394,7 @@ const AdminEspDep = () => {
               Anterior
             </button>
             <span className="px-4 py-2 bg-gray-100">
-              Página {page} de {Math.ceil(total / limit)}
+              Pagina {page} de {Math.ceil(total / limit)}
             </span>
             <button
               onClick={() => handlePageChange(page + 1)}
@@ -466,7 +460,7 @@ const AdminEspDep = () => {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Fecha de Ingreso</label>
+                <label className="block text-sm font-medium mb-1">Fecha de ingreso</label>
                 <input
                   name="fecha_ingreso"
                   value={formData.fecha_ingreso}
@@ -478,7 +472,7 @@ const AdminEspDep = () => {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Dirección</label>
+                <label className="block text-sm font-medium mb-1">Direccion</label>
                 <input
                   name="direccion"
                   value={formData.direccion}
@@ -493,17 +487,11 @@ const AdminEspDep = () => {
                 <div className="flex items-center">
                   <button
                     type="button"
-                    onClick={() => setFormData((prev) => ({ ...prev, estado: !prev.estado }))}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
-                      formData.estado ? 'bg-green-500' : 'bg-gray-300'
-                    }`}
+                    onClick={() => setFormData(prev => ({ ...prev, estado: !prev.estado }))}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${formData.estado ? 'bg-green-500' : 'bg-gray-300'}`}
                     disabled={viewMode}
                   >
-                    <span
-                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                        formData.estado ? 'translate-x-6' : 'translate-x-1'
-                      }`}
-                    />
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${formData.estado ? 'translate-x-6' : 'translate-x-1'}`} />
                   </button>
                   <span className="ml-3 text-sm font-medium text-gray-700">
                     {formData.estado ? (
@@ -522,7 +510,7 @@ const AdminEspDep = () => {
               </div>
               {!editMode && !viewMode && (
                 <div className="col-span-2">
-                  <label className="block text-sm font-medium mb-1">Contraseña</label>
+                  <label className="block text-sm font-medium mb-1">Contrasena</label>
                   <input
                     name="contrasena"
                     value={formData.contrasena}
@@ -531,9 +519,7 @@ const AdminEspDep = () => {
                     type="password"
                     disabled={viewMode}
                   />
-                  <p className="text-xs text-gray-500 mt-1">
-                    Opcional: si no se proporciona, se asignará '123456' por defecto.
-                  </p>
+                  <p className="text-xs text-gray-500 mt-1">Opcional</p>
                 </div>
               )}
               <div className="col-span-2 flex justify-end mt-4">

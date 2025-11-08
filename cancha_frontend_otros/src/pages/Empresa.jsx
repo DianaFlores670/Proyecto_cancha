@@ -1,20 +1,37 @@
+/* eslint-disable no-empty */
 import React, { useState, useEffect } from 'react';
 import api from '../services/api';
 
-// Configuración de permisos por rol
 const permissionsConfig = {
-  ADMINISTRADOR: {
-    canView: true,
-    canCreate: true,
-    canEdit: true,
-    canDelete: true,
-  },
-  DEFAULT: {
-    canView: false,
-    canCreate: false,
-    canEdit: false,
-    canDelete: false,
-  },
+  ADMINISTRADOR: { canView: true, canCreate: true, canEdit: true, canDelete: true },
+  DEFAULT: { canView: false, canCreate: false, canEdit: false, canDelete: false },
+};
+
+const getEffectiveRole = () => {
+  const keys = Object.keys(permissionsConfig);
+  const bag = new Set();
+  try {
+    const u = JSON.parse(localStorage.getItem('user') || '{}');
+    const arr = Array.isArray(u?.roles) ? u.roles : [];
+    for (const r of arr) {
+      if (typeof r === 'string') bag.add(r);
+      else if (r && typeof r === 'object') ['rol','role','nombre','name'].forEach(k => { if (r[k]) bag.add(r[k]); });
+    }
+    if (bag.size === 0 && u?.role) bag.add(u.role);
+  } catch {}
+  const tok = localStorage.getItem('token');
+  if (bag.size === 0 && tok && tok.split('.').length === 3) {
+    try {
+      const payload = JSON.parse(atob(tok.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')));
+      const t = Array.isArray(payload?.roles) ? payload.roles : (payload?.rol ? [payload.rol] : []);
+      t.forEach(v => bag.add(v));
+    } catch {}
+  }
+  const norm = Array.from(bag).map(v => String(v || '').trim().toUpperCase().replace(/\s+/g,'_'));
+  const map = v => v === 'ADMIN' ? 'ADMINISTRADOR' : v;
+  const norm2 = norm.map(map);
+  const prio = ['ADMINISTRADOR'];
+  return prio.find(r => norm2.includes(r) && keys.includes(r)) || norm2.find(r => keys.includes(r)) || 'DEFAULT';
 };
 
 const Empresa = () => {
@@ -52,16 +69,15 @@ const Empresa = () => {
     objetivo_3: '',
     quienes_somos: '',
     correo_empresa: '',
-    telefono: '',
+    telefonoss: '',
     direccion: '',
     id_administrador: ''
   });
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const limit = 10;
-  const [role, setRole] = useState('DEFAULT');
+  const [role, setRole] = useState(() => getEffectiveRole());
 
-  // States for image handling
   const [selectedFiles, setSelectedFiles] = useState({
     logo_imagen: null,
     imagen_hero: null,
@@ -77,133 +93,105 @@ const Empresa = () => {
     imagen_3: null
   });
 
-  // Obtener el rol del usuario desde localStorage
-useEffect(() => {
-  const userData = localStorage.getItem('user');
-  if (!userData) return;
+  useEffect(() => {
+    const sync = () => setRole(getEffectiveRole());
+    window.addEventListener('storage', sync);
+    window.addEventListener('auth-changed', sync);
+    window.addEventListener('focus', sync);
+    return () => {
+      window.removeEventListener('storage', sync);
+      window.removeEventListener('auth-changed', sync);
+      window.removeEventListener('focus', sync);
+    };
+  }, []);
 
-  try {
-    const u = JSON.parse(userData);
+  useEffect(() => { setError(null); }, [role]);
 
-    // 1) Normaliza a array en MAYÚSCULAS
-    const rolesArr = Array.isArray(u?.roles)
-      ? u.roles.map(r => String(r).toUpperCase())
-      : (u?.role ? [String(u.role).toUpperCase()] : []);
-
-    // 2) Elige un rol que exista en permissionsConfig, con prioridad
-    const keys = Object.keys(permissionsConfig);
-    const PRIORIDAD = ['ADMINISTRADOR']; // ajusta tu prioridad
-    const efectivo =
-      PRIORIDAD.find(r => rolesArr.includes(r) && keys.includes(r)) ||
-      rolesArr.find(r => keys.includes(r)) ||
-      'DEFAULT';
-
-    setRole(efectivo);
-  } catch (err) {
-    console.error('Error al parsear datos del usuario:', err);
-    setRole('DEFAULT');
-  }
-}, []);
-
-  // Obtener permisos según el rol (o DEFAULT si no hay rol o no está definido)
   const permissions = role && permissionsConfig[role] ? permissionsConfig[role] : permissionsConfig.DEFAULT;
 
-  // Fetch administradores válidos al cargar el componente
   useEffect(() => {
     const fetchAdministradores = async () => {
       try {
         const response = await api.get('/administrador/datos-especificos');
-        if (response.data.exito) {
-          setAdministradores(response.data.datos.administradores || []);
-        }
-      } catch (err) {
-        console.error('Error al obtener administradores:', err);
-      }
+        if (response.data?.exito) setAdministradores(response.data.datos.administradores || []);
+      } catch {}
     };
     fetchAdministradores();
   }, []);
 
-  // Function to generate image URLs
   const getImageUrl = (path) => {
     if (!path) return '';
-    const base = api.defaults.baseURL.replace(/\/$/, '');
-    const cleanPath = path.replace(/^\//, '');
-    return `${base}/${cleanPath}`;
+    try {
+      const base = (api.defaults?.baseURL || '').replace(/\/$/, '');
+      const cleanPath = String(path).replace(/^\//, '');
+      return `${base}/${cleanPath}`;
+    } catch {
+      return path;
+    }
   };
 
   const fetchEmpresas = async (params = {}) => {
+    if (!permissions.canView) {
+      setError('No tienes permisos para ver empresas');
+      return;
+    }
     setLoading(true);
     setError(null);
     const offset = (page - 1) * limit;
     const fullParams = { ...params, limit, offset };
     try {
       let response;
-      if (params.q) {
-        response = await api.get('/empresa/buscar', { params: fullParams });
-      } else if (params.tipo) {
-        response = await api.get('/empresa/filtro', { params: fullParams });
-      } else {
-        response = await api.get('/empresa/datos-especificos', { params: fullParams });
-      }
+      if (params.q) response = await api.get('/empresa/buscar', { params: fullParams });
+      else if (params.tipo) response = await api.get('/empresa/filtro', { params: fullParams });
+      else response = await api.get('/empresa/datos-especificos', { params: fullParams });
       if (response.data.exito) {
         setEmpresas(response.data.datos.empresas);
         setTotal(response.data.datos.paginacion.total);
       } else {
-        setError(response.data.mensaje);
+        setError(response.data.mensaje || 'Error al cargar empresas');
       }
     } catch (err) {
-      const errorMessage = err.response?.data?.mensaje || 'Error de conexión al servidor';
+      const errorMessage = err.response?.data?.mensaje || 'Error de conexion al servidor';
       setError(errorMessage);
-      console.error(err);
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    fetchEmpresas();
-  }, [page]);
+  useEffect(() => { if (role) fetchEmpresas(); }, [page, role]);
 
   const handleSearch = (e) => {
     e.preventDefault();
+    if (!permissions.canView) return;
     setPage(1);
-    if (searchTerm.trim()) {
-      fetchEmpresas({ q: searchTerm });
-    } else {
-      fetchEmpresas();
-    }
+    if (searchTerm.trim()) fetchEmpresas({ q: searchTerm });
+    else fetchEmpresas();
   };
 
   const handleFiltroChange = (e) => {
+    if (!permissions.canView) return;
     const tipo = e.target.value;
     setFiltro(tipo);
     setPage(1);
-    if (tipo) {
-      fetchEmpresas({ tipo });
-    } else {
-      fetchEmpresas();
-    }
+    if (tipo) fetchEmpresas({ tipo });
+    else fetchEmpresas();
   };
 
   const handleDelete = async (id) => {
-    if (!permissions.canDelete) return; // Verificar permiso
-    if (!window.confirm('¿Estás seguro de eliminar esta empresa?')) return;
+    if (!permissions.canDelete) return;
+    if (!window.confirm('Estas seguro de eliminar esta empresa?')) return;
     try {
       const response = await api.delete(`/empresa/${id}`);
-      if (response.data.exito) {
-        fetchEmpresas();
-      } else {
-        alert(response.data.mensaje);
-      }
+      if (response.data.exito) fetchEmpresas();
+      else setError(response.data.mensaje || 'No se pudo eliminar');
     } catch (err) {
-      const errorMessage = err.response?.data?.mensaje || 'Error de conexión al servidor';
+      const errorMessage = err.response?.data?.mensaje || 'Error de conexion al servidor';
       setError(errorMessage);
-      console.error(err);
     }
   };
 
   const openCreateModal = () => {
-    if (!permissions.canCreate) return; // Verificar permiso
+    if (!permissions.canCreate) return;
     setEditMode(false);
     setViewMode(false);
     setFormData({
@@ -230,149 +218,123 @@ useEffect(() => {
       objetivo_3: '',
       quienes_somos: '',
       correo_empresa: '',
-      telefono: '',
+      telefonoss: '',
       direccion: '',
       id_administrador: ''
     });
-    setSelectedFiles({
-      logo_imagen: null,
-      imagen_hero: null,
-      imagen_1: null,
-      imagen_2: null,
-      imagen_3: null
-    });
-    setImagePreviews({
-      logo_imagen: null,
-      imagen_hero: null,
-      imagen_1: null,
-      imagen_2: null,
-      imagen_3: null
-    });
+    setSelectedFiles({ logo_imagen: null, imagen_hero: null, imagen_1: null, imagen_2: null, imagen_3: null });
+    setImagePreviews({ logo_imagen: null, imagen_hero: null, imagen_1: null, imagen_2: null, imagen_3: null });
     setCurrentEmpresa(null);
     setModalOpen(true);
   };
 
   const openEditModal = async (id) => {
-    if (!permissions.canEdit) return; // Verificar permiso
+    if (!permissions.canEdit) return;
     try {
       const response = await api.get(`/empresa/dato-individual/${id}`);
       if (response.data.exito) {
-        const empresa = response.data.datos.empresa;
+        const e = response.data.datos.empresa;
         setFormData({
-          nombre_sistema: empresa.nombre_sistema || '',
-          logo_imagen: empresa.logo_imagen || '',
-          imagen_hero: empresa.imagen_hero || '',
-          titulo_h1: empresa.titulo_h1 || '',
-          descripcion_h1: empresa.descripcion_h1 || '',
-          te_ofrecemos: empresa.te_ofrecemos || '',
-          imagen_1: empresa.imagen_1 || '',
-          imagen_2: empresa.imagen_2 || '',
-          imagen_3: empresa.imagen_3 || '',
-          titulo_1: empresa.titulo_1 || '',
-          titulo_2: empresa.titulo_2 || '',
-          titulo_3: empresa.titulo_3 || '',
-          descripcion_1: empresa.descripcion_1 || '',
-          descripcion_2: empresa.descripcion_2 || '',
-          descripcion_3: empresa.descripcion_3 || '',
-          mision: empresa.mision || '',
-          vision: empresa.vision || '',
-          nuestro_objetivo: empresa.nuestro_objetivo || '',
-          objetivo_1: empresa.objetivo_1 || '',
-          objetivo_2: empresa.objetivo_2 || '',
-          objetivo_3: empresa.objetivo_3 || '',
-          quienes_somos: empresa.quienes_somos || '',
-          correo_empresa: empresa.correo_empresa || '',
-          telefono: empresa.telefono || '',
-          direccion: empresa.direccion || '',
-          id_administrador: empresa.id_administrador || ''
+          nombre_sistema: e.nombre_sistema || '',
+          logo_imagen: e.logo_imagen || '',
+          imagen_hero: e.imagen_hero || '',
+          titulo_h1: e.titulo_h1 || '',
+          descripcion_h1: e.descripcion_h1 || '',
+          te_ofrecemos: e.te_ofrecemos || '',
+          imagen_1: e.imagen_1 || '',
+          imagen_2: e.imagen_2 || '',
+          imagen_3: e.imagen_3 || '',
+          titulo_1: e.titulo_1 || '',
+          titulo_2: e.titulo_2 || '',
+          titulo_3: e.titulo_3 || '',
+          descripcion_1: e.descripcion_1 || '',
+          descripcion_2: e.descripcion_2 || '',
+          descripcion_3: e.descripcion_3 || '',
+          mision: e.mision || '',
+          vision: e.vision || '',
+          nuestro_objetivo: e.nuestro_objetivo || '',
+          objetivo_1: e.objetivo_1 || '',
+          objetivo_2: e.objetivo_2 || '',
+          objetivo_3: e.objetivo_3 || '',
+          quienes_somos: e.quienes_somos || '',
+          correo_empresa: e.correo_empresa || '',
+          telefonoss: e.telefonoss || '',
+          direccion: e.direccion || '',
+          id_administrador: e.id_administrador || ''
         });
         setImagePreviews({
-          logo_imagen: empresa.logo_imagen ? getImageUrl(empresa.logo_imagen) : null,
-          imagen_hero: empresa.imagen_hero ? getImageUrl(empresa.imagen_hero) : null,
-          imagen_1: empresa.imagen_1 ? getImageUrl(empresa.imagen_1) : null,
-          imagen_2: empresa.imagen_2 ? getImageUrl(empresa.imagen_2) : null,
-          imagen_3: empresa.imagen_3 ? getImageUrl(empresa.imagen_3) : null
+          logo_imagen: e.logo_imagen ? getImageUrl(e.logo_imagen) : null,
+          imagen_hero: e.imagen_hero ? getImageUrl(e.imagen_hero) : null,
+          imagen_1: e.imagen_1 ? getImageUrl(e.imagen_1) : null,
+          imagen_2: e.imagen_2 ? getImageUrl(e.imagen_2) : null,
+          imagen_3: e.imagen_3 ? getImageUrl(e.imagen_3) : null
         });
-        setSelectedFiles({
-          logo_imagen: null,
-          imagen_hero: null,
-          imagen_1: null,
-          imagen_2: null,
-          imagen_3: null
-        });
-        setCurrentEmpresa(empresa);
+        setSelectedFiles({ logo_imagen: null, imagen_hero: null, imagen_1: null, imagen_2: null, imagen_3: null });
+        setCurrentEmpresa(e);
         setEditMode(true);
         setViewMode(false);
         setModalOpen(true);
       } else {
-        alert(response.data.mensaje);
+        setError(response.data.mensaje || 'No se pudo cargar la empresa');
       }
     } catch (err) {
-      const errorMessage = err.response?.data?.mensaje || 'Error de conexión al servidor';
+      const errorMessage = err.response?.data?.mensaje || 'Error de conexion al servidor';
       setError(errorMessage);
-      console.error(err);
     }
   };
 
   const openViewModal = async (id) => {
-    if (!permissions.canView) return; // Verificar permiso
+    if (!permissions.canView) return;
     try {
       const response = await api.get(`/empresa/dato-individual/${id}`);
       if (response.data.exito) {
-        const empresa = response.data.datos.empresa;
+        const e = response.data.datos.empresa;
         setFormData({
-          nombre_sistema: empresa.nombre_sistema || '',
-          logo_imagen: empresa.logo_imagen || '',
-          imagen_hero: empresa.imagen_hero || '',
-          titulo_h1: empresa.titulo_h1 || '',
-          descripcion_h1: empresa.descripcion_h1 || '',
-          te_ofrecemos: empresa.te_ofrecemos || '',
-          imagen_1: empresa.imagen_1 || '',
-          imagen_2: empresa.imagen_2 || '',
-          imagen_3: empresa.imagen_3 || '',
-          titulo_1: empresa.titulo_1 || '',
-          titulo_2: empresa.titulo_2 || '',
-          titulo_3: empresa.titulo_3 || '',
-          descripcion_1: empresa.descripcion_1 || '',
-          descripcion_2: empresa.descripcion_2 || '',
-          descripcion_3: empresa.descripcion_3 || '',
-          mision: empresa.mision || '',
-          vision: empresa.vision || '',
-          nuestro_objetivo: empresa.nuestro_objetivo || '',
-          objetivo_1: empresa.objetivo_1 || '',
-          objetivo_2: empresa.objetivo_2 || '',
-          objetivo_3: empresa.objetivo_3 || '',
-          quienes_somos: empresa.quienes_somos || '',
-          correo_empresa: empresa.correo_empresa || '',
-          telefono: empresa.telefono || '',
-          direccion: empresa.direccion || '',
-          id_administrador: empresa.id_administrador || ''
+          nombre_sistema: e.nombre_sistema || '',
+          logo_imagen: e.logo_imagen || '',
+          imagen_hero: e.imagen_hero || '',
+          titulo_h1: e.titulo_h1 || '',
+          descripcion_h1: e.descripcion_h1 || '',
+          te_ofrecemos: e.te_ofrecemos || '',
+          imagen_1: e.imagen_1 || '',
+          imagen_2: e.imagen_2 || '',
+          imagen_3: e.imagen_3 || '',
+          titulo_1: e.titulo_1 || '',
+          titulo_2: e.titulo_2 || '',
+          titulo_3: e.titulo_3 || '',
+          descripcion_1: e.descripcion_1 || '',
+          descripcion_2: e.descripcion_2 || '',
+          descripcion_3: e.descripcion_3 || '',
+          mision: e.mision || '',
+          vision: e.vision || '',
+          nuestro_objetivo: e.nuestro_objetivo || '',
+          objetivo_1: e.objetivo_1 || '',
+          objetivo_2: e.objetivo_2 || '',
+          objetivo_3: e.objetivo_3 || '',
+          quienes_somos: e.quienes_somos || '',
+          correo_empresa: e.correo_empresa || '',
+          telefonoss: e.telefonoss || '',
+          direccion: e.direccion || '',
+          id_administrador: e.id_administrador || ''
         });
         setImagePreviews({
-          logo_imagen: empresa.logo_imagen ? getImageUrl(empresa.logo_imagen) : null,
-          imagen_hero: empresa.imagen_hero ? getImageUrl(empresa.imagen_hero) : null,
-          imagen_1: empresa.imagen_1 ? getImageUrl(empresa.imagen_1) : null,
-          imagen_2: empresa.imagen_2 ? getImageUrl(empresa.imagen_2) : null,
-          imagen_3: empresa.imagen_3 ? getImageUrl(empresa.imagen_3) : null
+          logo_imagen: e.logo_imagen ? getImageUrl(e.logo_imagen) : null,
+          imagen_hero: e.imagen_hero ? getImageUrl(e.imagen_hero) : null,
+          imagen_1: e.imagen_1 ? getImageUrl(e.imagen_1) : null,
+          imagen_2: e.imagen_2 ? getImageUrl(e.imagen_2) : null,
+          imagen_3: e.imagen_3 ? getImageUrl(e.imagen_3) : null
         });
-        setSelectedFiles({
-          logo_imagen: null,
-          imagen_hero: null,
-          imagen_1: null,
-          imagen_2: null,
-          imagen_3: null
-        });
-        setCurrentEmpresa(empresa);
+        setSelectedFiles({ logo_imagen: null, imagen_hero: null, imagen_1: null, imagen_2: null, imagen_3: null });
+        setCurrentEmpresa(e);
         setEditMode(false);
         setViewMode(true);
         setModalOpen(true);
       } else {
-        alert(response.data.mensaje);
+        setError(response.data.mensaje || 'No se pudo cargar la empresa');
       }
     } catch (err) {
-      const errorMessage = err.response?.data?.mensaje || 'Error de conexión al servidor';
+      const errorMessage = err.response?.data?.mensaje || 'Error de conexion al servidor';
       setError(errorMessage);
-      console.error(err);
     }
   };
 
@@ -381,20 +343,8 @@ useEffect(() => {
     setCurrentEmpresa(null);
     setError(null);
     setViewMode(false);
-    setSelectedFiles({
-      logo_imagen: null,
-      imagen_hero: null,
-      imagen_1: null,
-      imagen_2: null,
-      imagen_3: null
-    });
-    setImagePreviews({
-      logo_imagen: null,
-      imagen_hero: null,
-      imagen_1: null,
-      imagen_2: null,
-      imagen_3: null
-    });
+    setSelectedFiles({ logo_imagen: null, imagen_hero: null, imagen_1: null, imagen_2: null, imagen_3: null });
+    setImagePreviews({ logo_imagen: null, imagen_hero: null, imagen_1: null, imagen_2: null, imagen_3: null });
   };
 
   const handleInputChange = (e) => {
@@ -403,7 +353,7 @@ useEffect(() => {
   };
 
   const handleFileChange = (e, fieldName) => {
-    const file = e.target.files[0];
+    const file = e.target.files?.[0];
     if (file) {
       setSelectedFiles(prev => ({ ...prev, [fieldName]: file }));
       setImagePreviews(prev => ({ ...prev, [fieldName]: URL.createObjectURL(file) }));
@@ -413,107 +363,70 @@ useEffect(() => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (viewMode || (!permissions.canCreate && !editMode) || (!permissions.canEdit && editMode)) return;
-
     try {
       let response;
       const data = new FormData();
-
-      // Add text fields
       const filteredData = Object.fromEntries(
         Object.entries(formData).filter(([key, value]) => {
-          const requiredFields = ['nombre_sistema', 'id_administrador'];
-          if (requiredFields.includes(key)) return true;
+          const required = ['nombre_sistema', 'id_administrador'];
+          if (required.includes(key)) return true;
           return value !== '' && value !== null && value !== undefined;
         })
       );
-
       Object.entries(filteredData).forEach(([key, value]) => {
-        if (!['logo_imagen', 'imagen_hero', 'imagen_1', 'imagen_2', 'imagen_3'].includes(key)) {
-          data.append(key, value);
-        }
+        if (!['logo_imagen','imagen_hero','imagen_1','imagen_2','imagen_3'].includes(key)) data.append(key, value);
       });
-
-      // Add image files
-      ['logo_imagen', 'imagen_hero', 'imagen_1', 'imagen_2', 'imagen_3'].forEach(field => {
-        if (selectedFiles[field]) {
-          data.append(field, selectedFiles[field]);
-          console.log(`📸 ${field} seleccionado:`, selectedFiles[field].name);
-        }
+      ['logo_imagen','imagen_hero','imagen_1','imagen_2','imagen_3'].forEach(field => {
+        if (selectedFiles[field]) data.append(field, selectedFiles[field]);
       });
-
-      // Validations
       if (filteredData.nombre_sistema && filteredData.nombre_sistema.length > 100) {
-        setError('El nombre del sistema no debe exceder los 100 caracteres');
+        setError('El nombre del sistema no debe exceder 100 caracteres');
         return;
       }
       if (filteredData.titulo_h1 && filteredData.titulo_h1.length > 150) {
-        setError('El título H1 no debe exceder los 150 caracteres');
+        setError('El titulo H1 no debe exceder 150 caracteres');
         return;
       }
       if (filteredData.correo_empresa && filteredData.correo_empresa.length > 150) {
-        setError('El correo de la empresa no debe exceder los 150 caracteres');
+        setError('El correo de la empresa no debe exceder 150 caracteres');
         return;
       }
-      if (filteredData.telefono && filteredData.telefono.length > 50) {
-        setError('El teléfono no debe exceder los 50 caracteres');
+      if (filteredData.telefonoss && filteredData.telefonoss.length > 50) {
+        setError('El telefono no debe exceder 50 caracteres');
         return;
       }
       if (filteredData.correo_empresa && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(filteredData.correo_empresa)) {
-        setError('El correo de la empresa no es válido');
+        setError('El correo de la empresa no es valido');
         return;
       }
-      if (filteredData.id_administrador && !administradores.some(admin => admin.id_administrador === parseInt(filteredData.id_administrador))) {
-        setError('El administrador seleccionado no es válido');
+      if (filteredData.id_administrador && !administradores.some(a => a.id_administrador === parseInt(filteredData.id_administrador))) {
+        setError('El administrador seleccionado no es valido');
         return;
       }
-
-      const config = {
-        headers: {
-          'Content-Type': 'multipart/form-data'
-        }
-      };
-
-      if (editMode) {
-        console.log('📤 Enviando PATCH para actualizar empresa ID:', currentEmpresa.id_empresa);
-        console.log('📦 Datos enviados:');
-        for (let [key, value] of data.entries()) {
-          console.log(`   ${key}:`, key.includes('imagen') ? `[File: ${value.name}]` : value);
-        }
-        response = await api.patch(`/empresa/${currentEmpresa.id_empresa}`, data, config);
-      } else {
-        console.log('📤 Enviando POST para crear empresa...');
-        response = await api.post('/empresa/', data, config);
-      }
-
+      const config = { headers: { 'Content-Type': 'multipart/form-data' } };
+      if (editMode) response = await api.patch(`/empresa/${currentEmpresa.id_empresa}`, data, config);
+      else response = await api.post('/empresa/', data, config);
       if (response.data.exito) {
-        console.log('✅ Operación exitosa:', response.data.mensaje);
         closeModal();
         fetchEmpresas();
       } else {
-        alert('Error: ' + response.data.mensaje);
+        setError(response.data.mensaje || 'No se pudo guardar');
       }
     } catch (err) {
-      console.error('❌ Error in handleSubmit:', err);
-      console.error('❌ Detalles del error:', err.response?.data);
-      const errorMessage = err.response?.data?.mensaje || err.message || 'Error de conexión al servidor';
+      const errorMessage = err.response?.data?.mensaje || err.message || 'Error de conexion al servidor';
       setError(errorMessage);
-      alert(`Error: ${errorMessage}`);
     }
   };
 
   const handlePageChange = (newPage) => {
-    if (newPage >= 1 && newPage <= Math.ceil(total / limit)) {
-      setPage(newPage);
-    }
+    if (newPage >= 1 && newPage <= Math.ceil(total / limit)) setPage(newPage);
   };
 
-  if (!role) {
-    return <p>Cargando permisos...</p>;
-  }
+  if (!role) return <p>Cargando permisos...</p>;
 
   return (
     <div className="bg-white rounded-lg shadow p-6">
-      <h2 className="text-xl font-semibold mb-4">Gestión de Empresas</h2>
+      <h2 className="text-xl font-semibold mb-4">Gestion de Empresas</h2>
 
       <div className="flex flex-col xl:flex-row gap-4 mb-6 items-stretch">
         <div className="flex-1">
@@ -522,14 +435,16 @@ useEffect(() => {
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="🔍 Buscar por nombre, correo, dirección o administrador..."
+              placeholder="Buscar por nombre, correo, direccion o administrador"
               className="border rounded-l px-4 py-2 w-full"
+              disabled={!permissions.canView}
             />
             <button
               type="submit"
               className="bg-blue-500 text-white px-4 py-2 rounded-r hover:bg-blue-600 whitespace-nowrap"
+              disabled={!permissions.canView}
             >
-              🔎 Buscar
+              Buscar
             </button>
           </form>
         </div>
@@ -539,20 +454,20 @@ useEffect(() => {
             value={filtro}
             onChange={handleFiltroChange}
             className="border rounded px-3 py-2 flex-1 sm:min-w-[180px]"
+            disabled={!permissions.canView}
           >
-            <option value="">📋 Todos - Sin filtro</option>
-            <option value="nombre">👤 Ordenar por nombre</option>
-            <option value="fecha">📅 Ordenar por fecha</option>
-            <option value="correo">📧 Ordenar por correo</option>
+            <option value="">Sin filtro</option>
+            <option value="nombre">Por nombre</option>
+            <option value="fecha">Por fecha</option>
+            <option value="correo">Por correo</option>
           </select>
 
           {permissions.canCreate && (
             <button
               onClick={openCreateModal}
-              className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 whitespace-nowrap sm:w-auto w-full flex items-center justify-center gap-2"
+              className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 whitespace-nowrap sm:w-auto w-full"
             >
-              <span>🏢</span>
-              <span>Crear Empresa</span>
+              Crear Empresa
             </button>
           )}
         </div>
@@ -571,23 +486,23 @@ useEffect(() => {
                   <th className="px-4 py-2 text-left">#</th>
                   <th className="px-4 py-2 text-left">Nombre Sistema</th>
                   <th className="px-4 py-2 text-left">Correo</th>
-                  <th className="px-4 py-2 text-left">Teléfono</th>
+                  <th className="px-4 py-2 text-left">Telefono</th>
                   <th className="px-4 py-2 text-left">Administrador</th>
                   <th className="px-4 py-2 text-left">Acciones</th>
                 </tr>
               </thead>
               <tbody>
-                {empresas.map((empresa, index) => (
-                  <tr key={empresa.id_empresa} className="border-t">
+                {empresas.map((e, index) => (
+                  <tr key={e.id_empresa} className="border-t">
                     <td className="px-4 py-2">{(page - 1) * limit + index + 1}</td>
-                    <td className="px-4 py-2">{empresa.nombre_sistema}</td>
-                    <td className="px-4 py-2">{empresa.correo_empresa || '-'}</td>
-                    <td className="px-4 py-2">{empresa.telefono || '-'}</td>
-                    <td className="px-4 py-2">{`${empresa.admin_nombre} ${empresa.admin_apellido}`}</td>
+                    <td className="px-4 py-2">{e.nombre_sistema}</td>
+                    <td className="px-4 py-2">{e.correo_empresa || '-'}</td>
+                    <td className="px-4 py-2">{e.telefonoss || '-'}</td>
+                    <td className="px-4 py-2">{`${e.admin_nombre} ${e.admin_apellido}`}</td>
                     <td className="px-4 py-2 flex gap-2">
                       {permissions.canView && (
                         <button
-                          onClick={() => openViewModal(empresa.id_empresa)}
+                          onClick={() => openViewModal(e.id_empresa)}
                           className="text-green-500 hover:text-green-700 mr-2"
                         >
                           Ver Datos
@@ -595,7 +510,7 @@ useEffect(() => {
                       )}
                       {permissions.canEdit && (
                         <button
-                          onClick={() => openEditModal(empresa.id_empresa)}
+                          onClick={() => openEditModal(e.id_empresa)}
                           className="text-blue-500 hover:text-blue-700 mr-2"
                         >
                           Editar
@@ -603,7 +518,7 @@ useEffect(() => {
                       )}
                       {permissions.canDelete && (
                         <button
-                          onClick={() => handleDelete(empresa.id_empresa)}
+                          onClick={() => handleDelete(e.id_empresa)}
                           className="text-red-500 hover:text-red-700"
                         >
                           Eliminar
@@ -625,7 +540,7 @@ useEffect(() => {
               Anterior
             </button>
             <span className="px-4 py-2 bg-gray-100">
-              Página {page} de {Math.ceil(total / limit)}
+              Pagina {page} de {Math.ceil(total / limit)}
             </span>
             <button
               onClick={() => handlePageChange(page + 1)}
@@ -668,17 +583,17 @@ useEffect(() => {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Teléfono</label>
+                <label className="block text-sm font-medium mb-1">Telefono</label>
                 <input
-                  name="telefono"
-                  value={formData.telefono}
+                  name="telefonoss"
+                  value={formData.telefonoss}
                   onChange={handleInputChange}
                   className="w-full border rounded px-3 py-2 bg-gray-100"
                   disabled={viewMode}
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Dirección</label>
+                <label className="block text-sm font-medium mb-1">Direccion</label>
                 <input
                   name="direccion"
                   value={formData.direccion}
@@ -698,25 +613,19 @@ useEffect(() => {
                   disabled={viewMode}
                 >
                   <option value="">Seleccione un administrador</option>
-                  {administradores.map(admin => (
-                    <option key={admin.id_administrador} value={admin.id_administrador}>
-                      {`${admin.nombre} ${admin.apellido}`}
+                  {administradores.map(a => (
+                    <option key={a.id_administrador} value={a.id_administrador}>
+                      {`${a.nombre} ${a.apellido}`}
                     </option>
                   ))}
                 </select>
               </div>
+
               <div className="col-span-2">
                 <label className="block text-sm font-medium mb-1">Logo</label>
                 {imagePreviews.logo_imagen ? (
-                  <img
-                    src={imagePreviews.logo_imagen}
-                    alt="Logo"
-                    className="w-32 h-32 object-cover rounded mb-2"
-                    onError={(e) => console.error('Error loading logo:', e.target.src)}
-                  />
-                ) : viewMode ? (
-                  <p className="text-gray-500">No hay logo</p>
-                ) : null}
+                  <img src={imagePreviews.logo_imagen} alt="Logo" className="w-32 h-32 object-cover rounded mb-2" />
+                ) : viewMode ? <p className="text-gray-500">No hay logo</p> : null}
                 {!viewMode && (
                   <input
                     type="file"
@@ -726,18 +635,12 @@ useEffect(() => {
                   />
                 )}
               </div>
+
               <div className="col-span-2">
                 <label className="block text-sm font-medium mb-1">Imagen Hero</label>
                 {imagePreviews.imagen_hero ? (
-                  <img
-                    src={imagePreviews.imagen_hero}
-                    alt="Hero"
-                    className="w-32 h-32 object-cover rounded mb-2"
-                    onError={(e) => console.error('Error loading imagen_hero:', e.target.src)}
-                  />
-                ) : viewMode ? (
-                  <p className="text-gray-500">No hay imagen hero</p>
-                ) : null}
+                  <img src={imagePreviews.imagen_hero} alt="Hero" className="w-32 h-32 object-cover rounded mb-2" />
+                ) : viewMode ? <p className="text-gray-500">No hay imagen hero</p> : null}
                 {!viewMode && (
                   <input
                     type="file"
@@ -747,8 +650,9 @@ useEffect(() => {
                   />
                 )}
               </div>
+
               <div>
-                <label className="block text-sm font-medium mb-1">Título H1</label>
+                <label className="block text-sm font-medium mb-1">Titulo H1</label>
                 <input
                   name="titulo_h1"
                   value={formData.titulo_h1}
@@ -758,7 +662,7 @@ useEffect(() => {
                 />
               </div>
               <div className="col-span-2">
-                <label className="block text-sm font-medium mb-1">Descripción H1</label>
+                <label className="block text-sm font-medium mb-1">Descripcion H1</label>
                 <textarea
                   name="descripcion_h1"
                   value={formData.descripcion_h1}
@@ -768,6 +672,7 @@ useEffect(() => {
                   disabled={viewMode}
                 />
               </div>
+
               <div className="col-span-2">
                 <label className="block text-sm font-medium mb-1">Te Ofrecemos</label>
                 <textarea
@@ -779,18 +684,12 @@ useEffect(() => {
                   disabled={viewMode}
                 />
               </div>
+
               <div className="col-span-2">
                 <label className="block text-sm font-medium mb-1">Imagen 1</label>
                 {imagePreviews.imagen_1 ? (
-                  <img
-                    src={imagePreviews.imagen_1}
-                    alt="Imagen 1"
-                    className="w-32 h-32 object-cover rounded mb-2"
-                    onError={(e) => console.error('Error loading imagen_1:', e.target.src)}
-                  />
-                ) : viewMode ? (
-                  <p className="text-gray-500">No hay imagen 1</p>
-                ) : null}
+                  <img src={imagePreviews.imagen_1} alt="Imagen 1" className="w-32 h-32 object-cover rounded mb-2" />
+                ) : viewMode ? <p className="text-gray-500">No hay imagen 1</p> : null}
                 {!viewMode && (
                   <input
                     type="file"
@@ -801,7 +700,7 @@ useEffect(() => {
                 )}
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Título 1</label>
+                <label className="block text-sm font-medium mb-1">Titulo 1</label>
                 <input
                   name="titulo_1"
                   value={formData.titulo_1}
@@ -811,7 +710,7 @@ useEffect(() => {
                 />
               </div>
               <div className="col-span-2">
-                <label className="block text-sm font-medium mb-1">Descripción 1</label>
+                <label className="block text-sm font-medium mb-1">Descripcion 1</label>
                 <textarea
                   name="descripcion_1"
                   value={formData.descripcion_1}
@@ -821,18 +720,12 @@ useEffect(() => {
                   disabled={viewMode}
                 />
               </div>
+
               <div className="col-span-2">
                 <label className="block text-sm font-medium mb-1">Imagen 2</label>
                 {imagePreviews.imagen_2 ? (
-                  <img
-                    src={imagePreviews.imagen_2}
-                    alt="Imagen 2"
-                    className="w-32 h-32 object-cover rounded mb-2"
-                    onError={(e) => console.error('Error loading imagen_2:', e.target.src)}
-                  />
-                ) : viewMode ? (
-                  <p className="text-gray-500">No hay imagen 2</p>
-                ) : null}
+                  <img src={imagePreviews.imagen_2} alt="Imagen 2" className="w-32 h-32 object-cover rounded mb-2" />
+                ) : viewMode ? <p className="text-gray-500">No hay imagen 2</p> : null}
                 {!viewMode && (
                   <input
                     type="file"
@@ -843,7 +736,7 @@ useEffect(() => {
                 )}
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Título 2</label>
+                <label className="block text-sm font-medium mb-1">Titulo 2</label>
                 <input
                   name="titulo_2"
                   value={formData.titulo_2}
@@ -853,7 +746,7 @@ useEffect(() => {
                 />
               </div>
               <div className="col-span-2">
-                <label className="block text-sm font-medium mb-1">Descripción 2</label>
+                <label className="block text-sm font-medium mb-1">Descripcion 2</label>
                 <textarea
                   name="descripcion_2"
                   value={formData.descripcion_2}
@@ -863,18 +756,12 @@ useEffect(() => {
                   disabled={viewMode}
                 />
               </div>
+
               <div className="col-span-2">
                 <label className="block text-sm font-medium mb-1">Imagen 3</label>
                 {imagePreviews.imagen_3 ? (
-                  <img
-                    src={imagePreviews.imagen_3}
-                    alt="Imagen 3"
-                    className="w-32 h-32 object-cover rounded mb-2"
-                    onError={(e) => console.error('Error loading imagen_3:', e.target.src)}
-                  />
-                ) : viewMode ? (
-                  <p className="text-gray-500">No hay imagen 3</p>
-                ) : null}
+                  <img src={imagePreviews.imagen_3} alt="Imagen 3" className="w-32 h-32 object-cover rounded mb-2" />
+                ) : viewMode ? <p className="text-gray-500">No hay imagen 3</p> : null}
                 {!viewMode && (
                   <input
                     type="file"
@@ -885,7 +772,7 @@ useEffect(() => {
                 )}
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Título 3</label>
+                <label className="block text-sm font-medium mb-1">Titulo 3</label>
                 <input
                   name="titulo_3"
                   value={formData.titulo_3}
@@ -895,7 +782,7 @@ useEffect(() => {
                 />
               </div>
               <div className="col-span-2">
-                <label className="block text-sm font-medium mb-1">Descripción 3</label>
+                <label className="block text-sm font-medium mb-1">Descripcion 3</label>
                 <textarea
                   name="descripcion_3"
                   value={formData.descripcion_3}
@@ -905,8 +792,9 @@ useEffect(() => {
                   disabled={viewMode}
                 />
               </div>
+
               <div className="col-span-2">
-                <label className="block text-sm font-medium mb-1">Misión</label>
+                <label className="block text-sm font-medium mb-1">Mision</label>
                 <textarea
                   name="mision"
                   value={formData.mision}
@@ -917,7 +805,7 @@ useEffect(() => {
                 />
               </div>
               <div className="col-span-2">
-                <label className="block text-sm font-medium mb-1">Visión</label>
+                <label className="block text-sm font-medium mb-1">Vision</label>
                 <textarea
                   name="vision"
                   value={formData.vision}
@@ -927,6 +815,7 @@ useEffect(() => {
                   disabled={viewMode}
                 />
               </div>
+
               <div className="col-span-2">
                 <label className="block text-sm font-medium mb-1">Nuestro Objetivo</label>
                 <textarea
@@ -938,6 +827,7 @@ useEffect(() => {
                   disabled={viewMode}
                 />
               </div>
+
               <div className="col-span-2">
                 <label className="block text-sm font-medium mb-1">Objetivo 1</label>
                 <textarea
@@ -971,8 +861,9 @@ useEffect(() => {
                   disabled={viewMode}
                 />
               </div>
+
               <div className="col-span-2">
-                <label className="block text-sm font-medium mb-1">Quiénes Somos</label>
+                <label className="block text-sm font-medium mb-1">Quienes Somos</label>
                 <textarea
                   name="quienes_somos"
                   value={formData.quienes_somos}
@@ -982,6 +873,7 @@ useEffect(() => {
                   disabled={viewMode}
                 />
               </div>
+
               <div className="col-span-2 flex justify-end mt-4">
                 <button
                   type="button"

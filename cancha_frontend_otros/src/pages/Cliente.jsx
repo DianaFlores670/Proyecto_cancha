@@ -1,20 +1,37 @@
+/* eslint-disable no-empty */
 import React, { useState, useEffect } from 'react';
 import api from '../services/api';
 
-// Configuración de permisos por rol
 const permissionsConfig = {
-  ADMINISTRADOR: {
-    canView: true,
-    canCreate: true,
-    canEdit: true,
-    canDelete: true,
-  },
-  DEFAULT: {
-    canView: false,
-    canCreate: false,
-    canEdit: false,
-    canDelete: false,
-  },
+  ADMINISTRADOR: { canView: true, canCreate: true, canEdit: true, canDelete: true },
+  DEFAULT: { canView: false, canCreate: false, canEdit: false, canDelete: false },
+};
+
+const getEffectiveRole = () => {
+  const keys = Object.keys(permissionsConfig);
+  const bag = new Set();
+  try {
+    const u = JSON.parse(localStorage.getItem('user') || '{}');
+    const arr = Array.isArray(u?.roles) ? u.roles : [];
+    for (const r of arr) {
+      if (typeof r === 'string') bag.add(r);
+      else if (r && typeof r === 'object') ['rol','role','nombre','name'].forEach(k => { if (r[k]) bag.add(r[k]); });
+    }
+    if (bag.size === 0 && u?.role) bag.add(u.role);
+  } catch {}
+  const tok = localStorage.getItem('token');
+  if (bag.size === 0 && tok && tok.split('.').length === 3) {
+    try {
+      const payload = JSON.parse(atob(tok.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')));
+      const t = Array.isArray(payload?.roles) ? payload.roles : (payload?.rol ? [payload.rol] : []);
+      t.forEach(v => bag.add(v));
+    } catch {}
+  }
+  const norm = Array.from(bag).map(v => String(v || '').trim().toUpperCase().replace(/\s+/g,'_'));
+  const map = v => v === 'ADMIN' ? 'ADMINISTRADOR' : v;
+  const norm2 = norm.map(map);
+  const prio = ['ADMINISTRADOR'];
+  return prio.find(r => norm2.includes(r) && keys.includes(r)) || norm2.find(r => keys.includes(r)) || 'DEFAULT';
 };
 
 const Cliente = () => {
@@ -41,112 +58,91 @@ const Cliente = () => {
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const limit = 10;
-  const [role, setRole] = useState('DEFAULT');
+  const [role, setRole] = useState(() => getEffectiveRole());
 
-  // Obtener el rol del usuario desde localStorage
-useEffect(() => {
-  const userData = localStorage.getItem('user');
-  if (!userData) return;
+  useEffect(() => {
+    const sync = () => setRole(getEffectiveRole());
+    window.addEventListener('storage', sync);
+    window.addEventListener('auth-changed', sync);
+    window.addEventListener('focus', sync);
+    return () => {
+      window.removeEventListener('storage', sync);
+      window.removeEventListener('auth-changed', sync);
+      window.removeEventListener('focus', sync);
+    };
+  }, []);
 
-  try {
-    const u = JSON.parse(userData);
+  useEffect(() => { setError(null); }, [role]);
 
-    // 1) Normaliza a array en MAYÚSCULAS
-    const rolesArr = Array.isArray(u?.roles)
-      ? u.roles.map(r => String(r).toUpperCase())
-      : (u?.role ? [String(u.role).toUpperCase()] : []);
-
-    // 2) Elige un rol que exista en permissionsConfig, con prioridad
-    const keys = Object.keys(permissionsConfig);
-    const PRIORIDAD = ['ADMINISTRADOR']; // ajusta tu prioridad
-    const efectivo =
-      PRIORIDAD.find(r => rolesArr.includes(r) && keys.includes(r)) ||
-      rolesArr.find(r => keys.includes(r)) ||
-      'DEFAULT';
-
-    setRole(efectivo);
-  } catch (err) {
-    console.error('Error al parsear datos del usuario:', err);
-    setRole('DEFAULT');
-  }
-}, []);
-
-  // Obtener permisos según el rol (o DEFAULT si no hay rol o no está definido)
   const permissions = role && permissionsConfig[role] ? permissionsConfig[role] : permissionsConfig.DEFAULT;
 
   const fetchClientes = async (params = {}) => {
+    if (!permissions.canView) {
+      setError('No tienes permisos para ver clientes');
+      return;
+    }
     setLoading(true);
     setError(null);
     const offset = (page - 1) * limit;
     const fullParams = { ...params, limit, offset };
     try {
       let response;
-      if (params.q) {
-        response = await api.get('/cliente/buscar', { params: fullParams });
-      } else if (params.tipo) {
-        response = await api.get('/cliente/filtro', { params: fullParams });
-      } else {
-        response = await api.get('/cliente/datos-especificos', { params: fullParams });
-      }
+      if (params.q) response = await api.get('/cliente/buscar', { params: fullParams });
+      else if (params.tipo) response = await api.get('/cliente/filtro', { params: fullParams });
+      else response = await api.get('/cliente/datos-especificos', { params: fullParams });
       if (response.data.exito) {
         setClientes(response.data.datos.clientes);
         setTotal(response.data.datos.paginacion.total);
       } else {
-        setError(response.data.mensaje);
+        setError(response.data.mensaje || 'Error al cargar clientes');
       }
     } catch (err) {
-      const errorMessage = err.response?.data?.mensaje || 'Error de conexión al servidor';
+      const errorMessage = err.response?.data?.mensaje || 'Error de conexion al servidor';
       setError(errorMessage);
-      console.error(err);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchClientes();
-  }, [page]);
+    if (role) fetchClientes();
+  }, [page, role]);
 
   const handleSearch = (e) => {
     e.preventDefault();
+    if (!permissions.canView) return;
     setPage(1);
-    if (searchTerm.trim()) {
-      fetchClientes({ q: searchTerm });
-    } else {
-      fetchClientes();
-    }
+    if (searchTerm.trim()) fetchClientes({ q: searchTerm });
+    else fetchClientes();
   };
 
   const handleFiltroChange = (e) => {
+    if (!permissions.canView) return;
     const tipo = e.target.value;
     setFiltro(tipo);
     setPage(1);
-    if (tipo) {
-      fetchClientes({ tipo });
-    } else {
-      fetchClientes();
-    }
+    if (tipo) fetchClientes({ tipo });
+    else fetchClientes();
   };
 
   const handleDelete = async (id) => {
-    if (!permissions.canDelete) return; // Verificar permiso
-    if (!window.confirm('¿Estás seguro de eliminar este cliente?')) return;
+    if (!permissions.canDelete) return;
+    if (!window.confirm('Estas seguro de eliminar este cliente?')) return;
     try {
       const response = await api.delete(`/cliente/${id}`);
       if (response.data.exito) {
         fetchClientes();
       } else {
-        alert(response.data.mensaje);
+        setError(response.data.mensaje || 'No se pudo eliminar');
       }
     } catch (err) {
-      const errorMessage = err.response?.data?.mensaje || 'Error de conexión al servidor';
+      const errorMessage = err.response?.data?.mensaje || 'Error de conexion al servidor';
       setError(errorMessage);
-      console.error(err);
     }
   };
 
   const openCreateModal = () => {
-    if (!permissions.canCreate) return; // Verificar permiso
+    if (!permissions.canCreate) return;
     setEditMode(false);
     setViewMode(false);
     setFormData({
@@ -165,64 +161,62 @@ useEffect(() => {
   };
 
   const openEditModal = async (id) => {
-    if (!permissions.canEdit) return; // Verificar permiso
+    if (!permissions.canEdit) return;
     try {
       const response = await api.get(`/cliente/dato-individual/${id}`);
       if (response.data.exito) {
-        const cliente = response.data.datos.cliente;
+        const c = response.data.datos.cliente;
         setFormData({
-          nombre: cliente.nombre || '',
-          apellido: cliente.apellido || '',
-          correo: cliente.correo || '',
-          usuario: cliente.usuario || '',
-          fecha_registro: cliente.fecha_registro ? new Date(cliente.fecha_registro).toISOString().split('T')[0] : '',
-          fecha_nac: cliente.fecha_nac ? new Date(cliente.fecha_nac).toISOString().split('T')[0] : '',
-          carnet_identidad: cliente.carnet_identidad || '',
-          ci_complemento: cliente.ci_complemento || '',
+          nombre: c.nombre || '',
+          apellido: c.apellido || '',
+          correo: c.correo || '',
+          usuario: c.usuario || '',
+          fecha_registro: c.fecha_registro ? new Date(c.fecha_registro).toISOString().split('T')[0] : '',
+          fecha_nac: c.fecha_nac ? new Date(c.fecha_nac).toISOString().split('T')[0] : '',
+          carnet_identidad: c.carnet_identidad || '',
+          ci_complemento: c.ci_complemento || '',
           contrasena: ''
         });
-        setCurrentCliente(cliente);
+        setCurrentCliente(c);
         setEditMode(true);
         setViewMode(false);
         setModalOpen(true);
       } else {
-        alert(response.data.mensaje);
+        setError(response.data.mensaje || 'No se pudo cargar el cliente');
       }
     } catch (err) {
-      const errorMessage = err.response?.data?.mensaje || 'Error de conexión al servidor';
+      const errorMessage = err.response?.data?.mensaje || 'Error de conexion al servidor';
       setError(errorMessage);
-      console.error(err);
     }
   };
 
   const openViewModal = async (id) => {
-    if (!permissions.canView) return; // Verificar permiso
+    if (!permissions.canView) return;
     try {
       const response = await api.get(`/cliente/dato-individual/${id}`);
       if (response.data.exito) {
-        const cliente = response.data.datos.cliente;
+        const c = response.data.datos.cliente;
         setFormData({
-          nombre: cliente.nombre || '',
-          apellido: cliente.apellido || '',
-          correo: cliente.correo || '',
-          usuario: cliente.usuario || '',
-          fecha_registro: cliente.fecha_registro ? new Date(cliente.fecha_registro).toISOString().split('T')[0] : '',
-          fecha_nac: cliente.fecha_nac ? new Date(cliente.fecha_nac).toISOString().split('T')[0] : '',
-          carnet_identidad: cliente.carnet_identidad || '',
-          ci_complemento: cliente.ci_complemento || '',
+          nombre: c.nombre || '',
+          apellido: c.apellido || '',
+          correo: c.correo || '',
+          usuario: c.usuario || '',
+          fecha_registro: c.fecha_registro ? new Date(c.fecha_registro).toISOString().split('T')[0] : '',
+          fecha_nac: c.fecha_nac ? new Date(c.fecha_nac).toISOString().split('T')[0] : '',
+          carnet_identidad: c.carnet_identidad || '',
+          ci_complemento: c.ci_complemento || '',
           contrasena: ''
         });
-        setCurrentCliente(cliente);
+        setCurrentCliente(c);
         setEditMode(false);
         setViewMode(true);
         setModalOpen(true);
       } else {
-        alert(response.data.mensaje);
+        setError(response.data.mensaje || 'No se pudo cargar el cliente');
       }
     } catch (err) {
-      const errorMessage = err.response?.data?.mensaje || 'Error de conexión al servidor';
+      const errorMessage = err.response?.data?.mensaje || 'Error de conexion al servidor';
       setError(errorMessage);
-      console.error(err);
     }
   };
 
@@ -245,44 +239,58 @@ useEffect(() => {
       let response;
       const filteredData = Object.fromEntries(
         Object.entries(formData).filter(([key, value]) => {
-          const requiredFields = ['nombre', 'apellido', 'correo', 'usuario', 'contrasena'];
+          const required = ['nombre', 'apellido', 'correo', 'usuario', 'contrasena'];
           if (editMode && ['usuario', 'contrasena', 'fecha_registro'].includes(key)) return false;
-          if (requiredFields.includes(key)) return true;
+          if (required.includes(key)) return true;
           return value !== '' && value !== null && value !== undefined;
         })
       );
 
-      if (editMode) {
-        response = await api.patch(`/cliente/${currentCliente.id_cliente}`, filteredData);
-      } else {
-        response = await api.post('/cliente/', filteredData);
+      if (filteredData.fecha_nac) {
+        const f = new Date(filteredData.fecha_nac);
+        const min = new Date(1900, 0, 1);
+        const now = new Date();
+        if (isNaN(f.getTime()) || f > now || f < min) {
+          setError('La fecha de nacimiento no es valida');
+          return;
+        }
       }
+      if (filteredData.carnet_identidad && !/^\d{1,10}$/.test(filteredData.carnet_identidad)) {
+        setError('El carnet debe ser numerico de hasta 10 digitos');
+        return;
+      }
+      if (typeof filteredData.ci_complemento === 'string') {
+        filteredData.ci_complemento = filteredData.ci_complemento.toUpperCase();
+        if (filteredData.ci_complemento && !/^[A-Z0-9]{1,3}$/.test(filteredData.ci_complemento)) {
+          setError('El complemento CI debe ser alfanumerico de hasta 3');
+          return;
+        }
+      }
+
+      if (editMode) response = await api.patch(`/cliente/${currentCliente.id_cliente}`, filteredData);
+      else response = await api.post('/cliente/', filteredData);
+
       if (response.data.exito) {
         closeModal();
         fetchClientes();
       } else {
-        alert(response.data.mensaje);
+        setError(response.data.mensaje || 'No se pudo guardar');
       }
     } catch (err) {
-      const errorMessage = err.response?.data?.mensaje || 'Error de conexión al servidor';
+      const errorMessage = err.response?.data?.mensaje || 'Error de conexion al servidor';
       setError(errorMessage);
-      console.error(err);
     }
   };
 
   const handlePageChange = (newPage) => {
-    if (newPage >= 1 && newPage <= Math.ceil(total / limit)) {
-      setPage(newPage);
-    }
+    if (newPage >= 1 && newPage <= Math.ceil(total / limit)) setPage(newPage);
   };
 
-  if (!role) {
-    return <p>Cargando permisos...</p>;
-  }
+  if (!role) return <p>Cargando permisos...</p>;
 
   return (
     <div className="bg-white rounded-lg shadow p-6">
-      <h2 className="text-xl font-semibold mb-4">Gestión de Clientes</h2>
+      <h2 className="text-xl font-semibold mb-4">Gestion de Clientes</h2>
 
       <div className="flex flex-col xl:flex-row gap-4 mb-6 items-stretch">
         <div className="flex-1">
@@ -291,14 +299,16 @@ useEffect(() => {
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="🔍 Buscar por nombre, apellido, correo o carnet..."
+              placeholder="Buscar por nombre, apellido, correo o carnet"
               className="border rounded-l px-4 py-2 w-full"
+              disabled={!permissions.canView}
             />
             <button
               type="submit"
               className="bg-blue-500 text-white px-4 py-2 rounded-r hover:bg-blue-600 whitespace-nowrap"
+              disabled={!permissions.canView}
             >
-              🔎 Buscar
+              Buscar
             </button>
           </form>
         </div>
@@ -308,20 +318,20 @@ useEffect(() => {
             value={filtro}
             onChange={handleFiltroChange}
             className="border rounded px-3 py-2 flex-1 sm:min-w-[180px]"
+            disabled={!permissions.canView}
           >
-            <option value="">📋 Todos - Sin filtro</option>
-            <option value="nombre">👤 Ordenar por nombre</option>
-            <option value="fecha">📅 Ordenar por fecha</option>
-            <option value="correo">📧 Ordenar por correo</option>
+            <option value="">Todos</option>
+            <option value="nombre">Por nombre</option>
+            <option value="fecha">Por fecha</option>
+            <option value="correo">Por correo</option>
           </select>
 
           {permissions.canCreate && (
             <button
               onClick={openCreateModal}
-              className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 whitespace-nowrap sm:w-auto w-full flex items-center justify-center gap-2"
+              className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 whitespace-nowrap sm:w-auto w-full"
             >
-              <span>👥</span>
-              <span>Crear Cliente</span>
+              Crear Cliente
             </button>
           )}
         </div>
@@ -341,7 +351,7 @@ useEffect(() => {
                   <th className="px-4 py-2 text-left">Nombre</th>
                   <th className="px-4 py-2 text-left">Apellido</th>
                   <th className="px-4 py-2 text-left">Correo</th>
-                  <th className="px-4 py-2 text-left">Carnet Identidad</th>
+                  <th className="px-4 py-2 text-left">Carnet</th>
                   <th className="px-4 py-2 text-left">Acciones</th>
                 </tr>
               </thead>
@@ -352,14 +362,16 @@ useEffect(() => {
                     <td className="px-4 py-2">{cliente.nombre}</td>
                     <td className="px-4 py-2">{cliente.apellido}</td>
                     <td className="px-4 py-2">{cliente.correo}</td>
-                    <td className="px-4 py-2">{cliente.carnet_identidad || '-'}{cliente.ci_complemento || ''}</td>
+                    <td className="px-4 py-2">
+                      {(cliente.carnet_identidad || '-') + (cliente.ci_complemento ? '-' + cliente.ci_complemento : '')}
+                    </td>
                     <td className="px-4 py-2 flex gap-2">
                       {permissions.canView && (
                         <button
                           onClick={() => openViewModal(cliente.id_cliente)}
                           className="text-green-500 hover:text-green-700 mr-2"
                         >
-                          Ver Datos
+                          Ver
                         </button>
                       )}
                       {permissions.canEdit && (
@@ -394,7 +406,7 @@ useEffect(() => {
               Anterior
             </button>
             <span className="px-4 py-2 bg-gray-100">
-              Página {page} de {Math.ceil(total / limit)}
+              Pagina {page} de {Math.ceil(total / limit)}
             </span>
             <button
               onClick={() => handlePageChange(page + 1)}
@@ -482,13 +494,13 @@ useEffect(() => {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Carnet de Identidad</label>
+                <label className="block text-sm font-medium mb-1">Carnet</label>
                 <input
                   name="carnet_identidad"
                   value={formData.carnet_identidad}
                   onChange={handleInputChange}
                   className="w-full border rounded px-3 py-2 bg-gray-100"
-                  maxLength="10"
+                  maxLength={10}
                   pattern="\d{1,10}"
                   disabled={viewMode}
                 />
@@ -500,14 +512,14 @@ useEffect(() => {
                   value={formData.ci_complemento}
                   onChange={handleInputChange}
                   className="w-full border rounded px-3 py-2 bg-gray-100"
-                  maxLength="3"
+                  maxLength={3}
                   pattern="[A-Za-z0-9]{0,3}"
                   disabled={viewMode}
                 />
               </div>
               {!editMode && !viewMode && (
                 <div className="col-span-2">
-                  <label className="block text-sm font-medium mb-1">Contraseña</label>
+                  <label className="block text-sm font-medium mb-1">Contrasena</label>
                   <input
                     name="contrasena"
                     value={formData.contrasena}
@@ -516,9 +528,7 @@ useEffect(() => {
                     type="password"
                     disabled={viewMode}
                   />
-                  <p className="text-xs text-gray-500 mt-1">
-                    Opcional: si no se proporciona, se asignará '123456' por defecto.
-                  </p>
+                  <p className="text-xs text-gray-500 mt-1">Opcional</p>
                 </div>
               )}
               <div className="col-span-2 flex justify-end mt-4">

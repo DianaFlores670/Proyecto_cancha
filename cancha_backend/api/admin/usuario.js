@@ -7,6 +7,147 @@ const fs = require("fs").promises;
 const { unlinkFile, createUploadAndProcess } = require("../../middleware/multer");
 
 const router = express.Router();
+const jwt = require('jsonwebtoken');
+const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret_key';
+
+let sendMail = async () => {};
+let notifyAdminNuevaSolicitud = async () => {};
+const getCorreosAdmins = async () => {
+  const q = `
+    SELECT LOWER(TRIM(u.correo)) AS correo
+    FROM administrador a
+    JOIN usuario u ON u.id_persona = a.id_administrador
+    WHERE u.correo IS NOT NULL AND u.correo <> ''
+  `;
+  const { rows } = await pool.query(q);
+  const set = new Set(rows.map(r => r.correo).filter(Boolean));
+  return Array.from(set);
+};
+
+try {
+  const nodemailer = require('nodemailer');
+  const mailCfg = require('../../config/mail');
+  if (mailCfg && mailCfg.ENABLED) {
+    const transporter = nodemailer.createTransport({
+      host: mailCfg.HOST,
+      port: Number(mailCfg.PORT),
+      secure: !!mailCfg.SECURE,
+      auth: { user: mailCfg.USER, pass: mailCfg.PASS }
+    });
+    sendMail = async ({ to, bcc, subject, html, replyTo }) => {
+      await transporter.sendMail({
+        from: mailCfg.FROM, to, bcc, subject, html, replyTo
+      });
+    };
+    notifyAdminNuevaSolicitud = async ({ toList = [], id_solicitud, usuario, correo, espacio_nombre }) => {
+      if (!toList.length) return;
+      const to = toList[0];
+      const bcc = toList.slice(1);
+      const subject = 'Nueva solicitud: Admin Espacio Deportivo';
+      const html =
+        '<h3>Nueva solicitud para administrar un espacio</h3>' +
+        '<ul>' +
+        '<li><b>ID Solicitud:</b> ' + id_solicitud + '</li>' +
+        '<li><b>Solicitante:</b> ' + (usuario || '-') + ' (' + (correo || '-') + ')</li>' +
+        '<li><b>Espacio:</b> ' + (espacio_nombre || '-') + '</li>' +
+        '</ul>' +
+        '<p>Ingrese al panel para aprobar o rechazar.</p>';
+      await sendMail({ to, bcc, subject, html, replyTo: correo || undefined });
+    };
+  }
+} catch (_) {}
+
+
+const listarEspaciosLibres = async (req, res) => {
+  try {
+    const q = `
+      SELECT id_espacio, nombre, direccion
+      FROM espacio_deportivo
+      WHERE id_admin_esp_dep IS NULL
+      ORDER BY nombre ASC;
+    `;
+    const r = await pool.query(q);
+    res.json(respuesta(true, 'OK', r.rows));
+  } catch (e) {
+    res.status(500).json(respuesta(false, 'ERR'));
+  }
+};
+
+const crearSolicitudAdmEspDep = async (idUsuario, idEspacio, motivo = null) => {
+  const chk = await pool.query(
+    'SELECT id_admin_esp_dep, nombre FROM espacio_deportivo WHERE id_espacio = $1',
+    [idEspacio]
+  );
+  if (chk.rowCount === 0) throw new Error('Espacio no encontrado');
+  if (chk.rows[0].id_admin_esp_dep) throw new Error('Espacio con admin');
+
+  const ins = `
+    INSERT INTO solicitud_admin_esp_dep (id_usuario, id_espacio, motivo)
+    VALUES ($1, $2, $3)
+    RETURNING *;
+  `;
+  const { rows } = await pool.query(ins, [idUsuario, idEspacio, motivo || null]);
+  return { solicitud: rows[0], espacio_nombre: chk.rows[0].nombre };
+};
+
+
+const crearSolicitudAdmEspDepController = async (req, res) => {
+  try {
+    const idUsuario = parseInt(req.body.id_usuario);
+    const idEspacio = parseInt(req.body.id_espacio);
+    const motivo = req.body.motivo || null;
+    if (!idUsuario || !idEspacio) {
+      return res.status(400).json(respuesta(false, 'faltan campos'));
+    }
+    const s = await crearSolicitudAdmEspDep(idUsuario, idEspacio, motivo);
+    res.status(201).json(respuesta(true, 'OK', s));
+  } catch (e) {
+    if (e.code === '23505') return res.status(400).json(respuesta(false, 'duplicado'));
+    res.status(400).json(respuesta(false, e.message));
+  }
+};
+
+const login = async (req, res) => {
+  const { correo, contrasena } = req.body;
+  if (!correo || !contrasena) {
+    return res.status(400).json(respuesta(false, 'faltan campos'));
+  }
+  try {
+    const result = await pool.query('SELECT * FROM usuario WHERE correo = $1', [correo]);
+    const u = result.rows[0];
+    if (!u) return res.status(401).json(respuesta(false, 'credenciales'));
+    const ok = await bcrypt.compare(contrasena, u.contrasena);
+    if (!ok) return res.status(401).json(respuesta(false, 'credenciales'));
+
+    const roles = [];
+    const checks = [
+      { t: 'administrador', r: 'ADMINISTRADOR' },
+      { t: 'admin_esp_dep', r: 'ADMIN_ESP_DEP' },
+      { t: 'deportista', r: 'DEPORTISTA' },
+      { t: 'control', r: 'CONTROL' },
+      { t: 'encargado', r: 'ENCARGADO' },
+      { t: 'cliente', r: 'CLIENTE' }
+    ];
+    for (const c of checks) {
+      const r = await pool.query(`SELECT 1 FROM ${c.t} WHERE id_${c.t} = $1 LIMIT 1`, [u.id_persona]);
+      if (r.rowCount > 0) roles.push(c.r);
+    }
+
+    if (roles.length === 0) {
+      return res.status(403).json(respuesta(false, 'cuenta sin roles', { code: 'NO_ROLES' }));
+    }
+
+    const token = jwt.sign({ id_persona: u.id_persona, roles }, JWT_SECRET, { expiresIn: '5h' });
+    return res.json(
+      respuesta(true, 'OK', {
+        token,
+        usuario: { id_persona: u.id_persona, usuario: u.usuario, correo: u.correo, roles }
+      })
+    );
+  } catch (e) {
+    return res.status(500).json(respuesta(false, 'ERR'));
+  }
+};
 
 // Función de respuesta estandarizada
 const respuesta = (exito, mensaje, datos = null) => ({
@@ -134,10 +275,10 @@ const buscarUsuarios = async (texto, limite = 10, offset = 0) => {
         usuario ILIKE $1 OR
         telefono ILIKE $1
     `;
-    
+
     const sanitizeInput = (input) => input.replace(/[%_\\]/g, '\\$&');
     const terminoBusqueda = `%${sanitizeInput(texto)}%`;
-    
+
     const [resultDatos, resultTotal] = await Promise.all([
       pool.query(queryDatos, [terminoBusqueda, limite, offset]),
       pool.query(queryTotal, [terminoBusqueda])
@@ -167,13 +308,13 @@ const obtenerUsuarioPorId = async (id) => {
     const result = await pool.query(query, [id]);
 
     if (!result.rows[0]) return null;
-    
+
     // Obtener TODOS los roles del usuario
     const rolesUsuario = await obtenerRolesUsuario(id);
-    
+
     // Incluir roles disponibles
     const rolesDisponibles = obtenerRolesDisponibles();
-    
+
     return {
       ...result.rows[0],
       roles: rolesUsuario,  // ← Ahora es un array
@@ -200,19 +341,19 @@ const obtenerRolesUsuario = async (idUsuario) => {
     ];
 
     const roles = [];
-    
+
     for (const { tabla, rol } of tablasRoles) {
       const query = `SELECT * FROM ${tabla} WHERE id_${tabla} = $1`;
       const result = await pool.query(query, [idUsuario]);
       if (result.rows.length > 0) {
-        roles.push({ 
-          rol, 
+        roles.push({
+          rol,
           datos: result.rows[0],
           tabla: tabla
         });
       }
     }
-    
+
     return roles;
   } catch (error) {
     console.error('Error in obtenerRolesUsuario:', error);
@@ -225,73 +366,50 @@ const obtenerRolesUsuario = async (idUsuario) => {
  */
 const crearUsuario = async (datosUsuario) => {
   try {
-    // --- Rango aproximado de La Paz ---
     const LAT_MIN = -16.65;
     const LAT_MAX = -16.45;
     const LON_MIN = -68.25;
     const LON_MAX = -68.05;
 
-    // --- Validación y asignación de coordenadas ---
     let { latitud, longitud } = datosUsuario;
-
     if (latitud !== undefined && longitud !== undefined) {
-      const dentroDeLaPaz =
+      const ok =
         latitud >= LAT_MIN && latitud <= LAT_MAX &&
         longitud >= LON_MIN && longitud <= LON_MAX;
-
-      if (!dentroDeLaPaz) {
-        throw new Error('Las coordenadas deben estar dentro del área de La Paz, Bolivia');
-      }
+      if (!ok) throw new Error('Coordenadas fuera de rango');
     } else {
-      // Coordenadas aleatorias dentro del rango
-      const randomInRange = (min, max) => Math.random() * (max - min) + min;
-      latitud = parseFloat(randomInRange(LAT_MIN, LAT_MAX).toFixed(6));
-      longitud = parseFloat(randomInRange(LON_MIN, LON_MAX).toFixed(6));
+      const rnd = (a, b) => Math.random() * (b - a) + a;
+      latitud = parseFloat(rnd(LAT_MIN, LAT_MAX).toFixed(6));
+      longitud = parseFloat(rnd(LON_MIN, LON_MAX).toFixed(6));
     }
 
-    // --- Validaciones adicionales ---
-    const validarCorreo = (correo) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correo);
-    const validarTelefono = (telefono) => /^\+?\d{8,15}$/.test(telefono);
+    const validarCorreo = (c) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(c);
+    const validarTelefono = (t) => /^\+?\d{8,15}$/.test(t);
 
-    if (!validarCorreo(datosUsuario.correo)) {
-      throw new Error('El correo electrónico no es válido');
-    }
-
-    if (datosUsuario.telefono && !validarTelefono(datosUsuario.telefono)) {
-      throw new Error('El número de teléfono no es válido');
-    }
+    if (!validarCorreo(datosUsuario.correo)) throw new Error('Correo invalido');
+    if (datosUsuario.telefono && !validarTelefono(datosUsuario.telefono)) throw new Error('Telefono invalido');
 
     if (datosUsuario.sexo) {
       const sexosPermitidos = await obtenerValoresEnum('sexo_enum');
       if (!sexosPermitidos.includes(datosUsuario.sexo)) {
-        throw new Error(`El valor para sexo no es válido. Valores permitidos: ${sexosPermitidos.join(', ')}`);
+        throw new Error('Sexo invalido');
       }
     }
 
-    // Validar rol si se proporciona - AHORA SOPORTA rol_agregar TAMBIÉN
-    let rolAAgregar = datosUsuario.rol || datosUsuario.rol_agregar;
-    let rolAsignado = null;
+    const rawRol = String(datosUsuario.rol || datosUsuario.rol_agregar || '').toLowerCase().trim();
+    const wantsAdmin = rawRol === 'admin_esp_dep';
+    const wantsOther = ['encargado', 'control'].includes(rawRol);
 
-    if (rolAAgregar) {
-      const rolesDisponibles = obtenerRolesDisponibles().map(r => r.valor);
-      if (!rolesDisponibles.includes(rolAAgregar)) {
-        throw new Error(`El rol ${rolAAgregar} no es válido`);
-      }
-    }
-
-    // --- Hash de la contraseña ---
     const contrasenaHash = await bcrypt.hash(datosUsuario.contrasena || '123456', 10);
 
-    // --- Inserción SQL en usuario ---
-    const queryUsuario = `
+    const qUser = `
       INSERT INTO usuario (
-        nombre, apellido, contrasena, telefono, correo, 
+        nombre, apellido, contrasena, telefono, correo,
         sexo, imagen_perfil, usuario, latitud, longitud
-      ) 
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
       RETURNING id_persona
     `;
-    const valuesUsuario = [
+    const vUser = [
       datosUsuario.nombre || null,
       datosUsuario.apellido || null,
       contrasenaHash,
@@ -303,20 +421,45 @@ const crearUsuario = async (datosUsuario) => {
       latitud,
       longitud
     ];
-    const resultUsuario = await pool.query(queryUsuario, valuesUsuario);
-    const idUsuario = resultUsuario.rows[0].id_persona;
+    const rUser = await pool.query(qUser, vUser);
+    const idUsuario = rUser.rows[0].id_persona;
 
-    // --- Asignar rol si se proporciona ---
-    if (rolAAgregar) {
-      rolAsignado = await asignarRolUsuario(idUsuario, rolAAgregar, datosUsuario.datos_especificos || {});
+    await asignarRolUsuario(idUsuario, 'cliente', {});
+
+    if (wantsOther) {
+      await asignarRolUsuario(idUsuario, rawRol, datosUsuario.datos_especificos || {});
     }
 
-    // Obtener datos completos para retornar
+if (wantsAdmin) {
+  const idEsp = Number(datosUsuario.id_espacio);
+  if (Number.isInteger(idEsp)) {
+    const { solicitud, espacio_nombre } = await crearSolicitudAdmEspDep(
+      idUsuario,
+      idEsp,
+      datosUsuario.motivo || datosUsuario.carta || null
+    );
+    try {
+      const adminEmails = await getCorreosAdmins();
+      const u = await pool.query('SELECT usuario, correo FROM usuario WHERE id_persona=$1', [idUsuario]);
+      await notifyAdminNuevaSolicitud({
+        toList: adminEmails,
+        id_solicitud: solicitud.id_solicitud,
+        usuario: u.rows[0]?.usuario || null,
+        correo: u.rows[0]?.correo || null,
+        espacio_nombre
+      });
+    } catch (_) {}
+  }
+}
+
+
     const usuarioCompleto = await obtenerUsuarioPorId(idUsuario);
-    return { ...usuarioCompleto, rol_asignado: rolAsignado };
+    return { ...usuarioCompleto, rol_asignado: wantsOther ? rawRol : 'cliente' };
   } catch (error) {
-    console.error('Error in crearUsuario:', error);
-    throw new Error(error.message);
+    if (!error.statusCode) error.statusCode = 400;
+    const e = new Error(error.message || 'Error al crear usuario');
+    e.statusCode = error.statusCode;
+    throw e;
   }
 };
 
@@ -415,8 +558,8 @@ const actualizarUsuario = async (id, camposActualizar) => {
 
     // Retornar datos completos
     const usuarioCompleto = await obtenerUsuarioPorId(id);
-    return { 
-      ...usuarioCompleto, 
+    return {
+      ...usuarioCompleto,
       rol_agregado: rolAgregado,
       rol_eliminado: rolEliminado
     };
@@ -448,7 +591,7 @@ const agregarRolUsuario = async (idUsuario, rol, datosEspecificos = {}) => {
     // Verificar si ya tiene el rol
     const rolesExistentes = await obtenerRolesUsuario(idUsuario);
     const yaTieneRol = rolesExistentes.some(r => r.rol === rol);
-    
+
     if (yaTieneRol) {
       throw new Error(`El usuario ya tiene el rol: ${rol}`);
     }
@@ -468,7 +611,7 @@ const removerRolUsuario = async (idUsuario, rol) => {
   try {
     const tablasMap = {
       'cliente': 'cliente',
-      'administrador': 'administrador', 
+      'administrador': 'administrador',
       'admin_esp_dep': 'admin_esp_dep',
       'deportista': 'deportista',
       'control': 'control',
@@ -482,7 +625,7 @@ const removerRolUsuario = async (idUsuario, rol) => {
 
     const query = `DELETE FROM ${tabla} WHERE id_${tabla} = $1 RETURNING *`;
     const result = await pool.query(query, [idUsuario]);
-    
+
     return result.rows[0] || null;
   } catch (error) {
     console.error('Error in removerRolUsuario:', error);
@@ -523,7 +666,7 @@ const asignarRolUsuario = async (idUsuario, rol, datosEspecificos = {}) => {
 const removerRolesUsuario = async (idUsuario) => {
   try {
     const tablasRoles = [
-      'cliente', 'administrador', 'admin_esp_dep', 
+      'cliente', 'administrador', 'admin_esp_dep',
       'deportista', 'control', 'encargado'
     ];
 
@@ -646,7 +789,7 @@ const obtenerDatosEspecificosController = async (req, res) => {
     const offset = parseInt(req.query.offset) || 0;
 
     const { usuarios, total } = await obtenerDatosEspecificos(limite, offset);
-    
+
     res.json(respuesta(true, 'Datos específicos obtenidos correctamente', {
       usuarios,
       paginacion: { limite, offset, total }
@@ -698,7 +841,7 @@ const buscarUsuariosController = async (req, res) => {
     }
 
     const { usuarios, total } = await buscarUsuarios(q, limite, offset);
-    
+
     res.json(respuesta(true, 'Usuarios obtenidos correctamente', {
       usuarios,
       paginacion: { limite, offset, total }
@@ -906,5 +1049,8 @@ router.get('/dato-individual/:id', obtenerUsuarioPorIdController);
 router.post('/', crearUsuarioController);
 router.patch('/:id', actualizarUsuarioController);
 router.delete('/:id', eliminarUsuarioController);
+router.get('/espacios-libres', listarEspaciosLibres);
+router.post('/solicitudes/adm-esp-dep', crearSolicitudAdmEspDepController);
+router.post('/sign-in', login);
 
 module.exports = router;

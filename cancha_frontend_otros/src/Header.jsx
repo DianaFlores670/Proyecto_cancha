@@ -1,3 +1,4 @@
+/* eslint-disable no-empty */
 /* eslint-disable no-unused-vars */
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
@@ -18,15 +19,17 @@ const formatValue = (v) => {
 };
 
 const normalizeUser = (u) => {
-  const roles = Array.isArray(u?.roles)
-    ? u.roles.map(r => ({
-      rol: r?.rol ?? '',
-      tabla: r?.tabla ?? '',
-      datos: typeof r?.datos === 'object' && r?.datos !== null ? r.datos : {}
-    }))
-    : [];
+  const rolesSrc = Array.isArray(u?.roles) ? u.roles : [];
+  const roles = rolesSrc.map((r) => {
+    if (typeof r === 'string') return { rol: r.toLowerCase(), tabla: '', datos: {} };
+    const rol = typeof r?.rol === 'string' ? r.rol : '';
+    const tabla = typeof r?.tabla === 'string' ? r.tabla : '';
+    const datos = r && typeof r.datos === 'object' && r.datos !== null ? r.datos : {};
+    return { rol, tabla, datos };
+  });
   return { ...u, roles };
 };
+
 
 
 const Header = () => {
@@ -42,8 +45,15 @@ const Header = () => {
     correo: '',
     contrasena: '',
     confirmarContrasena: '',
-    rol_agregar: 'cliente', // Default role
+    rol_agregar: 'cliente',
+    id_espacio: '',
+    motivo: ''
   });
+  const [espaciosLibres, setEspaciosLibres] = useState([]);
+  const [espaciosLoading, setEspaciosLoading] = useState(false);
+  const [espaciosError, setEspaciosError] = useState(null);
+  const [showSubmissionModal, setShowSubmissionModal] = useState(false);
+  const [submissionMessage, setSubmissionMessage] = useState('');
   const [showRoleSection, setShowRoleSection] = useState(false);
   const [registerError, setRegisterError] = useState(null);
   const [registerLoading, setRegisterLoading] = useState(false);
@@ -87,6 +97,26 @@ const Header = () => {
     { valor: 'control', etiqueta: 'Control' },
     { valor: 'cliente', etiqueta: 'Cliente' },
   ];
+
+  const fetchEspaciosLibres = async () => {
+    setEspaciosLoading(true);
+    setEspaciosError(null);
+    try {
+      const r = await api.get('/solicitud-admin-esp-dep/espacios-libres');
+      const list =
+        r.data?.datos?.espacios ||
+        r.data?.datos ||
+        r.data?.data?.espacios ||
+        [];
+      setEspaciosLibres(Array.isArray(list) ? list : []);
+    } catch (err) {
+      setEspaciosError('Error al cargar espacios libres');
+      setEspaciosLibres([]);
+    } finally {
+      setEspaciosLoading(false);
+    }
+  };
+
 
   // Check login status and load user data
   useEffect(() => {
@@ -160,10 +190,10 @@ const Header = () => {
         setShowMenu(false);
       }
     };
-
     document.addEventListener('mousedown', handleClickOutside);
-    return () => document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
 
   // Handle login
   const handleLogin = async (e) => {
@@ -181,31 +211,45 @@ const Header = () => {
 
       if (data.success && data.data.token && data.data.usuario) {
         const normalized = normalizeUser(data.data.usuario);
-        localStorage.setItem('token', data.data.token);
-        localStorage.setItem('user', JSON.stringify(normalized));
-        setIsLoggedIn(true);
-        setUser(normalized);
-        setFormData({
-          nombre: normalized.nombre || '',
-          apellido: normalized.apellido || '',
-          correo: normalized.correo || '',
-          usuario: normalized.usuario || '',
-          telefono: normalized.telefono || '',
-          sexo: normalized.sexo || '',
-          imagen_perfil: normalized.imagen_perfil || '',
-          latitud: normalized.latitud || '',
-          longitud: normalized.longitud || '',
-          datos_especificos: normalized.roles?.[0]?.datos || {},
-        });
-        setImagePreview(normalized.imagen_perfil ? getImageUrl(normalized.imagen_perfil) : null);
+        if (data.success && data.data.token && data.data.usuario) {
+          const normalized = normalizeUser(data.data.usuario);
+          console.log(normalized.roles);
+          const hasRole = Array.isArray(normalized.roles) && normalized.roles.length > 0;
+          if (!hasRole) {
+            setLoginError('Tu cuenta no tiene roles habilitados. Solicita acceso o espera aprobacion.');
+            setLoginLoading(false);
+            return;
+          }
 
-        // navegación según roles (ahora es array y en minúsculas)
-        const roleSet = new Set((normalized.roles ?? []).map(r => (r.rol || '').toUpperCase()));
-        if (roleSet.has('CLIENTE') || roleSet.has('DEPORTISTA')) {
-          navigate('/espacios-deportivos');
+          localStorage.setItem('token', data.data.token);
+          localStorage.setItem('user', JSON.stringify(normalized));
+          setIsLoggedIn(true);
+          setUser(normalized);
+          setFormData({
+            nombre: normalized.nombre || '',
+            apellido: normalized.apellido || '',
+            correo: normalized.correo || '',
+            usuario: normalized.usuario || '',
+            telefono: normalized.telefono || '',
+            sexo: normalized.sexo || '',
+            imagen_perfil: normalized.imagen_perfil || '',
+            latitud: normalized.latitud || '',
+            longitud: normalized.longitud || '',
+            datos_especificos: normalized.roles?.[0]?.datos || {},
+          });
+          setImagePreview(normalized.imagen_perfil ? getImageUrl(normalized.imagen_perfil) : null);
+
+          const roleSet = new Set((normalized.roles ?? []).map(r => (r.rol || '').toUpperCase()));
+          if (roleSet.has('CLIENTE') || roleSet.has('DEPORTISTA')) {
+            navigate('/espacios-deportivos');
+          } else {
+            navigate('/administrador');
+          }
         } else {
-          navigate('/administrador');
+          setLoginError('Respuesta del servidor invalida. Intenta de nuevo.');
+          setLoginLoading(false);
         }
+
 
       } else {
         setLoginError('Respuesta del servidor inválida. Intenta de nuevo.');
@@ -222,44 +266,62 @@ const Header = () => {
 
   // Handle registration
   const handleRegister = async (e) => {
-    e.preventDefault();
-    setRegisterLoading(true);
-    setRegisterError(null);
+  e.preventDefault();
+  setRegisterLoading(true);
+  setRegisterError(null);
 
-    // Validate password confirmation
-    if (registerData.contrasena !== registerData.confirmarContrasena) {
-      setRegisterError('Las contraseñas no coinciden');
-      setRegisterLoading(false);
-      return;
-    }
+  if (registerData.contrasena !== registerData.confirmarContrasena) {
+    setRegisterError('Las contrasenas no coinciden');
+    setRegisterLoading(false);
+    return;
+  }
 
-    try {
-      const data = new FormData();
-      data.append('usuario', registerData.usuario);
-      data.append('correo', registerData.correo);
-      data.append('contrasena', registerData.contrasena);
-      data.append('rol_agregar', registerData.rol_agregar || 'cliente'); // Default to cliente if no role selected
+  const wantsAdmin = (registerData.rol_agregar || 'cliente') === 'admin_esp_dep';
+  if (wantsAdmin && !registerData.id_espacio) {
+    setRegisterError('Debe seleccionar un espacio deportivo');
+    setRegisterLoading(false);
+    return;
+  }
 
-      const response = await api.post('/usuario/', data, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
+  try {
+    const payload = {
+      usuario: registerData.usuario,
+      correo: registerData.correo,
+      contrasena: registerData.contrasena,
+      rol: registerData.rol_agregar || 'cliente',
+      ...(wantsAdmin ? {
+        id_espacio: Number(registerData.id_espacio),
+        motivo: (registerData.motivo || '').trim()
+      } : {})
+    };
 
-      if (response.data.exito) {
-        setShowRegisterModal(false);
-        setRegisterData({ usuario: '', correo: '', contrasena: '', confirmarContrasena: '', rol_agregar: 'cliente' });
-        setShowRoleSection(false);
-        navigate('/espacios-deportivos');
-      } else {
-        setRegisterError(response.data.mensaje || 'Error al registrarse');
-      }
-    } catch (err) {
-      setRegisterError(
-        err.response?.data?.mensaje || 'Error de conexión al servidor'
-      );
-    } finally {
-      setRegisterLoading(false);
-    }
-  };
+    const res = await api.post('/usuario/', payload);
+    const ok = res.data?.exito === true;
+    if (!ok) throw new Error(res.data?.mensaje || 'Registro fallido');
+
+    setShowRegisterModal(false);
+    setSubmissionMessage(
+      wantsAdmin
+        ? 'Solicitud creada. Te avisaremos por correo cuando se revise.'
+        : 'Registro completado. Bienvenido.'
+    );
+    setShowSubmissionModal(true);
+    setRegisterData({
+      usuario: '',
+      correo: '',
+      contrasena: '',
+      confirmarContrasena: '',
+      rol_agregar: 'cliente',
+      id_espacio: '',
+      motivo: ''
+    });
+    setShowRoleSection(false);
+  } catch (err) {
+    setRegisterError(err?.message || 'Error de conexion');
+  } finally {
+    setRegisterLoading(false);
+  }
+};
 
   // Handle logout
   const handleLogout = () => {
@@ -389,26 +451,44 @@ const Header = () => {
   // Handle input change
   const handleInputChange = (e) => {
     const { name, value } = e.target;
+
     if (name.startsWith('nueva_') || name.startsWith('confirmar_')) {
       setPasswordData((prev) => {
-        const newPasswordData = { ...prev, [name]: value };
-        if (newPasswordData.nueva_contrasena && newPasswordData.confirmar_contrasena) {
+        const next = { ...prev, [name]: value };
+        if (next.nueva_contrasena && next.confirmar_contrasena) {
           setPasswordMatchError(
-            newPasswordData.nueva_contrasena !== newPasswordData.confirmar_contrasena
-              ? 'Las contraseñas no coinciden'
-              : null
+            next.nueva_contrasena !== next.confirmar_contrasena ? 'Las contrasenas no coinciden' : null
           );
         } else {
           setPasswordMatchError(null);
         }
-        return newPasswordData;
+        return next;
       });
-    } else if (name in registerData) {
-      setRegisterData((prev) => ({ ...prev, [name]: value }));
-    } else {
-      setFormData((prev) => ({ ...prev, [name]: value }));
+      return;
     }
+
+    if (name in registerData) {
+      if (name === 'rol_agregar') {
+        const val = value;
+        setRegisterData((prev) => ({
+          ...prev,
+          rol_agregar: val,
+          id_espacio: val === 'admin_esp_dep' ? prev.id_espacio : '',
+          motivo: val === 'admin_esp_dep' ? prev.motivo : ''
+        }));
+        if (val === 'admin_esp_dep' && espaciosLibres.length === 0) {
+          fetchEspaciosLibres();
+        }
+        return;
+      }
+
+      setRegisterData((prev) => ({ ...prev, [name]: value }));
+      return;
+    }
+
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
+
 
   // Handle file change for profile image
   const handleFileChange = (e) => {
@@ -503,10 +583,19 @@ const Header = () => {
 
   const handleCloseRegisterModal = () => {
     setShowRegisterModal(false);
-    setRegisterData({ usuario: '', correo: '', contrasena: '', confirmarContrasena: '', rol_agregar: 'cliente' });
+    setRegisterData({
+      usuario: '',
+      correo: '',
+      contrasena: '',
+      confirmarContrasena: '',
+      rol_agregar: 'cliente',
+      id_espacio: '',
+      motivo: ''
+    });
     setShowRoleSection(false);
     setRegisterError(null);
   };
+
 
   const handleCloseProfileModal = () => {
     setShowProfileModal(false);
@@ -789,7 +878,13 @@ const Header = () => {
               <div>
                 <button
                   type="button"
-                  onClick={() => setShowRoleSection(!showRoleSection)}
+                  onClick={() => {
+                    const next = !showRoleSection;
+                    setShowRoleSection(next);
+                    if (next && registerData.rol_agregar === 'admin_esp_dep') {
+                      fetchEspaciosLibres();
+                    }
+                  }}
                   className="text-[#01CD6C] hover:text-[#00b359] text-sm font-medium flex items-center gap-2"
                 >
                   Quiero ser parte del sistema
@@ -816,13 +911,47 @@ const Header = () => {
                     >
                       <option value="cliente">Cliente (por defecto)</option>
                       {rolesDisponibles
-                        .filter((rol) => rol.valor !== 'cliente')
-                        .map((rol) => (
-                          <option key={rol.valor} value={rol.valor}>
-                            {rol.etiqueta}
-                          </option>
+                        .filter(rol => rol.valor !== 'cliente')
+                        .map(rol => (
+                          <option key={rol.valor} value={rol.valor}>{rol.etiqueta}</option>
                         ))}
                     </select>
+
+                    {registerData.rol_agregar === 'admin_esp_dep' && (
+                      <div className="mt-4 space-y-3">
+                        <label className="block text-sm font-medium text-[#23475F]">Seleccionar espacio deportivo</label>
+                        {espaciosLoading ? (
+                          <div className="text-sm text-[#23475F]">Cargando espacios...</div>
+                        ) : espaciosError ? (
+                          <div className="text-sm text-[#A31621]">{espaciosError}</div>
+                        ) : (
+                          <select
+                            name="id_espacio"
+                            value={registerData.id_espacio}
+                            onChange={handleInputChange}
+                            className="mt-1 w-full px-3 py-2 border border-[#23475F] rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-[#01CD6C]"
+                          >
+                            <option value="">Seleccione un espacio</option>
+                            {espaciosLibres.map(e => (
+                              <option key={e.id_espacio} value={e.id_espacio}>
+                                {e.nombre} {e.direccion ? `- ${e.direccion}` : ''}
+                              </option>
+                            ))}
+                          </select>
+                        )}
+
+                        <label className="block text-sm font-medium text-[#23475F]">Motivo de solicitud (opcional)</label>
+                        <textarea
+                          name="motivo"
+                          value={registerData.motivo}
+                          onChange={handleInputChange}
+                          rows={3}
+                          className="mt-1 w-full px-3 py-2 border border-[#23475F] rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-[#01CD6C]"
+                          placeholder="Explique brevemente por que solicita administrar el espacio"
+                        />
+                      </div>
+                    )}
+
                   </div>
                 )}
               </div>
@@ -842,6 +971,25 @@ const Header = () => {
           </div>
         </div>
       )}
+
+      {showSubmissionModal && (
+        <div className="fixed inset-0 bg-[#0F2634] bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white p-8 rounded-lg shadow-lg w-full max-w-md relative text-center">
+            <h3 className="text-2xl font-bold text-[#23475F] mb-4">Solicitud enviada</h3>
+            <p className="text-[#23475F] mb-6">{submissionMessage}</p>
+            <button
+              onClick={() => {
+                setShowSubmissionModal(false);
+                navigate('/espacios-deportivos');
+              }}
+              className="w-full py-2 px-4 bg-[#01CD6C] text-white rounded-md hover:bg-[#00b359] focus:outline-none focus:ring-2 focus:ring-[#23475F]"
+            >
+              Entendido
+            </button>
+          </div>
+        </div>
+      )}
+
 
       {/* Profile Modal */}
       {showProfileModal && (

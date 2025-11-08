@@ -1,26 +1,38 @@
+/* eslint-disable no-empty */
 import React, { useState, useEffect } from 'react';
 import api from '../services/api';
 
-// Configuración de permisos por rol
 const permissionsConfig = {
-  ADMINISTRADOR: {
-    canView: true,
-    canCreate: true,
-    canEdit: true,
-    canDelete: true,
-  },
-  ADMIN_ESP_DEP: {
-    canView: false,
-    canCreate: false,
-    canEdit: false,
-    canDelete: false,
-  },
-  DEFAULT: {
-    canView: false,
-    canCreate: false,
-    canEdit: false,
-    canDelete: false,
-  },
+  ADMINISTRADOR: { canView: true, canCreate: true, canEdit: true, canDelete: true },
+  ADMIN_ESP_DEP: { canView: false, canCreate: false, canEdit: false, canDelete: false },
+  DEFAULT: { canView: false, canCreate: false, canEdit: false, canDelete: false },
+};
+
+const getEffectiveRole = () => {
+  const keys = Object.keys(permissionsConfig);
+  const bag = new Set();
+  try {
+    const u = JSON.parse(localStorage.getItem('user') || '{}');
+    const arr = Array.isArray(u?.roles) ? u.roles : [];
+    for (const r of arr) {
+      if (typeof r === 'string') bag.add(r);
+      else if (r && typeof r === 'object') ['rol','role','nombre','name'].forEach(k => { if (r[k]) bag.add(r[k]); });
+    }
+    if (bag.size === 0 && u?.role) bag.add(u.role);
+  } catch {}
+  const tok = localStorage.getItem('token');
+  if (bag.size === 0 && tok && tok.split('.').length === 3) {
+    try {
+      const payload = JSON.parse(atob(tok.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')));
+      const t = Array.isArray(payload?.roles) ? payload.roles : (payload?.rol ? [payload.rol] : []);
+      t.forEach(v => bag.add(v));
+    } catch {}
+  }
+  const norm = Array.from(bag).map(v => String(v || '').trim().toUpperCase().replace(/\s+/g,'_'));
+  const map = v => v === 'ADMIN' ? 'ADMINISTRADOR' : v;
+  const norm2 = norm.map(map);
+  const prio = ['ADMINISTRADOR','ADMIN_ESP_DEP'];
+  return prio.find(r => norm2.includes(r) && keys.includes(r)) || norm2.find(r => keys.includes(r)) || 'DEFAULT';
 };
 
 const Pago = () => {
@@ -43,128 +55,90 @@ const Pago = () => {
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const limit = 10;
-  const [role, setRole] = useState('DEFAULT');
+  const [role, setRole] = useState(() => getEffectiveRole());
 
-  // Obtener el rol del usuario desde localStorage
-useEffect(() => {
-  const userData = localStorage.getItem('user');
-  if (!userData) return;
+  useEffect(() => {
+    const sync = () => setRole(getEffectiveRole());
+    window.addEventListener('storage', sync);
+    window.addEventListener('auth-changed', sync);
+    window.addEventListener('focus', sync);
+    return () => {
+      window.removeEventListener('storage', sync);
+      window.removeEventListener('auth-changed', sync);
+      window.removeEventListener('focus', sync);
+    };
+  }, []);
 
-  try {
-    const u = JSON.parse(userData);
-
-    // 1) Normaliza a array en MAYÚSCULAS
-    const rolesArr = Array.isArray(u?.roles)
-      ? u.roles.map(r => String(r).toUpperCase())
-      : (u?.role ? [String(u.role).toUpperCase()] : []);
-
-    // 2) Elige un rol que exista en permissionsConfig, con prioridad
-    const keys = Object.keys(permissionsConfig);
-    const PRIORIDAD = ['ADMINISTRADOR']; // ajusta tu prioridad
-    const efectivo =
-      PRIORIDAD.find(r => rolesArr.includes(r) && keys.includes(r)) ||
-      rolesArr.find(r => keys.includes(r)) ||
-      'DEFAULT';
-
-    setRole(efectivo);
-  } catch (err) {
-    console.error('Error al parsear datos del usuario:', err);
-    setRole('DEFAULT');
-  }
-}, []);
-
-  // Obtener permisos según el rol (o DEFAULT si no hay rol o no está definido)
   const permissions = role && permissionsConfig[role] ? permissionsConfig[role] : permissionsConfig.DEFAULT;
 
-  // Fetch reservas válidas al cargar el componente
   useEffect(() => {
     const fetchReservas = async () => {
       try {
         const response = await api.get('/reserva/datos-especificos');
-        if (response.data.exito) {
-          setReservas(response.data.datos.reservas || []);
-        }
+        if (response.data?.exito) setReservas(response.data.datos.reservas || []);
+        else setError(response.data?.mensaje || 'Error al obtener reservas');
       } catch (err) {
-        console.error('Error al obtener reservas:', err);
+        setError(err.response?.data?.mensaje || 'Error de conexion al obtener reservas');
       }
     };
-
-    fetchReservas();
-  }, []);
+    if (permissions.canView) fetchReservas();
+  }, [role]);
 
   const fetchPagos = async (params = {}) => {
+    if (!permissions.canView) { setError('No tienes permisos para ver los datos'); return; }
     setLoading(true);
     setError(null);
     const offset = (page - 1) * limit;
     const fullParams = { ...params, limit, offset };
     try {
       let response;
-      if (params.q) {
-        response = await api.get('/pago/buscar', { params: fullParams });
-      } else if (params.tipo) {
-        response = await api.get('/pago/filtro', { params: fullParams });
+      if (params.q) response = await api.get('/pago/buscar', { params: fullParams });
+      else if (params.tipo) response = await api.get('/pago/filtro', { params: fullParams });
+      else response = await api.get('/pago/datos-especificos', { params: fullParams });
+      if (response.data?.exito) {
+        setPagos(response.data.datos.pagos || []);
+        setTotal(response.data.datos.paginacion?.total || 0);
       } else {
-        response = await api.get('/pago/datos-especificos', { params: fullParams });
-      }
-      if (response.data.exito) {
-        setPagos(response.data.datos.pagos);
-        setTotal(response.data.datos.paginacion.total);
-      } else {
-        setError(response.data.mensaje);
+        setError(response.data?.mensaje || 'Error al cargar pagos');
       }
     } catch (err) {
-      const errorMessage = err.response?.data?.mensaje || 'Error de conexión al servidor';
-      setError(errorMessage);
-      console.error(err);
+      setError(err.response?.data?.mensaje || 'Error de conexion al servidor');
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    fetchPagos();
-  }, [page]);
+  useEffect(() => { fetchPagos(); }, [page, role]);
 
   const handleSearch = (e) => {
     e.preventDefault();
     setPage(1);
-    if (searchTerm.trim()) {
-      fetchPagos({ q: searchTerm });
-    } else {
-      fetchPagos();
-    }
+    if (searchTerm.trim()) fetchPagos({ q: searchTerm });
+    else fetchPagos();
   };
 
   const handleFiltroChange = (e) => {
     const tipo = e.target.value;
     setFiltro(tipo);
     setPage(1);
-    if (tipo) {
-      fetchPagos({ tipo });
-    } else {
-      fetchPagos();
-    }
+    if (tipo) fetchPagos({ tipo });
+    else fetchPagos();
   };
 
   const handleDelete = async (id) => {
-    if (!permissions.canDelete) return; // Verificar permiso
-    if (!window.confirm('¿Estás seguro de eliminar este pago?')) return;
+    if (!permissions.canDelete) return;
+    if (!window.confirm('Estas seguro de eliminar este pago?')) return;
     try {
       const response = await api.delete(`/pago/${id}`);
-      if (response.data.exito) {
-        fetchPagos();
-      } else {
-        alert(response.data.mensaje);
-      }
+      if (response.data?.exito) fetchPagos();
+      else setError(response.data?.mensaje || 'No se pudo eliminar');
     } catch (err) {
-      const errorMessage = err.response?.data?.mensaje || 'Error de conexión al servidor';
-      setError(errorMessage);
-      console.error(err);
+      setError(err.response?.data?.mensaje || 'Error de conexion al servidor');
     }
   };
 
   const openCreateModal = () => {
-    if (!permissions.canCreate) return; // Verificar permiso
+    if (!permissions.canCreate) return;
     setEditMode(false);
     setViewMode(false);
     setFormData({
@@ -178,54 +152,50 @@ useEffect(() => {
   };
 
   const openEditModal = async (id) => {
-    if (!permissions.canEdit) return; // Verificar permiso
+    if (!permissions.canEdit) return;
     try {
       const response = await api.get(`/pago/dato-individual/${id}`);
-      if (response.data.exito) {
-        const pago = response.data.datos.pago;
+      if (response.data?.exito) {
+        const p = response.data.datos.pago;
         setFormData({
-          monto: pago.monto || '',
-          metodo_pago: pago.metodo_pago || 'tarjeta',
-          fecha_pago: pago.fecha_pago ? new Date(pago.fecha_pago).toISOString().split('T')[0] : '',
-          id_reserva: pago.id_reserva || ''
+          monto: p.monto || '',
+          metodo_pago: p.metodo_pago || 'tarjeta',
+          fecha_pago: p.fecha_pago ? new Date(p.fecha_pago).toISOString().split('T')[0] : '',
+          id_reserva: p.id_reserva || ''
         });
-        setCurrentPago(pago);
+        setCurrentPago(p);
         setEditMode(true);
         setViewMode(false);
         setModalOpen(true);
       } else {
-        alert(response.data.mensaje);
+        setError(response.data?.mensaje || 'No se pudo cargar el registro');
       }
     } catch (err) {
-      const errorMessage = err.response?.data?.mensaje || 'Error de conexión al servidor';
-      setError(errorMessage);
-      console.error(err);
+      setError(err.response?.data?.mensaje || 'Error de conexion al servidor');
     }
   };
 
   const openViewModal = async (id) => {
-    if (!permissions.canView) return; // Verificar permiso
+    if (!permissions.canView) return;
     try {
       const response = await api.get(`/pago/dato-individual/${id}`);
-      if (response.data.exito) {
-        const pago = response.data.datos.pago;
+      if (response.data?.exito) {
+        const p = response.data.datos.pago;
         setFormData({
-          monto: pago.monto || '',
-          metodo_pago: pago.metodo_pago || 'tarjeta',
-          fecha_pago: pago.fecha_pago ? new Date(pago.fecha_pago).toISOString().split('T')[0] : '',
-          id_reserva: pago.id_reserva || ''
+          monto: p.monto || '',
+          metodo_pago: p.metodo_pago || 'tarjeta',
+          fecha_pago: p.fecha_pago ? new Date(p.fecha_pago).toISOString().split('T')[0] : '',
+          id_reserva: p.id_reserva || ''
         });
-        setCurrentPago(pago);
+        setCurrentPago(p);
         setEditMode(false);
         setViewMode(true);
         setModalOpen(true);
       } else {
-        alert(response.data.mensaje);
+        setError(response.data?.mensaje || 'No se pudo cargar el registro');
       }
     } catch (err) {
-      const errorMessage = err.response?.data?.mensaje || 'Error de conexión al servidor';
-      setError(errorMessage);
-      console.error(err);
+      setError(err.response?.data?.mensaje || 'Error de conexion al servidor');
     }
   };
 
@@ -245,68 +215,39 @@ useEffect(() => {
     e.preventDefault();
     if (viewMode || (!permissions.canCreate && !editMode) || (!permissions.canEdit && editMode)) return;
     try {
+      const filtered = {
+        monto: formData.monto !== '' ? parseFloat(formData.monto) : undefined,
+        metodo_pago: formData.metodo_pago || undefined,
+        fecha_pago: formData.fecha_pago || undefined,
+        id_reserva: formData.id_reserva ? parseInt(formData.id_reserva) : undefined
+      };
+      if (!filtered.monto || isNaN(filtered.monto) || filtered.monto <= 0) { setError('El monto debe ser positivo'); return; }
+      const metodos = ['tarjeta','efectivo','transferencia','QR'];
+      if (!filtered.metodo_pago || !metodos.includes(filtered.metodo_pago)) { setError('Metodo de pago invalido'); return; }
+      if (!filtered.id_reserva || !reservas.some(r => r.id_reserva === filtered.id_reserva)) { setError('La reserva seleccionada no es valida'); return; }
+      if (filtered.fecha_pago) {
+        const f = new Date(filtered.fecha_pago);
+        if (isNaN(f.getTime())) { setError('La fecha de pago no es valida'); return; }
+      }
       let response;
-      const filteredData = Object.fromEntries(
-        Object.entries(formData).filter(([key, value]) => {
-          const requiredFields = ['monto', 'metodo_pago', 'id_reserva'];
-          if (requiredFields.includes(key)) return true;
-          return value !== '' && value !== null && value !== undefined;
-        })
-      );
-
-      // Validaciones frontend
-      if (!filteredData.monto || isNaN(filteredData.monto) || filteredData.monto <= 0) {
-        setError('El monto es obligatorio y debe ser un número positivo');
-        return;
-      }
-      const metodosValidos = ['tarjeta', 'efectivo', 'transferencia', 'QR'];
-      if (!filteredData.metodo_pago || !metodosValidos.includes(filteredData.metodo_pago)) {
-        setError(`El método de pago debe ser uno de: ${metodosValidos.join(', ')}`);
-        return;
-      }
-      if (!filteredData.id_reserva || !reservas.some(reserva => reserva.id_reserva === parseInt(filteredData.id_reserva))) {
-        setError('La reserva seleccionada no es válida');
-        return;
-      }
-      if (filteredData.fecha_pago) {
-        const fechaPago = new Date(filteredData.fecha_pago);
-        if (isNaN(fechaPago.getTime())) {
-          setError('La fecha de pago no es válida');
-          return;
-        }
-      }
-
-      if (editMode) {
-        response = await api.patch(`/pago/${currentPago.id_pago}`, filteredData);
-      } else {
-        response = await api.post('/pago/', filteredData);
-      }
-      if (response.data.exito) {
-        closeModal();
-        fetchPagos();
-      } else {
-        alert(response.data.mensaje);
-      }
+      if (editMode) response = await api.patch(`/pago/${currentPago.id_pago}`, filtered);
+      else response = await api.post('/pago/', filtered);
+      if (response.data?.exito) { closeModal(); fetchPagos(); }
+      else setError(response.data?.mensaje || 'No se pudo guardar');
     } catch (err) {
-      const errorMessage = err.response?.data?.mensaje || 'Error de conexión al servidor';
-      setError(errorMessage);
-      console.error(err);
+      setError(err.response?.data?.mensaje || 'Error de conexion al servidor');
     }
   };
 
   const handlePageChange = (newPage) => {
-    if (newPage >= 1 && newPage <= Math.ceil(total / limit)) {
-      setPage(newPage);
-    }
+    if (newPage >= 1 && newPage <= Math.ceil(total / limit)) setPage(newPage);
   };
 
-  if (!role) {
-    return <p>Cargando permisos...</p>;
-  }
+  if (!role) return <p>Cargando permisos...</p>;
 
   return (
     <div className="bg-white rounded-lg shadow p-6">
-      <h2 className="text-xl font-semibold mb-4">Gestión de Pagos</h2>
+      <h2 className="text-xl font-semibold mb-4">Gestion de Pagos</h2>
 
       <div className="flex flex-col xl:flex-row gap-4 mb-6 items-stretch">
         <div className="flex-1">
@@ -315,14 +256,14 @@ useEffect(() => {
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="🔍 Buscar por cliente, cancha o método de pago..."
+              placeholder="Buscar por cliente, cancha o metodo de pago"
               className="border rounded-l px-4 py-2 w-full"
             />
             <button
               type="submit"
               className="bg-blue-500 text-white px-4 py-2 rounded-r hover:bg-blue-600 whitespace-nowrap"
             >
-              🔎 Buscar
+              Buscar
             </button>
           </form>
         </div>
@@ -333,19 +274,18 @@ useEffect(() => {
             onChange={handleFiltroChange}
             className="border rounded px-3 py-2 flex-1 sm:min-w-[180px]"
           >
-            <option value="">📋 Todos - Sin filtro</option>
-            <option value="fecha">📅 Ordenar por fecha</option>
-            <option value="monto">💰 Ordenar por monto</option>
-            <option value="metodo">💳 Ordenar por método de pago</option>
+            <option value="">Todos - sin filtro</option>
+            <option value="fecha">Ordenar por fecha</option>
+            <option value="monto">Ordenar por monto</option>
+            <option value="metodo">Ordenar por metodo de pago</option>
           </select>
 
           {permissions.canCreate && (
             <button
               onClick={openCreateModal}
-              className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 whitespace-nowrap sm:w-auto w-full flex items-center justify-center gap-2"
+              className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 whitespace-nowrap sm:w-auto w-full"
             >
-              <span>💵</span>
-              <span>Crear Pago</span>
+              Crear Pago
             </button>
           )}
         </div>
@@ -365,8 +305,8 @@ useEffect(() => {
                   <th className="px-4 py-2 text-left">Cliente</th>
                   <th className="px-4 py-2 text-left">Cancha</th>
                   <th className="px-4 py-2 text-left">Monto</th>
-                  <th className="px-4 py-2 text-left">Método de Pago</th>
-                  <th className="px-4 py-2 text-left">Fecha de Pago</th>
+                  <th className="px-4 py-2 text-left">Metodo de pago</th>
+                  <th className="px-4 py-2 text-left">Fecha de pago</th>
                   <th className="px-4 py-2 text-left">Acciones</th>
                 </tr>
               </thead>
@@ -420,7 +360,7 @@ useEffect(() => {
               Anterior
             </button>
             <span className="px-4 py-2 bg-gray-100">
-              Página {page} de {Math.ceil(total / limit)}
+              Pagina {page} de {Math.ceil(total / limit)}
             </span>
             <button
               onClick={() => handlePageChange(page + 1)}
@@ -473,7 +413,7 @@ useEffect(() => {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Método de Pago</label>
+                <label className="block text-sm font-medium mb-1">Metodo de pago</label>
                 <select
                   name="metodo_pago"
                   value={formData.metodo_pago}
@@ -489,7 +429,7 @@ useEffect(() => {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Fecha de Pago</label>
+                <label className="block text-sm font-medium mb-1">Fecha de pago</label>
                 <input
                   name="fecha_pago"
                   value={formData.fecha_pago}

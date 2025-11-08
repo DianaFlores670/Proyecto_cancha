@@ -1,32 +1,39 @@
+/* eslint-disable no-empty */
 import React, { useState, useEffect } from 'react';
 import api from '../services/api';
 
-// Configuración de permisos por rol
 const permissionsConfig = {
-  ADMINISTRADOR: {
-    canView: true,
-    canCreate: true,
-    canEdit: true,
-    canDelete: true,
-  },
-  ADMIN_ESP_DEP: {
-    canView: false,
-    canCreate: false,
-    canEdit: false,
-    canDelete: false,
-  },
-  ENCARGADO: {
-    canView: true,
-    canCreate: false,
-    canEdit: false,
-    canDelete: false,
-  },
-  DEFAULT: {
-    canView: false,
-    canCreate: false,
-    canEdit: false,
-    canDelete: false,
-  },
+  ADMINISTRADOR: { canView: true, canCreate: true, canEdit: true, canDelete: true },
+  ADMIN_ESP_DEP: { canView: false, canCreate: false, canEdit: false, canDelete: false },
+  ENCARGADO: { canView: true, canCreate: false, canEdit: false, canDelete: false },
+  DEFAULT: { canView: false, canCreate: false, canEdit: false, canDelete: false },
+};
+
+const getEffectiveRole = () => {
+  const keys = Object.keys(permissionsConfig);
+  const bag = new Set();
+  try {
+    const u = JSON.parse(localStorage.getItem('user') || '{}');
+    const arr = Array.isArray(u?.roles) ? u.roles : [];
+    for (const r of arr) {
+      if (typeof r === 'string') bag.add(r);
+      else if (r && typeof r === 'object') ['rol','role','nombre','name'].forEach(k => { if (r[k]) bag.add(r[k]); });
+    }
+    if (bag.size === 0 && u?.role) bag.add(u.role);
+  } catch {}
+  const tok = localStorage.getItem('token');
+  if (bag.size === 0 && tok && tok.split('.').length === 3) {
+    try {
+      const payload = JSON.parse(atob(tok.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')));
+      const t = Array.isArray(payload?.roles) ? payload.roles : (payload?.rol ? [payload.rol] : []);
+      t.forEach(v => bag.add(v));
+    } catch {}
+  }
+  const norm = Array.from(bag).map(v => String(v || '').trim().toUpperCase().replace(/\s+/g,'_'));
+  const map = v => v === 'ADMIN' ? 'ADMINISTRADOR' : v;
+  const norm2 = norm.map(map);
+  const prio = ['ADMINISTRADOR','CONTROL','ADMIN_ESP_DEP'];
+  return prio.find(r => norm2.includes(r) && keys.includes(r)) || norm2.find(r => keys.includes(r)) || 'DEFAULT';
 };
 
 const ReporteIncidencia = () => {
@@ -51,109 +58,81 @@ const ReporteIncidencia = () => {
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const limit = 10;
-  const [role, setRole] = useState('DEFAULT');
+  const [role, setRole] = useState(() => getEffectiveRole());
 
-  // Obtener el rol del usuario desde localStorage
-useEffect(() => {
-  const userData = localStorage.getItem('user');
-  if (!userData) return;
+  useEffect(() => {
+    const sync = () => setRole(getEffectiveRole());
+    window.addEventListener('storage', sync);
+    window.addEventListener('auth-changed', sync);
+    window.addEventListener('focus', sync);
+    return () => {
+      window.removeEventListener('storage', sync);
+      window.removeEventListener('auth-changed', sync);
+      window.removeEventListener('focus', sync);
+    };
+  }, []);
 
-  try {
-    const u = JSON.parse(userData);
-
-    // 1) Normaliza a array en MAYÚSCULAS
-    const rolesArr = Array.isArray(u?.roles)
-      ? u.roles.map(r => String(r).toUpperCase())
-      : (u?.role ? [String(u.role).toUpperCase()] : []);
-
-    // 2) Elige un rol que exista en permissionsConfig, con prioridad
-    const keys = Object.keys(permissionsConfig);
-    const PRIORIDAD = ['ADMINISTRADOR']; // ajusta tu prioridad
-    const efectivo =
-      PRIORIDAD.find(r => rolesArr.includes(r) && keys.includes(r)) ||
-      rolesArr.find(r => keys.includes(r)) ||
-      'DEFAULT';
-
-    setRole(efectivo);
-  } catch (err) {
-    console.error('Error al parsear datos del usuario:', err);
-    setRole('DEFAULT');
-  }
-}, []);
-
-  // Obtener permisos según el rol (o DEFAULT si no hay rol o no está definido)
   const permissions = role && permissionsConfig[role] ? permissionsConfig[role] : permissionsConfig.DEFAULT;
 
-  // Fetch reservas y encargados válidos al cargar el componente
   useEffect(() => {
     const fetchReservas = async () => {
       try {
-        const response = await api.get('/reserva/datos-especificos');
-        if (response.data.exito) {
-          setReservas(response.data.datos.reservas || []);
-        }
-      } catch (err) {
-        console.error('Error al obtener reservas:', err);
+        const r = await api.get('/reserva/datos-especificos');
+        if (r.data?.exito) setReservas(r.data.datos?.reservas || []);
+        else setError(r.data?.mensaje || 'Error al obtener reservas');
+      } catch (e) {
+        setError(e.response?.data?.mensaje || 'Error de conexion al obtener reservas');
       }
     };
-
     const fetchEncargados = async () => {
       try {
-        const response = await api.get('/encargado/datos-especificos');
-        if (response.data.exito) {
-          setEncargados(response.data.datos.encargados || []);
-        }
-      } catch (err) {
-        console.error('Error al obtener encargados:', err);
+        const r = await api.get('/encargado/datos-especificos');
+        if (r.data?.exito) setEncargados(r.data.datos?.encargados || []);
+        else setError(r.data?.mensaje || 'Error al obtener encargados');
+      } catch (e) {
+        setError(e.response?.data?.mensaje || 'Error de conexion al obtener encargados');
       }
     };
-
-    fetchReservas();
-    fetchEncargados();
-  }, []);
+    if (permissions.canView) {
+      fetchReservas();
+      fetchEncargados();
+    } else {
+      setError('No tienes permisos para ver los datos');
+    }
+  }, [role]);
 
   const fetchReportes = async (params = {}) => {
+    if (!permissions.canView) { setError('No tienes permisos para ver los datos'); return; }
     setLoading(true);
     setError(null);
     const offset = (page - 1) * limit;
     const fullParams = { ...params, limit, offset };
     try {
-      let response;
-      if (params.q) {
-        response = await api.get('/reporte_incidencia/buscar', { params: fullParams });
-      } else if (params.tipo) {
-        response = await api.get('/reporte_incidencia/filtro', { params: fullParams });
+      let r;
+      if (params.q) r = await api.get('/reporte_incidencia/buscar', { params: fullParams });
+      else if (params.tipo) r = await api.get('/reporte_incidencia/filtro', { params: fullParams });
+      else r = await api.get('/reporte_incidencia/datos-especificos', { params: fullParams });
+      if (r.data?.exito) {
+        setReportes(r.data.datos?.reportes || []);
+        setTotal(r.data.datos?.paginacion?.total || 0);
       } else {
-        response = await api.get('/reporte_incidencia/datos-especificos', { params: fullParams });
+        setError(r.data?.mensaje || 'Error al cargar datos');
       }
-      if (response.data.exito) {
-        setReportes(response.data.datos.reportes);
-        setTotal(response.data.datos.paginacion.total);
-      } else {
-        setError(response.data.mensaje);
-      }
-    } catch (err) {
-      const errorMessage = err.response?.data?.mensaje || 'Error de conexión al servidor';
-      setError(errorMessage);
-      console.error(err);
+    } catch (e) {
+      setError(e.response?.data?.mensaje || 'Error de conexion al servidor');
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    fetchReportes();
-  }, [page]);
+  useEffect(() => { fetchReportes(); }, [page, role]);
 
   const handleSearch = (e) => {
     e.preventDefault();
     setPage(1);
     setFiltro('');
-    if (searchTerm.trim()) {
-      fetchReportes({ q: searchTerm });
-    } else {
-      fetchReportes();
-    }
+    if (searchTerm.trim()) fetchReportes({ q: searchTerm });
+    else fetchReportes();
   };
 
   const handleFiltroChange = (e) => {
@@ -161,32 +140,24 @@ useEffect(() => {
     setFiltro(tipo);
     setPage(1);
     setSearchTerm('');
-    if (tipo) {
-      fetchReportes({ tipo });
-    } else {
-      fetchReportes();
-    }
+    if (tipo) fetchReportes({ tipo });
+    else fetchReportes();
   };
 
   const handleDelete = async (id) => {
-    if (!permissions.canDelete) return; // Verificar permiso
-    if (!window.confirm('¿Estás seguro de eliminar este reporte de incidencia?')) return;
+    if (!permissions.canDelete) return;
+    if (!window.confirm('Estas seguro de eliminar este reporte de incidencia?')) return;
     try {
-      const response = await api.delete(`/reporte_incidencia/${id}`);
-      if (response.data.exito) {
-        fetchReportes();
-      } else {
-        alert(response.data.mensaje);
-      }
-    } catch (err) {
-      const errorMessage = err.response?.data?.mensaje || 'Error de conexión al servidor';
-      setError(errorMessage);
-      console.error(err);
+      const r = await api.delete(`/reporte_incidencia/${id}`);
+      if (r.data?.exito) fetchReportes();
+      else setError(r.data?.mensaje || 'No se pudo eliminar');
+    } catch (e) {
+      setError(e.response?.data?.mensaje || 'Error de conexion al servidor');
     }
   };
 
   const openCreateModal = () => {
-    if (!permissions.canCreate) return; // Verificar permiso
+    if (!permissions.canCreate) return;
     setEditMode(false);
     setViewMode(false);
     setFormData({
@@ -201,56 +172,52 @@ useEffect(() => {
   };
 
   const openEditModal = async (id) => {
-    if (!permissions.canEdit) return; // Verificar permiso
+    if (!permissions.canEdit) return;
     try {
-      const response = await api.get(`/reporte_incidencia/dato-individual/${id}`);
-      if (response.data.exito) {
-        const reporte = response.data.datos.reporte;
+      const r = await api.get(`/reporte_incidencia/dato-individual/${id}`);
+      if (r.data?.exito) {
+        const rep = r.data.datos?.reporte || {};
         setFormData({
-          detalle: reporte.detalle || '',
-          sugerencia: reporte.sugerencia || '',
-          id_encargado: reporte.id_encargado || '',
-          id_reserva: reporte.id_reserva || '',
-          verificado: reporte.verificado || false
+          detalle: rep.detalle || '',
+          sugerencia: rep.sugerencia || '',
+          id_encargado: rep.id_encargado || '',
+          id_reserva: rep.id_reserva || '',
+          verificado: !!rep.verificado
         });
-        setCurrentReporte(reporte);
+        setCurrentReporte(rep);
         setEditMode(true);
         setViewMode(false);
         setModalOpen(true);
       } else {
-        alert(response.data.mensaje);
+        setError(r.data?.mensaje || 'No se pudo cargar el registro');
       }
-    } catch (err) {
-      const errorMessage = err.response?.data?.mensaje || 'Error de conexión al servidor';
-      setError(errorMessage);
-      console.error(err);
+    } catch (e) {
+      setError(e.response?.data?.mensaje || 'Error de conexion al servidor');
     }
   };
 
   const openViewModal = async (id) => {
-    if (!permissions.canView) return; // Verificar permiso
+    if (!permissions.canView) return;
     try {
-      const response = await api.get(`/reporte_incidencia/dato-individual/${id}`);
-      if (response.data.exito) {
-        const reporte = response.data.datos.reporte;
+      const r = await api.get(`/reporte_incidencia/dato-individual/${id}`);
+      if (r.data?.exito) {
+        const rep = r.data.datos?.reporte || {};
         setFormData({
-          detalle: reporte.detalle || '',
-          sugerencia: reporte.sugerencia || '',
-          id_encargado: reporte.id_encargado || '',
-          id_reserva: reporte.id_reserva || '',
-          verificado: reporte.verificado || false
+          detalle: rep.detalle || '',
+          sugerencia: rep.sugerencia || '',
+          id_encargado: rep.id_encargado || '',
+          id_reserva: rep.id_reserva || '',
+          verificado: !!rep.verificado
         });
-        setCurrentReporte(reporte);
+        setCurrentReporte(rep);
         setEditMode(false);
         setViewMode(true);
         setModalOpen(true);
       } else {
-        alert(response.data.mensaje);
+        setError(r.data?.mensaje || 'No se pudo cargar el registro');
       }
-    } catch (err) {
-      const errorMessage = err.response?.data?.mensaje || 'Error de conexión al servidor';
-      setError(errorMessage);
-      console.error(err);
+    } catch (e) {
+      setError(e.response?.data?.mensaje || 'Error de conexion al servidor');
     }
   };
 
@@ -262,65 +229,51 @@ useEffect(() => {
   };
 
   const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    const { name, value, type, checked } = e.target;
+    setFormData(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (viewMode || (!permissions.canCreate && !editMode) || (!permissions.canEdit && editMode)) return; // Verificar permisos
+    if (viewMode) return;
+    if ((editMode && !permissions.canEdit) || (!editMode && !permissions.canCreate)) return;
     try {
-      let response;
-      const filteredData = Object.fromEntries(
-        Object.entries(formData).filter(([key, value]) => {
-          const requiredFields = ['id_encargado', 'id_reserva'];
-          if (requiredFields.includes(key)) return true;
-          return value !== '' && value !== null && value !== undefined;
-        })
-      );
-
-      // Validaciones frontend
-      if (!filteredData.id_encargado || !encargados.some(encargado => encargado.id_encargado === parseInt(filteredData.id_encargado))) {
-        setError('El encargado seleccionado no es válido');
-        return;
-      }
-      if (!filteredData.id_reserva || !reservas.some(reserva => reserva.id_reserva === parseInt(filteredData.id_reserva))) {
-        setError('La reserva seleccionada no es válida');
-        return;
-      }
-
-      if (editMode) {
-        response = await api.patch(`/reporte_incidencia/${currentReporte.id_reporte}`, filteredData);
-      } else {
-        response = await api.post('/reporte_incidencia/', filteredData);
-      }
-      if (response.data.exito) {
+      const base = { ...formData };
+      const rid = parseInt(base.id_reserva);
+      const eid = parseInt(base.id_encargado);
+      if (!reservas.some(r => r.id_reserva === rid)) { setError('La reserva seleccionada no es valida'); return; }
+      if (!encargados.some(x => x.id_encargado === eid)) { setError('El encargado seleccionado no es valido'); return; }
+      const payload = {
+        detalle: base.detalle || undefined,
+        sugerencia: base.sugerencia || undefined,
+        id_encargado: eid,
+        id_reserva: rid,
+        verificado: !!base.verificado
+      };
+      let r;
+      if (editMode) r = await api.patch(`/reporte_incidencia/${currentReporte.id_reporte}`, payload);
+      else r = await api.post('/reporte_incidencia/', payload);
+      if (r.data?.exito) {
         closeModal();
         fetchReportes();
       } else {
-        alert(response.data.mensaje);
+        setError(r.data?.mensaje || 'No se pudo guardar');
       }
     } catch (err) {
-      const errorMessage = err.response?.data?.mensaje || 'Error de conexión al servidor';
-      setError(errorMessage);
-      console.error(err);
+      setError(err.response?.data?.mensaje || 'Error de conexion al servidor');
     }
   };
 
   const handlePageChange = (newPage) => {
-    if (newPage >= 1 && newPage <= Math.ceil(total / limit)) {
-      setPage(newPage);
-    }
+    if (newPage >= 1 && newPage <= Math.ceil(total / limit)) setPage(newPage);
   };
 
-  if (!role) {
-    return <p>Cargando permisos...</p>;
-  }
+  if (!role) return <p>Cargando permisos...</p>;
 
   return (
     <div className="bg-white rounded-lg shadow p-6">
-      <h2 className="text-xl font-semibold mb-4">Gestión de Reportes de Incidencia</h2>
-      
+      <h2 className="text-xl font-semibold mb-4">Gestion de Reportes de Incidencia</h2>
+
       <div className="flex flex-col xl:flex-row gap-4 mb-6 items-stretch">
         <div className="flex-1">
           <form onSubmit={handleSearch} className="flex h-full">
@@ -328,14 +281,14 @@ useEffect(() => {
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="🔍 Buscar por encargado, cliente, cancha o descripción..."
+              placeholder="Buscar por encargado, cliente, cancha o descripcion"
               className="border rounded-l px-4 py-2 w-full"
             />
-            <button 
-              type="submit" 
+            <button
+              type="submit"
               className="bg-blue-500 text-white px-4 py-2 rounded-r hover:bg-blue-600 whitespace-nowrap"
             >
-              🔎 Buscar
+              Buscar
             </button>
           </form>
         </div>
@@ -346,28 +299,27 @@ useEffect(() => {
             onChange={handleFiltroChange}
             className="border rounded px-3 py-2 flex-1 sm:min-w-[180px]"
           >
-            <option value="">📋 Todos - Sin filtro</option>
-            <option value="fecha">📅 Ordenar por fecha</option>
-            <option value="prioridad">⚠️ Ordenar por prioridad</option>
-            <option value="estado">🔄 Ordenar por estado</option>
-            <option value="verificado_si">✅ Solo verificados</option>
-            <option value="verificado_no">❌ Solo no verificados</option>
+            <option value="">Todos - sin filtro</option>
+            <option value="fecha">Ordenar por fecha</option>
+            <option value="prioridad">Ordenar por prioridad</option>
+            <option value="estado">Ordenar por estado</option>
+            <option value="verificado_si">Solo verificados</option>
+            <option value="verificado_no">Solo no verificados</option>
           </select>
 
           {permissions.canCreate && (
             <button
               onClick={openCreateModal}
-              className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 whitespace-nowrap sm:w-auto w-full flex items-center justify-center gap-2"
+              className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 whitespace-nowrap sm:w-auto w-full"
             >
-              <span>📝</span>
-              <span>Crear Incidencia</span>
+              Crear incidencia
             </button>
           )}
         </div>
       </div>
 
       {loading ? (
-        <p>Cargando reportes de incidencia...</p>
+        <p>Cargando datos...</p>
       ) : error ? (
         <p className="text-red-500">{error}</p>
       ) : (
@@ -392,11 +344,11 @@ useEffect(() => {
                     <td className="px-4 py-2">{`${reporte.cliente_nombre} ${reporte.cliente_apellido}`}</td>
                     <td className="px-4 py-2">{reporte.cancha_nombre}</td>
                     <td className="px-4 py-2">{`${reporte.encargado_nombre} ${reporte.encargado_apellido}`}</td>
-                    <td className="px-4 py-2">{reporte.detalle ? reporte.detalle.substring(0, 50) + (reporte.detalle.length > 50 ? '...' : '') : '-'}</td>
+                    <td className="px-4 py-2">{reporte.detalle ? reporte.detalle.substring(0, 80) + (reporte.detalle.length > 80 ? '...' : '') : '-'}</td>
                     <td className="px-4 py-2">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        reporte.verificado ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                      }`}> {reporte.verificado ? '✔️ Sí' : '❌ No'}</span>
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${reporte.verificado ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                        {reporte.verificado ? 'Si' : 'No'}
+                      </span>
                     </td>
                     <td className="px-4 py-2 flex gap-2">
                       {permissions.canView && (
@@ -404,7 +356,7 @@ useEffect(() => {
                           onClick={() => openViewModal(reporte.id_reporte)}
                           className="text-green-500 hover:text-green-700 mr-2"
                         >
-                          Ver Datos
+                          Ver datos
                         </button>
                       )}
                       {permissions.canEdit && (
@@ -439,7 +391,7 @@ useEffect(() => {
               Anterior
             </button>
             <span className="px-4 py-2 bg-gray-100">
-              Página {page} de {Math.ceil(total / limit)}
+              Pagina {page} de {Math.ceil(total / limit)}
             </span>
             <button
               onClick={() => handlePageChange(page + 1)}
@@ -456,7 +408,7 @@ useEffect(() => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-8 max-w-2xl w-full max-h-[80vh] overflow-y-auto">
             <h3 className="text-xl font-semibold mb-4">
-              {viewMode ? 'Ver Datos de Reporte de Incidencia' : editMode ? 'Editar Reporte de Incidencia' : 'Crear Reporte de Incidencia'}
+              {viewMode ? 'Ver datos de reporte de incidencia' : editMode ? 'Editar reporte de incidencia' : 'Crear reporte de incidencia'}
             </h3>
             <form onSubmit={handleSubmit} className="grid grid-cols-2 gap-4">
               <div>
@@ -519,32 +471,19 @@ useEffect(() => {
               </div>
               <div className="mt-3">
                 <label className="block text-sm font-medium mb-1">Verificado</label>
-                <div
-                  className="relative inline-flex items-center cursor-pointer"
-                  onClick={() => !viewMode && setFormData((prev) => ({ ...prev, verificado: !prev.verificado }))}
-                >
+                <label className="relative inline-flex items-center cursor-pointer">
                   <input
                     type="checkbox"
                     name="verificado"
                     checked={formData.verificado}
-                    onChange={(e) => !viewMode && setFormData((prev) => ({ ...prev, verificado: e.target.checked }))}
+                    onChange={handleInputChange}
                     className="sr-only"
                     disabled={viewMode}
                   />
-                  <div
-                    className={`w-11 h-6 rounded-full transition-colors duration-300 ${
-                      formData.verificado ? 'bg-green-500' : 'bg-gray-300'
-                    }`}
-                  ></div>
-                  <div
-                    className={`absolute left-0.5 top-0.5 bg-white w-5 h-5 rounded-full shadow transform transition-transform duration-300 ${
-                      formData.verificado ? 'translate-x-5' : ''
-                    }`}
-                  ></div>
-                </div>
-                <span className="ml-3 text-sm text-gray-600">
-                  {formData.verificado ? 'Verificado' : 'No verificado'}
-                </span>
+                  <div className={`w-11 h-6 rounded-full transition-colors duration-300 ${formData.verificado ? 'bg-green-500' : 'bg-gray-300'}`} />
+                  <div className={`absolute left-0.5 top-0.5 bg-white w-5 h-5 rounded-full shadow transform transition-transform duration-300 ${formData.verificado ? 'translate-x-5' : ''}`} />
+                  <span className="ml-3 text-sm text-gray-600">{formData.verificado ? 'Verificado' : 'No verificado'}</span>
+                </label>
               </div>
               <div className="col-span-2 flex justify-end mt-4">
                 <button
@@ -564,6 +503,7 @@ useEffect(() => {
                 )}
               </div>
             </form>
+            {error && <p className="text-red-500 mt-4">{error}</p>}
           </div>
         </div>
       )}

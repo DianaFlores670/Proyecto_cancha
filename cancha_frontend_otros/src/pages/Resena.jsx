@@ -1,32 +1,39 @@
+/* eslint-disable no-empty */
 import React, { useState, useEffect } from 'react';
 import api from '../services/api';
 
-// Configuración de permisos por rol
 const permissionsConfig = {
-  ADMINISTRADOR: {
-    canView: true,
-    canCreate: true,
-    canEdit: true,
-    canDelete: true,
-  },
-  ADMIN_ESP_DEP: {
-    canView: true,
-    canCreate: true,
-    canEdit: true,
-    canDelete: true,
-  },
-  CONTROL: {
-    canView: true,
-    canCreate: false,
-    canEdit: true,
-    canDelete: false,
-  },
-  DEFAULT: {
-    canView: false,
-    canCreate: false,
-    canEdit: false,
-    canDelete: false,
-  },
+  ADMINISTRADOR: { canView: true, canCreate: true, canEdit: true, canDelete: true },
+  ADMIN_ESP_DEP: { canView: true, canCreate: true, canEdit: true, canDelete: true },
+  CONTROL: { canView: true, canCreate: false, canEdit: true, canDelete: false },
+  DEFAULT: { canView: false, canCreate: false, canEdit: false, canDelete: false },
+};
+
+const getEffectiveRole = () => {
+  const keys = Object.keys(permissionsConfig);
+  const bag = new Set();
+  try {
+    const u = JSON.parse(localStorage.getItem('user') || '{}');
+    const arr = Array.isArray(u?.roles) ? u.roles : [];
+    for (const r of arr) {
+      if (typeof r === 'string') bag.add(r);
+      else if (r && typeof r === 'object') ['rol','role','nombre','name'].forEach(k => { if (r[k]) bag.add(r[k]); });
+    }
+    if (bag.size === 0 && u?.role) bag.add(u.role);
+  } catch {}
+  const tok = localStorage.getItem('token');
+  if (bag.size === 0 && tok && tok.split('.').length === 3) {
+    try {
+      const payload = JSON.parse(atob(tok.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')));
+      const t = Array.isArray(payload?.roles) ? payload.roles : (payload?.rol ? [payload.rol] : []);
+      t.forEach(v => bag.add(v));
+    } catch {}
+  }
+  const norm = Array.from(bag).map(v => String(v || '').trim().toUpperCase().replace(/\s+/g,'_'));
+  const map = v => v === 'ADMIN' ? 'ADMINISTRADOR' : v;
+  const norm2 = norm.map(map);
+  const prio = ['ADMINISTRADOR','CONTROL','ADMIN_ESP_DEP'];
+  return prio.find(r => norm2.includes(r) && keys.includes(r)) || norm2.find(r => keys.includes(r)) || 'DEFAULT';
 };
 
 const Resena = () => {
@@ -51,96 +58,68 @@ const Resena = () => {
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const limit = 10;
-  const [role, setRole] = useState('DEFAULT');
+  const [role, setRole] = useState(() => getEffectiveRole());
 
-  // Obtener el rol del usuario desde localStorage
-useEffect(() => {
-  const userData = localStorage.getItem('user');
-  if (!userData) return;
+  useEffect(() => {
+    const sync = () => setRole(getEffectiveRole());
+    window.addEventListener('storage', sync);
+    window.addEventListener('auth-changed', sync);
+    window.addEventListener('focus', sync);
+    return () => {
+      window.removeEventListener('storage', sync);
+      window.removeEventListener('auth-changed', sync);
+      window.removeEventListener('focus', sync);
+    };
+  }, []);
 
-  try {
-    const u = JSON.parse(userData);
-
-    // 1) Normaliza a array en MAYÚSCULAS
-    const rolesArr = Array.isArray(u?.roles)
-      ? u.roles.map(r => String(r).toUpperCase())
-      : (u?.role ? [String(u.role).toUpperCase()] : []);
-
-    // 2) Elige un rol que exista en permissionsConfig, con prioridad
-    const keys = Object.keys(permissionsConfig);
-    const PRIORIDAD = ['ADMINISTRADOR']; // ajusta tu prioridad
-    const efectivo =
-      PRIORIDAD.find(r => rolesArr.includes(r) && keys.includes(r)) ||
-      rolesArr.find(r => keys.includes(r)) ||
-      'DEFAULT';
-
-    setRole(efectivo);
-  } catch (err) {
-    console.error('Error al parsear datos del usuario:', err);
-    setRole('DEFAULT');
-  }
-}, []);
-
-  // Obtener permisos según el rol (o DEFAULT si no hay rol o no está definido)
   const permissions = role && permissionsConfig[role] ? permissionsConfig[role] : permissionsConfig.DEFAULT;
 
-  // Fetch todas las reservas válidas al cargar el componente
   useEffect(() => {
     const fetchReservas = async () => {
       try {
-        const response = await api.get('/reserva/datos-especificos', { params: { limit: 1000 } });
-        if (response.data.exito) {
-          setReservas(response.data.datos.reservas || []);
-        }
-      } catch (err) {
-        console.error('Error al obtener reservas:', err);
+        const r = await api.get('/reserva/datos-especificos', { params: { limit: 1000 } });
+        if (r.data?.exito) setReservas(r.data.datos?.reservas || []);
+        else setError(r.data?.mensaje || 'Error al obtener reservas');
+      } catch (e) {
+        setError(e.response?.data?.mensaje || 'Error de conexion al obtener reservas');
       }
     };
-    fetchReservas();
-  }, []);
+    if (permissions.canView) fetchReservas();
+    else setError('No tienes permisos para ver los datos');
+  }, [role]);
 
   const fetchResenas = async (params = {}) => {
+    if (!permissions.canView) { setError('No tienes permisos para ver los datos'); return; }
     setLoading(true);
     setError(null);
     const offset = (page - 1) * limit;
     const fullParams = { ...params, limit, offset };
     try {
-      let response;
-      if (params.q) {
-        response = await api.get('/resena/buscar', { params: fullParams });
-      } else if (params.tipo) {
-        response = await api.get('/resena/filtro', { params: fullParams });
+      let r;
+      if (params.q) r = await api.get('/resena/buscar', { params: fullParams });
+      else if (params.tipo) r = await api.get('/resena/filtro', { params: fullParams });
+      else r = await api.get('/resena/datos-especificos', { params: fullParams });
+      if (r.data?.exito) {
+        setResenas(r.data.datos?.resenas || []);
+        setTotal(r.data.datos?.paginacion?.total || 0);
       } else {
-        response = await api.get('/resena/datos-especificos', { params: fullParams });
+        setError(r.data?.mensaje || 'Error al cargar datos');
       }
-      if (response.data.exito) {
-        setResenas(response.data.datos.resenas);
-        setTotal(response.data.datos.paginacion.total);
-      } else {
-        setError(response.data.mensaje);
-      }
-    } catch (err) {
-      const errorMessage = err.response?.data?.mensaje || 'Error de conexión al servidor';
-      setError(errorMessage);
-      console.error(err);
+    } catch (e) {
+      setError(e.response?.data?.mensaje || 'Error de conexion al servidor');
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    fetchResenas();
-  }, [page]);
+  useEffect(() => { fetchResenas(); }, [page, role]);
 
   const handleSearch = (e) => {
     e.preventDefault();
     setPage(1);
     setFiltro('');
-    if (searchTerm.trim()) {
-      fetchResenas({ q: searchTerm });
-    } else {
-      fetchResenas();
-    }
+    if (searchTerm.trim()) fetchResenas({ q: searchTerm });
+    else fetchResenas();
   };
 
   const handleFiltroChange = (e) => {
@@ -148,32 +127,24 @@ useEffect(() => {
     setFiltro(tipo);
     setPage(1);
     setSearchTerm('');
-    if (tipo) {
-      fetchResenas({ tipo });
-    } else {
-      fetchResenas();
-    }
+    if (tipo) fetchResenas({ tipo });
+    else fetchResenas();
   };
 
   const handleDelete = async (id) => {
-    if (!permissions.canDelete) return; // Verificar permiso
-    if (!window.confirm('¿Estás seguro de eliminar esta reseña?')) return;
+    if (!permissions.canDelete) return;
+    if (!window.confirm('Estas seguro de eliminar esta resena?')) return;
     try {
-      const response = await api.delete(`/resena/${id}`);
-      if (response.data.exito) {
-        fetchResenas();
-      } else {
-        alert(response.data.mensaje);
-      }
-    } catch (err) {
-      const errorMessage = err.response?.data?.mensaje || 'Error de conexión al servidor';
-      setError(errorMessage);
-      console.error(err);
+      const r = await api.delete(`/resena/${id}`);
+      if (r.data?.exito) fetchResenas();
+      else setError(r.data?.mensaje || 'No se pudo eliminar');
+    } catch (e) {
+      setError(e.response?.data?.mensaje || 'Error de conexion al servidor');
     }
   };
 
   const openCreateModal = () => {
-    if (!permissions.canCreate) return; // Verificar permiso
+    if (!permissions.canCreate) return;
     setEditMode(false);
     setViewMode(false);
     setFormData({
@@ -189,58 +160,54 @@ useEffect(() => {
   };
 
   const openEditModal = async (id) => {
-    if (!permissions.canEdit) return; // Verificar permiso
+    if (!permissions.canEdit) return;
     try {
-      const response = await api.get(`/resena/dato-individual/${id}`);
-      if (response.data.exito) {
-        const resena = response.data.datos.resena;
+      const r = await api.get(`/resena/dato-individual/${id}`);
+      if (r.data?.exito) {
+        const x = r.data.datos?.resena || {};
         setFormData({
-          id_reserva: resena.id_reserva || '',
-          estrellas: resena.estrellas || '',
-          comentario: resena.comentario || '',
-          fecha_creacion: resena.fecha_creacion ? new Date(resena.fecha_creacion).toISOString().split('T')[0] : '',
-          estado: resena.estado !== undefined ? resena.estado : false,
-          verificado: resena.verificado !== undefined ? resena.verificado : false
+          id_reserva: x.id_reserva || '',
+          estrellas: x.estrellas || '',
+          comentario: x.comentario || '',
+          fecha_creacion: x.fecha_creacion ? new Date(x.fecha_creacion).toISOString().split('T')[0] : '',
+          estado: x.estado !== undefined ? !!x.estado : false,
+          verificado: x.verificado !== undefined ? !!x.verificado : false
         });
-        setCurrentResena(resena);
+        setCurrentResena(x);
         setEditMode(true);
         setViewMode(false);
         setModalOpen(true);
       } else {
-        alert(response.data.mensaje);
+        setError(r.data?.mensaje || 'No se pudo cargar el registro');
       }
-    } catch (err) {
-      const errorMessage = err.response?.data?.mensaje || 'Error de conexión al servidor';
-      setError(errorMessage);
-      console.error(err);
+    } catch (e) {
+      setError(e.response?.data?.mensaje || 'Error de conexion al servidor');
     }
   };
 
   const openViewModal = async (id) => {
-    if (!permissions.canView) return; // Verificar permiso
+    if (!permissions.canView) return;
     try {
-      const response = await api.get(`/resena/dato-individual/${id}`);
-      if (response.data.exito) {
-        const resena = response.data.datos.resena;
+      const r = await api.get(`/resena/dato-individual/${id}`);
+      if (r.data?.exito) {
+        const x = r.data.datos?.resena || {};
         setFormData({
-          id_reserva: resena.id_reserva || '',
-          estrellas: resena.estrellas || '',
-          comentario: resena.comentario || '',
-          fecha_creacion: resena.fecha_creacion ? new Date(resena.fecha_creacion).toISOString().split('T')[0] : '',
-          estado: resena.estado !== undefined ? resena.estado : false,
-          verificado: resena.verificado !== undefined ? resena.verificado : false
+          id_reserva: x.id_reserva || '',
+          estrellas: x.estrellas || '',
+          comentario: x.comentario || '',
+          fecha_creacion: x.fecha_creacion ? new Date(x.fecha_creacion).toISOString().split('T')[0] : '',
+          estado: x.estado !== undefined ? !!x.estado : false,
+          verificado: x.verificado !== undefined ? !!x.verificado : false
         });
-        setCurrentResena(resena);
+        setCurrentResena(x);
         setEditMode(false);
         setViewMode(true);
         setModalOpen(true);
       } else {
-        alert(response.data.mensaje);
+        setError(r.data?.mensaje || 'No se pudo cargar el registro');
       }
-    } catch (err) {
-      const errorMessage = err.response?.data?.mensaje || 'Error de conexión al servidor';
-      setError(errorMessage);
-      console.error(err);
+    } catch (e) {
+      setError(e.response?.data?.mensaje || 'Error de conexion al servidor');
     }
   };
 
@@ -253,78 +220,49 @@ useEffect(() => {
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: type === 'checkbox' ? checked : value
-    }));
+    setFormData(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (viewMode || (!permissions.canCreate && !editMode) || (!permissions.canEdit && editMode)) return; // Verificar permisos
+    if (viewMode) return;
+    if ((editMode && !permissions.canEdit) || (!editMode && !permissions.canCreate)) return;
     try {
-      let response;
-      const filteredData = Object.fromEntries(
-        Object.entries(formData).filter(([key, value]) => {
-          const requiredFields = ['id_reserva', 'estrellas'];
-          if (requiredFields.includes(key)) return true;
-          return value !== '' && value !== null && value !== undefined;
-        })
-      );
-
-      // Validaciones frontend
-      if (filteredData.estrellas && (isNaN(filteredData.estrellas) || filteredData.estrellas < 1 || filteredData.estrellas > 5)) {
-        setError('Las estrellas deben estar entre 1 y 5');
-        return;
-      }
-
-      if (filteredData.id_reserva && !reservas.some(reserva => reserva.id_reserva === parseInt(filteredData.id_reserva))) {
-        setError('La reserva seleccionada no es válida');
-        return;
-      }
-
-      // Validar que verificado y estado sean booleanos si están presentes
-      if (filteredData.verificado !== undefined && typeof filteredData.verificado !== 'boolean') {
-        setError('El campo verificado debe ser un valor booleano');
-        return;
-      }
-      if (filteredData.estado !== undefined && typeof filteredData.estado !== 'boolean') {
-        setError('El campo estado debe ser un valor booleano');
-        return;
-      }
-
-      if (editMode) {
-        response = await api.patch(`/resena/${currentResena.id_resena}`, filteredData);
-      } else {
-        response = await api.post('/resena/', filteredData);
-      }
-      if (response.data.exito) {
+      const rid = parseInt(formData.id_reserva);
+      if (!reservas.some(r => r.id_reserva === rid)) { setError('La reserva seleccionada no es valida'); return; }
+      const est = Number(formData.estrellas);
+      if (!(est >= 1 && est <= 5)) { setError('Las estrellas deben estar entre 1 y 5'); return; }
+      const payload = {
+        id_reserva: rid,
+        estrellas: est,
+        comentario: formData.comentario || undefined,
+        estado: !!formData.estado,
+        verificado: !!formData.verificado
+      };
+      let r;
+      if (editMode) r = await api.patch(`/resena/${currentResena.id_resena}`, payload);
+      else r = await api.post('/resena/', payload);
+      if (r.data?.exito) {
         closeModal();
         fetchResenas();
       } else {
-        alert(response.data.mensaje);
+        setError(r.data?.mensaje || 'No se pudo guardar');
       }
     } catch (err) {
-      const errorMessage = err.response?.data?.mensaje || 'Error de conexión al servidor';
-      setError(errorMessage);
-      console.error(err);
+      setError(err.response?.data?.mensaje || 'Error de conexion al servidor');
     }
   };
 
   const handlePageChange = (newPage) => {
-    if (newPage >= 1 && newPage <= Math.ceil(total / limit)) {
-      setPage(newPage);
-    }
+    if (newPage >= 1 && newPage <= Math.ceil(total / limit)) setPage(newPage);
   };
 
-  if (!role) {
-    return <p>Cargando permisos...</p>;
-  }
+  if (!role) return <p>Cargando permisos...</p>;
 
   return (
     <div className="bg-white rounded-lg shadow p-6">
-      <h2 className="text-xl font-semibold mb-4">Gestión de Reseñas</h2>
-      
+      <h2 className="text-xl font-semibold mb-4">Gestion de Resenas</h2>
+
       <div className="flex flex-col xl:flex-row gap-4 mb-6 items-stretch">
         <div className="flex-1">
           <form onSubmit={handleSearch} className="flex h-full">
@@ -332,14 +270,14 @@ useEffect(() => {
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="🔍 Buscar por cliente, cancha o comentario..."
+              placeholder="Buscar por cliente, cancha o comentario"
               className="border rounded-l px-4 py-2 w-full"
             />
-            <button 
-              type="submit" 
+            <button
+              type="submit"
               className="bg-blue-500 text-white px-4 py-2 rounded-r hover:bg-blue-600 whitespace-nowrap"
             >
-              🔎 Buscar
+              Buscar
             </button>
           </form>
         </div>
@@ -350,11 +288,11 @@ useEffect(() => {
             onChange={handleFiltroChange}
             className="border rounded px-3 py-2 flex-1 sm:min-w-[200px]"
           >
-            <option value="">📋 Todos - Sin filtro</option>
-            <option value="cliente_nombre">👤 Ordenar por cliente</option>
-            <option value="cancha_nombre">🏟️ Ordenar por cancha</option>
-            <option value="verificado_si">✅ Solo verificadas</option>
-            <option value="verificado_no">❌ Solo no verificadas</option>
+            <option value="">Todos - sin filtro</option>
+            <option value="cliente_nombre">Ordenar por cliente</option>
+            <option value="cancha_nombre">Ordenar por cancha</option>
+            <option value="verificado_si">Solo verificadas</option>
+            <option value="verificado_no">Solo no verificadas</option>
           </select>
 
           {permissions.canCreate && (
@@ -363,14 +301,14 @@ useEffect(() => {
               className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 whitespace-nowrap sm:w-auto w-full flex items-center justify-center gap-2"
             >
               <span>⭐</span>
-              <span>Crear Reseña</span>
+              <span>Crear resena</span>
             </button>
           )}
         </div>
       </div>
 
       {loading ? (
-        <p>Cargando reseñas...</p>
+        <p>Cargando resenas...</p>
       ) : error ? (
         <p className="text-red-500">{error}</p>
       ) : (
@@ -397,9 +335,9 @@ useEffect(() => {
                     <td className="px-4 py-2">{resena.estrellas}</td>
                     <td className="px-4 py-2">{resena.comentario || '-'}</td>
                     <td className="px-4 py-2">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        resena.verificado ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                      }`}> {resena.verificado ? '✔️ Sí' : '❌ No'}</span>
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${resena.verificado ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                        {resena.verificado ? 'Si' : 'No'}
+                      </span>
                     </td>
                     <td className="px-4 py-2 flex gap-2">
                       {permissions.canView && (
@@ -407,7 +345,7 @@ useEffect(() => {
                           onClick={() => openViewModal(resena.id_resena)}
                           className="text-green-500 hover:text-green-700 mr-2"
                         >
-                          Ver Datos
+                          Ver datos
                         </button>
                       )}
                       {permissions.canEdit && (
@@ -442,7 +380,7 @@ useEffect(() => {
               Anterior
             </button>
             <span className="px-4 py-2 bg-gray-100">
-              Página {page} de {Math.ceil(total / limit)}
+              Pagina {page} de {Math.ceil(total / limit)}
             </span>
             <button
               onClick={() => handlePageChange(page + 1)}
@@ -459,7 +397,7 @@ useEffect(() => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-8 max-w-2xl w-full max-h-[80vh] overflow-y-auto">
             <h3 className="text-xl font-semibold mb-4">
-              {viewMode ? 'Ver Datos de Reseña' : editMode ? 'Editar Reseña' : 'Crear Reseña'}
+              {viewMode ? 'Ver datos de resena' : editMode ? 'Editar resena' : 'Crear resena'}
             </h3>
             <form onSubmit={handleSubmit} className="grid grid-cols-2 gap-4">
               <div className="col-span-2">
@@ -475,7 +413,7 @@ useEffect(() => {
                   <option value="">Seleccione una reserva</option>
                   {reservas.map(reserva => (
                     <option key={reserva.id_reserva} value={reserva.id_reserva}>
-                      Reserva #{reserva.id_reserva} - {reserva.cliente_nombre} {reserva.cliente_apellido} ({reserva.cancha_nombre}) - {new Date(reserva.fecha_reserva).toLocaleDateString()}
+                      Reserva #{reserva.id_reserva} - {reserva.cliente_nombre} {reserva.cliente_apellido} ({reserva.cancha_nombre}) - {reserva.fecha_reserva ? new Date(reserva.fecha_reserva).toLocaleDateString() : (reserva.fecha ? new Date(reserva.fecha).toLocaleDateString() : '')}
                     </option>
                   ))}
                 </select>
@@ -507,7 +445,7 @@ useEffect(() => {
               </div>
               {editMode && (
                 <div>
-                  <label className="block text-sm font-medium mb-1">Fecha de Creación</label>
+                  <label className="block text-sm font-medium mb-1">Fecha de creacion</label>
                   <input
                     name="fecha_creacion"
                     value={formData.fecha_creacion}
@@ -515,15 +453,13 @@ useEffect(() => {
                     readOnly
                     disabled
                   />
-                  <p className="text-xs text-gray-500 mt-1">
-                    Fecha automática asignada por el sistema
-                  </p>
+                  <p className="text-xs text-gray-500 mt-1">Fecha automatica asignada por el sistema</p>
                 </div>
               )}
               <div className="flex items-center space-x-4">
                 <div>
                   <label className="block text-sm font-medium mb-2">Estado</label>
-                  <div 
+                  <div
                     className="relative inline-flex items-center cursor-pointer"
                     onClick={() => !viewMode && setFormData(prev => ({ ...prev, estado: !prev.estado }))}
                   >
@@ -535,24 +471,14 @@ useEffect(() => {
                       className="sr-only"
                       disabled={viewMode}
                     />
-                    <div
-                      className={`w-11 h-6 rounded-full transition-colors duration-300 ${
-                        formData.estado ? 'bg-blue-500' : 'bg-gray-300'
-                      }`}
-                    ></div>
-                    <div
-                      className={`absolute left-0.5 top-0.5 bg-white w-5 h-5 rounded-full shadow transform transition-transform duration-300 ${
-                        formData.estado ? 'translate-x-5' : ''
-                      }`}
-                    ></div>
+                    <div className={`w-11 h-6 rounded-full transition-colors duration-300 ${formData.estado ? 'bg-blue-500' : 'bg-gray-300'}`} />
+                    <div className={`absolute left-0.5 top-0.5 bg-white w-5 h-5 rounded-full shadow transform transition-transform duration-300 ${formData.estado ? 'translate-x-5' : ''}`} />
                   </div>
-                  <span className="ml-3 text-sm text-gray-600">
-                    {formData.estado ? 'Activo' : 'Inactivo'}
-                  </span>
+                  <span className="ml-3 text-sm text-gray-600">{formData.estado ? 'Activo' : 'Inactivo'}</span>
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-2">Verificado</label>
-                  <div 
+                  <div
                     className="relative inline-flex items-center cursor-pointer"
                     onClick={() => !viewMode && setFormData(prev => ({ ...prev, verificado: !prev.verificado }))}
                   >
@@ -564,20 +490,10 @@ useEffect(() => {
                       className="sr-only"
                       disabled={viewMode}
                     />
-                    <div
-                      className={`w-11 h-6 rounded-full transition-colors duration-300 ${
-                        formData.verificado ? 'bg-green-500' : 'bg-gray-300'
-                      }`}
-                    ></div>
-                    <div
-                      className={`absolute left-0.5 top-0.5 bg-white w-5 h-5 rounded-full shadow transform transition-transform duration-300 ${
-                        formData.verificado ? 'translate-x-5' : ''
-                      }`}
-                    ></div>
+                    <div className={`w-11 h-6 rounded-full transition-colors duration-300 ${formData.verificado ? 'bg-green-500' : 'bg-gray-300'}`} />
+                    <div className={`absolute left-0.5 top-0.5 bg-white w-5 h-5 rounded-full shadow transform transition-transform duration-300 ${formData.verificado ? 'translate-x-5' : ''}`} />
                   </div>
-                  <span className="ml-3 text-sm text-gray-600">
-                    {formData.verificado ? 'Sí' : 'No'}
-                  </span>
+                  <span className="ml-3 text-sm text-gray-600">{formData.verificado ? 'Si' : 'No'}</span>
                 </div>
               </div>
               <div className="col-span-2 flex justify-end mt-4">
@@ -598,6 +514,7 @@ useEffect(() => {
                 )}
               </div>
             </form>
+            {error && <p className="text-red-500 mt-4">{error}</p>}
           </div>
         </div>
       )}
