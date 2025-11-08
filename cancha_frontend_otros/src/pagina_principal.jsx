@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Routes, Route, Link, Navigate, useNavigate, useLocation } from 'react-router-dom';
+import Solicitud from './pages/Solicitud';
 import Usuario from './pages/Usuario';
 import Administrador from './pages/Administrador';
 import Cliente from './pages/Cliente';
@@ -29,6 +30,7 @@ import CanchaAdmin from './roles/CanchaAdmin';
 // Configuración de rutas para cada rol
 const roleRoutesConfig = {
   ADMINISTRADOR: [
+    { id: 'solicitud', label: 'Solicitud', icon: '📝', path: 'solicitud', component: Solicitud },
     { id: 'usuario', label: 'Usuario', icon: '👤', path: 'usuario', component: Usuario },
     { id: 'administrador', label: 'Administrador', icon: '👤', path: 'administrador', component: Administrador },
     { id: 'admin_esp_dep', label: 'Admin Esp Dep', icon: '⚙️', path: 'admin-esp-dep', component: Admin_Esp_Dep },

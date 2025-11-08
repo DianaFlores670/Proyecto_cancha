@@ -72,6 +72,28 @@ const obtenerDatosEspecificos = async (limite = 10, offset = 0) => {
  */
 const obtenerEspaciosFiltrados = async (tipoFiltro, limite = 10, offset = 0) => {
   try {
+    if (tipoFiltro === 'sin_admin') {
+      const queryDatos = `
+        SELECT e.id_espacio, e.nombre, e.direccion, e.latitud, e.longitud, e.horario_apertura, e.horario_cierre,
+               a.id_admin_esp_dep, p.nombre AS admin_nombre, p.apellido AS admin_apellido
+        FROM espacio_deportivo e
+        LEFT JOIN admin_esp_dep a ON e.id_admin_esp_dep = a.id_admin_esp_dep
+        LEFT JOIN usuario p ON a.id_admin_esp_dep = p.id_persona
+        WHERE e.id_admin_esp_dep IS NULL
+        ORDER BY e.id_espacio ASC
+        LIMIT $1 OFFSET $2
+      `;
+      const queryTotal = `SELECT COUNT(*) FROM espacio_deportivo e WHERE e.id_admin_esp_dep IS NULL`;
+      const [resultDatos, resultTotal] = await Promise.all([
+        pool.query(queryDatos, [limite, offset]),
+        pool.query(queryTotal)
+      ]);
+      return {
+        espacios: resultDatos.rows,
+        total: parseInt(resultTotal.rows[0].count)
+      };
+    }
+
     const ordenesPermitidas = {
       nombre: 'e.nombre ASC',
       direccion: 'e.direccion ASC',
@@ -106,6 +128,7 @@ const obtenerEspaciosFiltrados = async (tipoFiltro, limite = 10, offset = 0) => 
     throw new Error(`Error al obtener espacios filtrados: ${error.message}`);
   }
 };
+
 
 /**
  * Buscar espacios deportivos por texto en múltiples campos
@@ -378,9 +401,9 @@ const obtenerEspaciosFiltradosController = async (req, res) => {
     const limite = parseInt(req.query.limit) || 10;
     const offset = parseInt(req.query.offset) || 0;
 
-    const tiposValidos = ['nombre', 'direccion', 'admin_nombre'];
+    const tiposValidos = ['nombre', 'direccion', 'admin_nombre', 'sin_admin'];
     if (!tipo || !tiposValidos.includes(tipo)) {
-      return res.status(400).json(respuesta(false, 'El parámetro "tipo" es inválido o no proporcionado'));
+      return res.status(400).json(respuesta(false, 'El parametro "tipo" es invalido o no proporcionado'));
     }
 
     const { espacios, total } = await obtenerEspaciosFiltrados(tipo, limite, offset);
@@ -395,6 +418,7 @@ const obtenerEspaciosFiltradosController = async (req, res) => {
     res.status(500).json(respuesta(false, error.message));
   }
 };
+
 
 /**
  * Controlador para GET /buscar

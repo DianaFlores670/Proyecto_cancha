@@ -14,6 +14,17 @@ const respuesta = (exito, mensaje, datos = null) => ({
 });
 
 // MODELOS - Funciones puras para operaciones de base de datos
+const obtenerEspaciosPorAdmin = async (id_admin_esp_dep, limite = 100, offset = 0) => {
+  const q = `
+    SELECT id_espacio, nombre
+    FROM espacio_deportivo
+    WHERE id_admin_esp_dep = $1
+    ORDER BY nombre
+    LIMIT $2 OFFSET $3
+  `;
+  const r = await pool.query(q, [id_admin_esp_dep, limite, offset]);
+  return r.rows;
+};
 
 /**
  * Obtener datos específicos de canchas con información del espacio deportivo
@@ -404,6 +415,20 @@ const asignarDisciplinasCancha = async (id_cancha, id_admin_esp_dep, disciplinas
 };
 
 // CONTROLADORES - Manejan las request y response
+const obtenerEspaciosPorAdminController = async (req, res) => {
+  try {
+    const id_admin_esp_dep = parseInt(req.query.id_admin_esp_dep);
+    const limite = parseInt(req.query.limit) || 100;
+    const offset = parseInt(req.query.offset) || 0;
+    if (!id_admin_esp_dep || isNaN(id_admin_esp_dep)) {
+      return res.status(400).json(respuesta(false, 'ID de administrador no valido o no proporcionado'));
+    }
+    const espacios = await obtenerEspaciosPorAdmin(id_admin_esp_dep, limite, offset);
+    return res.json(respuesta(true, 'Espacios obtenidos correctamente', { espacios, paginacion: { limite, offset, total: espacios.length } }));
+  } catch (e) {
+    return res.status(500).json(respuesta(false, e.message));
+  }
+};
 
 /**
  * Controlador para GET /datos-especificos
@@ -776,5 +801,8 @@ router.delete('/:id', eliminarCanchaController);
 // Disciplinas endpoints
 router.get('/disciplinas', obtenerDisciplinasController);
 router.post('/:id/disciplinas', asignarDisciplinasController);
+
+router.get('/espacios', obtenerEspaciosPorAdminController);
+
 
 module.exports = router;

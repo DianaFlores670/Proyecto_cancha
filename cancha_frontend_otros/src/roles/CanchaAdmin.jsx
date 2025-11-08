@@ -1,56 +1,84 @@
+/* eslint-disable react-hooks/exhaustive-deps */
+/* eslint-disable no-empty */
+/* eslint-disable no-unused-vars */
 import React, { useState, useEffect } from 'react';
 import api from '../services/api';
-// Normaliza roles
-const getUserRoles = (u) => {
-  if (Array.isArray(u?.roles)) return u.roles.map(r => String(r).toUpperCase());
-  if (u?.role) return [String(u.role).toUpperCase()];
-  return [];
+
+const norm = (v) => String(v || '').trim().toUpperCase().replace(/\s+/g, '_');
+
+const readUser = () => {
+  try { return JSON.parse(localStorage.getItem('user') || '{}'); } catch { return {}; }
 };
 
-// Para este dashboard, prioriza ADMIN_ESP_DEP sobre ADMINISTRADOR
-const pickRoleForThisPage = (u) => {
-  const roles = getUserRoles(u);
-  if (roles.includes('ADMIN_ESP_DEP')) return 'ADMIN_ESP_DEP';
-  if (roles.includes('ADMINISTRADOR'))  return 'ADMINISTRADOR';
-  return 'DEFAULT';
+const readTokenPayload = () => {
+  try {
+    const t = localStorage.getItem('token');
+    if (!t || t.split('.').length !== 3) return {};
+    const b = t.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    const pad = '='.repeat((4 - (b.length % 4)) % 4);
+    return JSON.parse(atob(b + pad));
+  } catch { return {}; }
 };
 
+const pickRole = (u, p) => {
+  const bag = new Set();
+  const arr = Array.isArray(u?.roles) ? u.roles : (u?.role ? [u.role] : []);
+  arr.forEach(r => bag.add(norm(typeof r === 'string' ? r : r?.rol || r?.role || r?.nombre || r?.name)));
+  const parr = Array.isArray(p?.roles) ? p.roles : (p?.rol ? [p.rol] : []);
+  parr.forEach(r => bag.add(norm(r)));
+  const list = Array.from(bag);
+  if (list.includes('ADMIN_ESP_DEP')) return 'ADMIN_ESP_DEP';
+  if (list.includes('ADMIN') || list.includes('ADMINISTRADOR')) return 'ADMINISTRADOR';
+  return list[0] || 'DEFAULT';
+};
 
-// Configuración de permisos por rol
+const resolveAdminId = (u, p) => {
+  if (Number.isInteger(u?.id_admin_esp_dep)) return u.id_admin_esp_dep;
+  if (Number.isInteger(u?.id_persona)) return u.id_persona;
+  if (Number.isInteger(u?.id)) return u.id;
+  if (Number.isInteger(u?.persona?.id_persona)) return u.persona.id_persona;
+  if (Number.isInteger(p?.id_admin_esp_dep)) return p.id_admin_esp_dep;
+  if (Number.isInteger(p?.id_persona)) return p.id_persona;
+  if (Number.isInteger(p?.id)) return p.id;
+  return null;
+};
+
 const permissionsConfig = {
-  ADMINISTRADOR: {
-    canView: true,
-    canCreate: true,
-    canEdit: true,
-    canDelete: true,
-  },
-  ADMIN_ESP_DEP: {
-    canView: true,
-    canCreate: true,
-    canEdit: true,
-    canDelete: true,
-  },
-  DEFAULT: {
-    canView: false,
-    canCreate: false,
-    canEdit: false,
-    canDelete: false,
-  },
+  ADMINISTRADOR: { canView: true, canCreate: true, canEdit: true, canDelete: true },
+  ADMIN_ESP_DEP: { canView: true, canCreate: true, canEdit: true, canDelete: true },
+  DEFAULT: { canView: false, canCreate: false, canEdit: false, canDelete: false },
+};
+
+const getImageUrl = (path) => {
+  if (!path) return '';
+  const base = (api.defaults?.baseURL || '').replace(/\/$/, '');
+  const clean = String(path).replace(/^\//, '');
+  return `${base}/${clean}`;
 };
 
 const CanchaAdmin = () => {
+  const [role, setRole] = useState(null);
+  const [idAdminEspDep, setIdAdminEspDep] = useState(null);
+
   const [canchas, setCanchas] = useState([]);
   const [espacios, setEspacios] = useState([]);
+  const [disciplinas, setDisciplinas] = useState([]);
+  const [disciplinasSeleccionadas, setDisciplinasSeleccionadas] = useState([]);
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+
   const [searchTerm, setSearchTerm] = useState('');
   const [filtro, setFiltro] = useState('');
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const limit = 10;
+
   const [modalOpen, setModalOpen] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [viewMode, setViewMode] = useState(false);
   const [currentCancha, setCurrentCancha] = useState(null);
-  const [disciplinas, setDisciplinas] = useState([]);
-  const [disciplinasSeleccionadas, setDisciplinasSeleccionadas] = useState([]);
+
   const [formData, setFormData] = useState({
     nombre: '',
     ubicacion: '',
@@ -60,153 +88,108 @@ const CanchaAdmin = () => {
     imagen_cancha: '',
     id_espacio: ''
   });
-  const [page, setPage] = useState(1);
-  const [total, setTotal] = useState(0);
-  const limit = 10;
+
   const [selectedFile, setSelectedFile] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
-  const [role, setRole] = useState('DEFAULT');
-  const [idAdminEspDep, setIdAdminEspDep] = useState(null);
 
-  // Obtener el rol e id_persona (id_admin_esp_dep) desde localStorage
-useEffect(() => {
-  const userData = localStorage.getItem('user');
-  if (!userData) {
-    setError('No se encontraron datos de usuario');
-    return;
-  }
-  try {
-    const u = JSON.parse(userData);
-    const effective = pickRoleForThisPage(u);
-    setRole(effective);
-    // Solo necesitamos id_admin_esp_dep cuando el rol efectivo es ADMIN_ESP_DEP
-    setIdAdminEspDep(effective === 'ADMIN_ESP_DEP' ? u.id_persona : null);
-  } catch (e) {
-    console.error('Error al parsear datos del usuario:', e);
-    setError('Error al cargar datos del usuario');
-  }
-}, []);
-
-
-  // Obtener permisos según el rol
-const permissions = permissionsConfig[role] || permissionsConfig.DEFAULT;
-
-
-  // Fetch espacios deportivos válidos
   useEffect(() => {
-    const fetchEspacios = async () => {
-      if (!idAdminEspDep) return;
-      try {
-        const response = await api.get('/cancha-admin/datos-especificos', {
-          params: { id_admin_esp_dep: idAdminEspDep }
-        });
-        if (response.data.exito) {
-          setEspacios(response.data.datos.espacios || []);
-        }
-      } catch (err) {
-        console.error('Error al obtener espacios deportivos:', err);
-        setError('Error al cargar espacios deportivos');
-      }
-    };
-    fetchEspacios();
-  }, [idAdminEspDep]);
-
-  // Fetch disciplinas
-  useEffect(() => {
-    const fetchDisciplinas = async () => {
-      try {
-        const response = await api.get('/cancha-admin/disciplinas');
-        if (response.data.exito) {
-          setDisciplinas(response.data.datos.disciplinas || []);
-        }
-      } catch (err) {
-        console.error('Error al obtener disciplinas:', err);
-        setError('Error al cargar disciplinas');
-      }
-    };
-    fetchDisciplinas();
+    const u = readUser();
+    const p = readTokenPayload();
+    const r = pickRole(u, p);
+    setRole(r);
+    const idGuess = resolveAdminId(u, p);
+    setIdAdminEspDep(r === 'ADMIN_ESP_DEP' ? idGuess : null);
   }, []);
 
-  // Generar URLs de imágenes
-  const getImageUrl = (path) => {
-    if (!path) return '';
-    const base = api.defaults.baseURL.replace(/\/$/, '');
-    const cleanPath = path.replace(/^\//, '');
-    return `${base}/${cleanPath}`;
-  };
+  useEffect(() => { setError(null); }, [role, idAdminEspDep]);
 
-  // Fetch canchas con paginación y filtros
+  const permissions = permissionsConfig[role || 'DEFAULT'] || permissionsConfig.DEFAULT;
+
+  useEffect(() => {
+  const fetchEspacios = async () => {
+    if (!(role && permissions.canView)) return;
+    const extra = role === 'ADMIN_ESP_DEP' && idAdminEspDep ? { id_admin_esp_dep: idAdminEspDep } : {};
+    try {
+      const r = await api.get('/cancha-admin/espacios', { params: { ...extra, limit: 100, offset: 0 } });
+      if (r.data?.exito) setEspacios(Array.isArray(r.data.datos?.espacios) ? r.data.datos.espacios : []);
+    } catch (e) {}
+  };
+  fetchEspacios();
+}, [role, idAdminEspDep, permissions.canView]);
+
+useEffect(() => {
+  if (!(role && permissions.canView)) return;
+  const fetchDisciplinas = async () => {
+    try {
+      const r = await api.get('/cancha-admin/disciplinas');
+      const list = Array.isArray(r.data?.datos?.disciplinas) ? r.data.datos.disciplinas : [];
+      setDisciplinas(list);
+    } catch (e) {
+      setError('Error al cargar disciplinas');
+    }
+  };
+  fetchDisciplinas();
+}, [role, permissions.canView]);
+
+
+
   const fetchCanchas = async (params = {}) => {
-    if (!idAdminEspDep) return;
+    if (!permissions.canView) { setError('No tienes permisos para ver'); return; }
     setLoading(true);
     setError(null);
     const offset = (page - 1) * limit;
-    const fullParams = { ...params, limit, offset, id_admin_esp_dep: idAdminEspDep };
+    const extra = role === 'ADMIN_ESP_DEP' && idAdminEspDep ? { id_admin_esp_dep: idAdminEspDep } : {};
+    const fullParams = { ...params, limit, offset, ...extra };
     try {
-      let response;
-      if (params.q) {
-        response = await api.get('/cancha-admin/buscar', { params: fullParams });
-      } else if (params.tipo) {
-        response = await api.get('/cancha-admin/filtro', { params: fullParams });
+      let resp;
+      if (params.q) resp = await api.get('/cancha-admin/buscar', { params: fullParams });
+      else if (params.tipo) resp = await api.get('/cancha-admin/filtro', { params: fullParams });
+      else resp = await api.get('/cancha-admin/datos-especificos', { params: fullParams });
+      if (resp.data?.exito) {
+        const rows = Array.isArray(resp.data.datos?.canchas) ? resp.data.datos.canchas : [];
+        const t = resp.data.datos?.paginacion?.total;
+        setCanchas(rows);
+        setTotal(typeof t === 'number' ? t : rows.length);
       } else {
-        response = await api.get('/cancha-admin/datos-especificos', { params: fullParams });
+        setError(resp.data?.mensaje || 'Error al cargar');
       }
-      if (response.data.exito) {
-        setCanchas(response.data.datos.canchas);
-        setTotal(response.data.datos.paginacion.total);
-      } else {
-        setError(response.data.mensaje);
-      }
-    } catch (err) {
-      const errorMessage = err.response?.data?.mensaje || 'Error de conexión al servidor';
-      setError(errorMessage);
-      console.error(err);
+    } catch (e) {
+      setError(e.response?.data?.mensaje || 'Error de conexion');
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
+    if (!role) return;
     fetchCanchas();
-  }, [page, idAdminEspDep]);
+  }, [role, idAdminEspDep, page]);
 
   const handleSearch = (e) => {
     e.preventDefault();
     setPage(1);
-    if (searchTerm.trim()) {
-      fetchCanchas({ q: searchTerm });
-    } else {
-      fetchCanchas();
-    }
+    if (searchTerm.trim()) fetchCanchas({ q: searchTerm });
+    else fetchCanchas();
   };
 
   const handleFiltroChange = (e) => {
     const tipo = e.target.value;
     setFiltro(tipo);
     setPage(1);
-    if (tipo) {
-      fetchCanchas({ tipo });
-    } else {
-      fetchCanchas();
-    }
+    if (tipo) fetchCanchas({ tipo });
+    else fetchCanchas();
   };
 
   const handleDelete = async (id) => {
     if (!permissions.canDelete) return;
-    if (!window.confirm('¿Estás seguro de eliminar esta cancha?')) return;
+    if (!window.confirm('Estas seguro de eliminar esta cancha?')) return;
     try {
-      const response = await api.delete(`/cancha-admin/${id}`, {
-        params: { id_admin_esp_dep: idAdminEspDep }
-      });
-      if (response.data.exito) {
-        fetchCanchas();
-      } else {
-        alert(response.data.mensaje);
-      }
-    } catch (err) {
-      const errorMessage = err.response?.data?.mensaje || 'Error de conexión al servidor';
-      setError(errorMessage);
-      console.error(err);
+      const extra = role === 'ADMIN_ESP_DEP' && idAdminEspDep ? { id_admin_esp_dep: idAdminEspDep } : {};
+      const r = await api.delete(`/cancha-admin/${id}`, { params: extra });
+      if (r.data?.exito) fetchCanchas();
+      else setError(r.data?.mensaje || 'No se pudo eliminar');
+    } catch (e) {
+      setError(e.response?.data?.mensaje || 'Error de conexion');
     }
   };
 
@@ -233,76 +216,64 @@ const permissions = permissionsConfig[role] || permissionsConfig.DEFAULT;
   const openEditModal = async (id) => {
     if (!permissions.canEdit) return;
     try {
-      const response = await api.get(`/cancha-admin/dato-individual/${id}`, {
-        params: { id_admin_esp_dep: idAdminEspDep }
+      const extra = role === 'ADMIN_ESP_DEP' && idAdminEspDep ? { id_admin_esp_dep: idAdminEspDep } : {};
+      const r = await api.get(`/cancha-admin/dato-individual/${id}`, { params: extra });
+      if (!r.data?.exito) { setError(r.data?.mensaje || 'No se pudo cargar'); return; }
+      const c = r.data.datos?.cancha || {};
+      setFormData({
+        nombre: c.nombre || '',
+        ubicacion: c.ubicacion || '',
+        capacidad: c.capacidad || '',
+        estado: c.estado || '',
+        monto_por_hora: c.monto_por_hora || '',
+        imagen_cancha: c.imagen_cancha || '',
+        id_espacio: c.id_espacio || ''
       });
-      if (response.data.exito) {
-        const cancha = response.data.datos.cancha;
-        setFormData({
-          nombre: cancha.nombre || '',
-          ubicacion: cancha.ubicacion || '',
-          capacidad: cancha.capacidad || '',
-          estado: cancha.estado || '',
-          monto_por_hora: cancha.monto_por_hora || '',
-          imagen_cancha: cancha.imagen_cancha || '',
-          id_espacio: cancha.id_espacio || ''
-        });
-        setImagePreview(cancha.imagen_cancha ? getImageUrl(cancha.imagen_cancha) : null);
-        setSelectedFile(null);
-        setDisciplinasSeleccionadas(cancha.disciplinas ? cancha.disciplinas.map(d => ({
-          id_disciplina: d.id_disciplina,
-          nombre: d.nombre,
-          frecuencia_practica: d.frecuencia_practica || 'Regular'
-        })) : []);
-        setCurrentCancha(cancha);
-        setEditMode(true);
-        setViewMode(false);
-        setModalOpen(true);
-      } else {
-        alert(response.data.mensaje);
-      }
-    } catch (err) {
-      const errorMessage = err.response?.data?.mensaje || 'Error de conexión al servidor';
-      setError(errorMessage);
-      console.error(err);
+      setImagePreview(c.imagen_cancha ? getImageUrl(c.imagen_cancha) : null);
+      setSelectedFile(null);
+      setDisciplinasSeleccionadas(c.disciplinas ? c.disciplinas.map(d => ({
+        id_disciplina: d.id_disciplina,
+        nombre: d.nombre,
+        frecuencia_practica: d.frecuencia_practica || 'Regular'
+      })) : []);
+      setCurrentCancha(c);
+      setEditMode(true);
+      setViewMode(false);
+      setModalOpen(true);
+    } catch (e) {
+      setError(e.response?.data?.mensaje || 'Error de conexion');
     }
   };
 
   const openViewModal = async (id) => {
     if (!permissions.canView) return;
     try {
-      const response = await api.get(`/cancha-admin/dato-individual/${id}`, {
-        params: { id_admin_esp_dep: idAdminEspDep }
+      const extra = role === 'ADMIN_ESP_DEP' && idAdminEspDep ? { id_admin_esp_dep: idAdminEspDep } : {};
+      const r = await api.get(`/cancha-admin/dato-individual/${id}`, { params: extra });
+      if (!r.data?.exito) { setError(r.data?.mensaje || 'No se pudo cargar'); return; }
+      const c = r.data.datos?.cancha || {};
+      setFormData({
+        nombre: c.nombre || '',
+        ubicacion: c.ubicacion || '',
+        capacidad: c.capacidad || '',
+        estado: c.estado || '',
+        monto_por_hora: c.monto_por_hora || '',
+        imagen_cancha: c.imagen_cancha || '',
+        id_espacio: c.id_espacio || ''
       });
-      if (response.data.exito) {
-        const cancha = response.data.datos.cancha;
-        setFormData({
-          nombre: cancha.nombre || '',
-          ubicacion: cancha.ubicacion || '',
-          capacidad: cancha.capacidad || '',
-          estado: cancha.estado || '',
-          monto_por_hora: cancha.monto_por_hora || '',
-          imagen_cancha: cancha.imagen_cancha || '',
-          id_espacio: cancha.id_espacio || ''
-        });
-        setImagePreview(cancha.imagen_cancha ? getImageUrl(cancha.imagen_cancha) : null);
-        setSelectedFile(null);
-        setDisciplinasSeleccionadas(cancha.disciplinas ? cancha.disciplinas.map(d => ({
-          id_disciplina: d.id_disciplina,
-          nombre: d.nombre,
-          frecuencia_practica: d.frecuencia_practica || 'Regular'
-        })) : []);
-        setCurrentCancha(cancha);
-        setEditMode(false);
-        setViewMode(true);
-        setModalOpen(true);
-      } else {
-        alert(response.data.mensaje);
-      }
-    } catch (err) {
-      const errorMessage = err.response?.data?.mensaje || 'Error de conexión al servidor';
-      setError(errorMessage);
-      console.error(err);
+      setImagePreview(c.imagen_cancha ? getImageUrl(c.imagen_cancha) : null);
+      setSelectedFile(null);
+      setDisciplinasSeleccionadas(c.disciplinas ? c.disciplinas.map(d => ({
+        id_disciplina: d.id_disciplina,
+        nombre: d.nombre,
+        frecuencia_practica: d.frecuencia_practica || 'Regular'
+      })) : []);
+      setCurrentCancha(c);
+      setEditMode(false);
+      setViewMode(true);
+      setModalOpen(true);
+    } catch (e) {
+      setError(e.response?.data?.mensaje || 'Error de conexion');
     }
   };
 
@@ -322,7 +293,7 @@ const permissions = permissionsConfig[role] || permissionsConfig.DEFAULT;
   };
 
   const handleFileChange = (e) => {
-    const file = e.target.files[0];
+    const file = e.target.files?.[0];
     if (file) {
       setSelectedFile(file);
       setImagePreview(URL.createObjectURL(file));
@@ -332,145 +303,76 @@ const permissions = permissionsConfig[role] || permissionsConfig.DEFAULT;
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (viewMode || (!permissions.canCreate && !editMode) || (!permissions.canEdit && editMode)) return;
-
     try {
-      let response;
+      let resp;
       const data = new FormData();
-      const filteredData = Object.fromEntries(
-        Object.entries(formData).filter(([key, value]) => {
-          const requiredFields = ['nombre', 'id_espacio'];
-          if (requiredFields.includes(key)) return true;
-          return value !== '' && value !== null && value !== undefined;
+      const filtered = Object.fromEntries(
+        Object.entries(formData).filter(([k, v]) => {
+          const req = ['nombre', 'id_espacio'];
+          if (req.includes(k)) return true;
+          return v !== '' && v !== null && v !== undefined;
         })
       );
+      Object.entries(filtered).forEach(([k, v]) => { if (k !== 'imagen_cancha') data.append(k, v); });
+      if (selectedFile) data.append('imagen_cancha', selectedFile);
+      if (role === 'ADMIN_ESP_DEP' && idAdminEspDep) data.append('id_admin_esp_dep', idAdminEspDep);
 
-      Object.entries(filteredData).forEach(([key, value]) => {
-        if (key !== 'imagen_cancha') {
-          data.append(key, value);
-        }
-      });
+      if (filtered.nombre && filtered.nombre.length > 100) { setError('Nombre muy largo'); return; }
+      if (filtered.ubicacion && filtered.ubicacion.length > 255) { setError('Ubicacion muy larga'); return; }
+      if (filtered.capacidad && (isNaN(filtered.capacidad) || filtered.capacidad < 0)) { setError('Capacidad invalida'); return; }
+      const estadosValidos = ['disponible','ocupada','mantenimiento'];
+      if (filtered.estado && !estadosValidos.includes(filtered.estado)) { setError('Estado invalido'); return; }
+      if (filtered.monto_por_hora && (isNaN(filtered.monto_por_hora) || filtered.monto_por_hora < 0)) { setError('Monto invalido'); return; }
+      if (filtered.id_espacio && !espacios.some(e => e.id_espacio === parseInt(filtered.id_espacio))) { setError('Espacio invalido'); return; }
 
-      if (selectedFile) {
-        data.append('imagen_cancha', selectedFile);
-      }
-      data.append('id_admin_esp_dep', idAdminEspDep);
-
-      // Validaciones
-      if (filteredData.nombre && filteredData.nombre.length > 100) {
-        setError('El nombre no debe exceder los 100 caracteres');
-        return;
-      }
-      if (filteredData.ubicacion && filteredData.ubicacion.length > 255) {
-        setError('La ubicación no debe exceder los 255 caracteres');
-        return;
-      }
-      if (filteredData.capacidad && (isNaN(filteredData.capacidad) || filteredData.capacidad < 0)) {
-        setError('La capacidad debe ser un número positivo');
-        return;
-      }
-      const estadosValidos = ['disponible', 'ocupada', 'mantenimiento'];
-      if (filteredData.estado && !estadosValidos.includes(filteredData.estado)) {
-        setError(`El estado debe ser uno de: ${estadosValidos.join(', ')}`);
-        return;
-      }
-      if (filteredData.monto_por_hora && (isNaN(filteredData.monto_por_hora) || filteredData.monto_por_hora < 0)) {
-        setError('El monto por hora debe ser un número positivo');
-        return;
-      }
-      if (filteredData.id_espacio && !espacios.some(espacio => espacio.id_espacio === parseInt(filteredData.id_espacio))) {
-        setError('El espacio deportivo seleccionado no es válido');
-        return;
-      }
-
-      const config = {
-        headers: {
-          'Content-Type': 'multipart/form-data'
-        }
-      };
-
+      const cfg = { headers: { 'Content-Type': 'multipart/form-data' } };
       if (editMode) {
-        console.log('📤 Enviando PATCH para actualizar cancha ID:', currentCancha.id_cancha);
-        console.log('📦 Datos enviados:');
-        for (let [key, value] of data.entries()) {
-          console.log(`   ${key}:`, key === 'imagen_cancha' ? `[File: ${value.name}]` : value);
-        }
-        response = await api.patch(`/cancha/${currentCancha.id_cancha}`, data, config);
-        if (response.data.exito && disciplinasSeleccionadas.length > 0) {
-          await api.post(`/cancha/${currentCancha.id_cancha}/disciplinas`, {
-            id_admin_esp_dep: idAdminEspDep,
-            disciplinas: disciplinasSeleccionadas
-          }, config);
+        resp = await api.patch(`/cancha/${currentCancha.id_cancha}`, data, cfg);
+        if (resp.data?.exito && disciplinasSeleccionadas.length > 0) {
+          await api.post(`/cancha/${currentCancha.id_cancha}/disciplinas`, { id_admin_esp_dep: idAdminEspDep, disciplinas: disciplinasSeleccionadas }, cfg);
         }
       } else {
-        console.log('📤 Enviando POST para crear cancha...');
-        response = await api.post('/cancha/', data, config);
-        if (response.data.exito && disciplinasSeleccionadas.length > 0) {
-          const nuevaCanchaId = response.data.datos.cancha.id_cancha;
-          await api.post(`/cancha/${nuevaCanchaId}/disciplinas`, {
-            id_admin_esp_dep: idAdminEspDep,
-            disciplinas: disciplinasSeleccionadas
-          }, config);
+        resp = await api.post('/cancha/', data, cfg);
+        if (resp.data?.exito && disciplinasSeleccionadas.length > 0) {
+          const nuevaId = resp.data.datos?.cancha?.id_cancha;
+          if (nuevaId) {
+            await api.post(`/cancha/${nuevaId}/disciplinas`, { id_admin_esp_dep: idAdminEspDep, disciplinas: disciplinasSeleccionadas }, cfg);
+          }
         }
       }
-
-      if (response.data.exito) {
-        console.log('✅ Operación exitosa:', response.data.mensaje);
-        closeModal();
-        fetchCanchas();
-      } else {
-        alert('Error: ' + response.data.mensaje);
-      }
+      if (resp.data?.exito) { closeModal(); fetchCanchas(); }
+      else setError(resp.data?.mensaje || 'No se pudo guardar');
     } catch (err) {
-      console.error('❌ Error in handleSubmit:', err);
-      console.error('❌ Detalles del error:', err.response?.data);
-      const errorMessage = err.response?.data?.mensaje || err.message || 'Error de conexión al servidor';
-      setError(errorMessage);
-      alert(`Error: ${errorMessage}`);
+      setError(err.response?.data?.mensaje || err.message || 'Error de conexion');
     }
   };
 
   const handlePageChange = (newPage) => {
-    if (newPage >= 1 && newPage <= Math.ceil(total / limit)) {
-      setPage(newPage);
-    }
+    if (newPage >= 1 && newPage <= Math.ceil(total / limit)) setPage(newPage);
   };
 
   const handleDisciplinaChange = (e) => {
-    const selectedId = parseInt(e.target.value);
-    if (selectedId && !disciplinasSeleccionadas.some(d => d.id_disciplina === selectedId)) {
-      const disciplina = disciplinas.find(d => d.id_disciplina === selectedId);
-      if (disciplina) {
-        setDisciplinasSeleccionadas(prev => [...prev, {
-          id_disciplina: disciplina.id_disciplina,
-          nombre: disciplina.nombre,
-          frecuencia_practica: 'Regular'
-        }]);
-      }
-    }
+    const id = parseInt(e.target.value);
+    if (!id) return;
+    if (disciplinasSeleccionadas.some(d => d.id_disciplina === id)) return;
+    const d = disciplinas.find(x => x.id_disciplina === id);
+    if (!d) return;
+    setDisciplinasSeleccionadas(prev => [...prev, { id_disciplina: d.id_disciplina, nombre: d.nombre, frecuencia_practica: 'Regular' }]);
   };
 
   const handleFrecuenciaChange = (id_disciplina, frecuencia) => {
-    setDisciplinasSeleccionadas(prev =>
-      prev.map(d => d.id_disciplina === id_disciplina
-        ? { ...d, frecuencia_practica: frecuencia }
-        : d
-      )
-    );
+    setDisciplinasSeleccionadas(prev => prev.map(d => d.id_disciplina === id_disciplina ? { ...d, frecuencia_practica: frecuencia } : d));
   };
 
   const handleRemoveDisciplina = (id_disciplina) => {
-    setDisciplinasSeleccionadas(prev =>
-      prev.filter(d => d.id_disciplina !== id_disciplina)
-    );
+    setDisciplinasSeleccionadas(prev => prev.filter(d => d.id_disciplina !== id_disciplina));
   };
 
- if (role === 'DEFAULT' || (role === 'ADMIN_ESP_DEP' && !idAdminEspDep)) {
-  return <p>Cargando permisos...</p>;
-}
+  if (!role || (role === 'ADMIN_ESP_DEP' && !idAdminEspDep)) return <p>Cargando permisos...</p>;
 
   return (
     <div className="bg-white rounded-lg shadow p-6">
-      <h2 className="text-xl font-semibold mb-4">Gestión de Canchas</h2>
+      <h2 className="text-xl font-semibold mb-4">Gestion de Canchas</h2>
 
       <div className="flex flex-col xl:flex-row gap-4 mb-6 items-stretch">
         <div className="flex-1">
@@ -479,14 +381,14 @@ const permissions = permissionsConfig[role] || permissionsConfig.DEFAULT;
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="🔍 Buscar por nombre, ubicación o espacio deportivo..."
+              placeholder="Buscar por nombre, ubicacion o espacio deportivo"
               className="border rounded-l px-4 py-2 w-full"
             />
             <button
               type="submit"
               className="bg-blue-500 text-white px-4 py-2 rounded-r hover:bg-blue-600 whitespace-nowrap"
             >
-              🔎 Buscar
+              Buscar
             </button>
           </form>
         </div>
@@ -497,19 +399,18 @@ const permissions = permissionsConfig[role] || permissionsConfig.DEFAULT;
             onChange={handleFiltroChange}
             className="border rounded px-3 py-2 flex-1 sm:min-w-[180px]"
           >
-            <option value="">📋 Todos - Sin filtro</option>
-            <option value="nombre">👤 Ordenar por nombre</option>
-            <option value="estado">🟢 Ordenar por estado</option>
-            <option value="monto">💰 Ordenar por monto por hora</option>
+            <option value="">Todos - sin filtro</option>
+            <option value="nombre">Por nombre</option>
+            <option value="estado">Por estado</option>
+            <option value="monto">Por monto por hora</option>
           </select>
 
           {permissions.canCreate && (
             <button
               onClick={openCreateModal}
-              className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 whitespace-nowrap sm:w-auto w-full flex items-center justify-center gap-2"
+              className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 whitespace-nowrap sm:w-auto w-full"
             >
-              <span>⚽</span>
-              <span>Crear Cancha</span>
+              Crear cancha
             </button>
           )}
         </div>
@@ -527,34 +428,34 @@ const permissions = permissionsConfig[role] || permissionsConfig.DEFAULT;
                 <tr className="bg-gray-50">
                   <th className="px-4 py-2 text-left">#</th>
                   <th className="px-4 py-2 text-left">Nombre</th>
-                  <th className="px-4 py-2 text-left">Ubicación</th>
+                  <th className="px-4 py-2 text-left">Ubicacion</th>
                   <th className="px-4 py-2 text-left">Capacidad</th>
                   <th className="px-4 py-2 text-left">Estado</th>
-                  <th className="px-4 py-2 text-left">Monto por Hora</th>
+                  <th className="px-4 py-2 text-left">Monto por hora</th>
                   <th className="px-4 py-2 text-left">Acciones</th>
                 </tr>
               </thead>
               <tbody>
-                {canchas.map((cancha, index) => (
-                  <tr key={cancha.id_cancha} className="border-t">
+                {canchas.map((c, index) => (
+                  <tr key={c.id_cancha} className="border-t">
                     <td className="px-4 py-2">{(page - 1) * limit + index + 1}</td>
-                    <td className="px-4 py-2">{cancha.nombre}</td>
-                    <td className="px-4 py-2">{cancha.ubicacion || '-'}</td>
-                    <td className="px-4 py-2">{cancha.capacidad || '-'}</td>
-                    <td className="px-4 py-2">{cancha.estado || '-'}</td>
-                    <td className="px-4 py-2">{cancha.monto_por_hora ? `$${cancha.monto_por_hora}` : '-'}</td>
+                    <td className="px-4 py-2">{c.nombre}</td>
+                    <td className="px-4 py-2">{c.ubicacion || '-'}</td>
+                    <td className="px-4 py-2">{c.capacidad || '-'}</td>
+                    <td className="px-4 py-2">{c.estado || '-'}</td>
+                    <td className="px-4 py-2">{c.monto_por_hora ? `$${c.monto_por_hora}` : '-'}</td>
                     <td className="px-4 py-2 flex gap-2">
                       {permissions.canView && (
                         <button
-                          onClick={() => openViewModal(cancha.id_cancha)}
+                          onClick={() => openViewModal(c.id_cancha)}
                           className="text-green-500 hover:text-green-700 mr-2"
                         >
-                          Ver Datos
+                          Ver datos
                         </button>
                       )}
                       {permissions.canEdit && (
                         <button
-                          onClick={() => openEditModal(cancha.id_cancha)}
+                          onClick={() => openEditModal(c.id_cancha)}
                           className="text-blue-500 hover:text-blue-700 mr-2"
                         >
                           Editar
@@ -562,7 +463,7 @@ const permissions = permissionsConfig[role] || permissionsConfig.DEFAULT;
                       )}
                       {permissions.canDelete && (
                         <button
-                          onClick={() => handleDelete(cancha.id_cancha)}
+                          onClick={() => handleDelete(c.id_cancha)}
                           className="text-red-500 hover:text-red-700"
                         >
                           Eliminar
@@ -584,7 +485,7 @@ const permissions = permissionsConfig[role] || permissionsConfig.DEFAULT;
               Anterior
             </button>
             <span className="px-4 py-2 bg-gray-100">
-              Página {page} de {Math.ceil(total / limit)}
+              Pagina {page} de {Math.ceil(total / limit)}
             </span>
             <button
               onClick={() => handlePageChange(page + 1)}
@@ -601,7 +502,7 @@ const permissions = permissionsConfig[role] || permissionsConfig.DEFAULT;
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-8 max-w-2xl w-full max-h-[80vh] overflow-y-auto">
             <h3 className="text-xl font-semibold mb-4">
-              {viewMode ? 'Ver Datos de Cancha' : editMode ? 'Editar Cancha' : 'Crear Cancha'}
+              {viewMode ? 'Ver datos de cancha' : editMode ? 'Editar cancha' : 'Crear cancha'}
             </h3>
             <form onSubmit={handleSubmit} className="grid grid-cols-2 gap-4">
               <div>
@@ -616,7 +517,7 @@ const permissions = permissionsConfig[role] || permissionsConfig.DEFAULT;
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Ubicación</label>
+                <label className="block text-sm font-medium mb-1">Ubicacion</label>
                 <input
                   name="ubicacion"
                   value={formData.ubicacion}
@@ -647,13 +548,13 @@ const permissions = permissionsConfig[role] || permissionsConfig.DEFAULT;
                   disabled={viewMode}
                 >
                   <option value="">Seleccione un estado</option>
-                  <option value="disponible">Disponible</option>
-                  <option value="ocupada">Ocupada</option>
-                  <option value="mantenimiento">Mantenimiento</option>
+                  <option value="disponible">disponible</option>
+                  <option value="ocupada">ocupada</option>
+                  <option value="mantenimiento">mantenimiento</option>
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Monto por Hora</label>
+                <label className="block text-sm font-medium mb-1">Monto por hora</label>
                 <input
                   name="monto_por_hora"
                   value={formData.monto_por_hora}
@@ -666,16 +567,15 @@ const permissions = permissionsConfig[role] || permissionsConfig.DEFAULT;
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Imagen Cancha</label>
+                <label className="block text-sm font-medium mb-1">Imagen cancha</label>
                 {imagePreview ? (
                   <img
                     src={imagePreview}
-                    alt="Imagen Cancha"
+                    alt="imagen_cancha"
                     className="w-32 h-32 object-cover rounded mb-2"
-                    onError={(e) => console.error('Error loading imagen_cancha:', e.target.src)}
                   />
                 ) : viewMode ? (
-                  <p className="text-gray-500">No hay imagen</p>
+                  <p className="text-gray-500">Sin imagen</p>
                 ) : null}
                 {!viewMode && (
                   <input
@@ -687,7 +587,7 @@ const permissions = permissionsConfig[role] || permissionsConfig.DEFAULT;
                 )}
               </div>
               <div className="col-span-2">
-                <label className="block text-sm font-medium mb-1">Espacio Deportivo</label>
+                <label className="block text-sm font-medium mb-1">Espacio deportivo</label>
                 <select
                   name="id_espacio"
                   value={formData.id_espacio}
@@ -696,28 +596,27 @@ const permissions = permissionsConfig[role] || permissionsConfig.DEFAULT;
                   required
                   disabled={viewMode}
                 >
-                  <option value="">Seleccione un espacio deportivo</option>
-                  {espacios.map(espacio => (
-                    <option key={espacio.id_espacio} value={espacio.id_espacio}>
-                      {espacio.nombre}
+                  <option value="">Seleccione un espacio</option>
+                  {espacios.map(e => (
+                    <option key={e.id_espacio} value={e.id_espacio}>
+                      {e.nombre}
                     </option>
                   ))}
                 </select>
               </div>
+
               <div className="col-span-2">
                 <label className="block text-sm font-medium mb-1">Disciplinas</label>
                 {viewMode ? (
                   <div className="space-y-2 max-h-40 overflow-y-auto">
-                    {disciplinasSeleccionadas.map(disciplina => (
-                      <div key={disciplina.id_disciplina} className="flex items-center justify-between p-2 border rounded">
-                        <span className="flex-1">{disciplina.nombre}</span>
-                        <span>{disciplina.frecuencia_practica}</span>
+                    {disciplinasSeleccionadas.map(d => (
+                      <div key={d.id_disciplina} className="flex items-center justify-between p-2 border rounded">
+                        <span className="flex-1">{d.nombre}</span>
+                        <span>{d.frecuencia_practica}</span>
                       </div>
                     ))}
                     {disciplinasSeleccionadas.length === 0 && (
-                      <p className="text-gray-500 text-sm text-center py-2">
-                        No hay disciplinas seleccionadas
-                      </p>
+                      <p className="text-gray-500 text-sm text-center py-2">Sin disciplinas</p>
                     )}
                   </div>
                 ) : (
@@ -728,23 +627,23 @@ const permissions = permissionsConfig[role] || permissionsConfig.DEFAULT;
                       value=""
                       disabled={viewMode}
                     >
-                      <option value="">Seleccione una disciplina para agregar</option>
+                      <option value="">Agregar disciplina</option>
                       {disciplinas
-                        .filter(d => !disciplinasSeleccionadas.some(selected => selected.id_disciplina === d.id_disciplina))
-                        .map(disciplina => (
-                          <option key={disciplina.id_disciplina} value={disciplina.id_disciplina}>
-                            {disciplina.nombre}
+                        .filter(d => !disciplinasSeleccionadas.some(s => s.id_disciplina === d.id_disciplina))
+                        .map(d => (
+                          <option key={d.id_disciplina} value={d.id_disciplina}>
+                            {d.nombre}
                           </option>
                         ))
                       }
                     </select>
                     <div className="space-y-2 max-h-40 overflow-y-auto">
-                      {disciplinasSeleccionadas.map(disciplina => (
-                        <div key={disciplina.id_disciplina} className="flex items-center justify-between p-2 border rounded">
-                          <span className="flex-1">{disciplina.nombre}</span>
+                      {disciplinasSeleccionadas.map(d => (
+                        <div key={d.id_disciplina} className="flex items-center justify-between p-2 border rounded">
+                          <span className="flex-1">{d.nombre}</span>
                           <select
-                            value={disciplina.frecuencia_practica}
-                            onChange={(e) => handleFrecuenciaChange(disciplina.id_disciplina, e.target.value)}
+                            value={d.frecuencia_practica}
+                            onChange={(e) => handleFrecuenciaChange(d.id_disciplina, e.target.value)}
                             className="border rounded px-2 py-1 mx-2"
                             disabled={viewMode}
                           >
@@ -755,23 +654,22 @@ const permissions = permissionsConfig[role] || permissionsConfig.DEFAULT;
                           </select>
                           <button
                             type="button"
-                            onClick={() => handleRemoveDisciplina(disciplina.id_disciplina)}
+                            onClick={() => handleRemoveDisciplina(d.id_disciplina)}
                             className="text-red-500 hover:text-red-700 ml-2"
                             disabled={viewMode}
                           >
-                            ✕
+                            x
                           </button>
                         </div>
                       ))}
                       {disciplinasSeleccionadas.length === 0 && (
-                        <p className="text-gray-500 text-sm text-center py-2">
-                          No hay disciplinas seleccionadas
-                        </p>
+                        <p className="text-gray-500 text-sm text-center py-2">Sin disciplinas</p>
                       )}
                     </div>
                   </div>
                 )}
               </div>
+
               <div className="col-span-2 flex justify-end mt-4">
                 <button
                   type="button"

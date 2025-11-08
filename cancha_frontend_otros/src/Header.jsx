@@ -4,6 +4,24 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import api from './services/api';
 
+const ROLE_PANEL_MAP = {
+  admin_esp_dep: { path: '/administrador', label: 'Ir a Panel Administrador' },
+  control: { path: '/control', label: 'Ir a Panel Control' },
+  encargado: { path: '/encargado', label: 'Ir a Panel Encargado' }
+};
+
+const getPanelEntries = (u) => {
+  const raw = Array.isArray(u?.roles) ? u.roles : [];
+  const list = raw
+    .map(r => (r?.rol || '').toLowerCase())
+    .filter(r => r && r !== 'cliente' && r !== 'administrador');
+  const uniq = Array.from(new Set(list));
+  return uniq
+    .map(r => ROLE_PANEL_MAP[r])
+    .filter(Boolean);
+};
+
+
 const formatRole = (v) => {
   const s = (v || '').toString().replace(/[_-]+/g, ' ').trim();
   return s ? s.replace(/\b\w/g, c => c.toUpperCase()) : 'Sin rol';
@@ -699,30 +717,43 @@ const Header = () => {
                 </button>
 
                 {showMenu && (
-                  <div className="absolute right-0 mt-2 w-56 bg-[#FFFFFF] rounded-lg shadow-lg z-50">
-                    <div className="px-4 py-3 text-[#23475F] font-medium border-b border-gray-200">
-                      {user?.nombre || 'Sin nombre'} {user?.apellido || 'Sin apellido'}
-                    </div>
-                    <button
-                      onClick={openProfileModal}
-                      className="block w-full text-left px-4 py-2 text-[#23475F] hover:bg-[#01CD6C] hover:text-white transition-colors duration-200"
-                    >
-                      Mi Perfil
-                    </button>
-                    <button
-                      onClick={openEditProfileModal}
-                      className="block w-full text-left px-4 py-2 text-[#23475F] hover:bg-[#01CD6C] hover:text-white transition-colors duration-200"
-                    >
-                      Editar Mi Perfil
-                    </button>
-                    <button
-                      onClick={handleLogout}
-                      className="w-full text-left px-4 py-2 text-[#23475F] hover:bg-[#A31621] hover:text-white transition-colors duration-200"
-                    >
-                      Cerrar Sesión
-                    </button>
-                  </div>
-                )}
+  <div className="absolute right-0 mt-2 w-56 bg-[#FFFFFF] rounded-lg shadow-lg z-50">
+    <div className="px-4 py-3 text-[#23475F] font-medium border-b border-gray-200">
+      {user?.nombre || 'Sin nombre'} {user?.apellido || 'Sin apellido'}
+    </div>
+
+    {/* paneles segun roles */}
+    {getPanelEntries(user).map((p, idx) => (
+      <button
+        key={idx}
+        onClick={() => { setShowMenu(false); navigate(p.path); }}
+        className="block w-full text-left px-4 py-2 text-[#23475F] hover:bg-[#01CD6C] hover:text-white transition-colors duration-200"
+      >
+        {p.label}
+      </button>
+    ))}
+
+    <button
+      onClick={openProfileModal}
+      className="block w-full text-left px-4 py-2 text-[#23475F] hover:bg-[#01CD6C] hover:text-white transition-colors duration-200"
+    >
+      Mi Perfil
+    </button>
+    <button
+      onClick={openEditProfileModal}
+      className="block w-full text-left px-4 py-2 text-[#23475F] hover:bg-[#01CD6C] hover:text-white transition-colors duration-200"
+    >
+      Editar Mi Perfil
+    </button>
+    <button
+      onClick={handleLogout}
+      className="w-full text-left px-4 py-2 text-[#23475F] hover:bg-[#A31621] hover:text-white transition-colors duration-200"
+    >
+      Cerrar Sesion
+    </button>
+  </div>
+)}
+
               </div>
             ) : (
               <button
