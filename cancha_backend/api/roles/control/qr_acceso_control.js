@@ -47,7 +47,7 @@ const obtenerQRParaControl = async (codigo_qr, id_control) => {
     `;
     await pool.query(updateControl, [id_control, qr.id_qr]);
   }
-
+  
   return qr;
 };
 
