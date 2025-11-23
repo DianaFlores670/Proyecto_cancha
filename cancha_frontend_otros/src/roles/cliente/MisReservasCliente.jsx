@@ -5,8 +5,6 @@ import { Link } from "react-router-dom";
 import api from "../../services/api";
 import Header from "../../Header";
 
-import { getImageUrl } from "../../utils";
-
 const canLeaveReview = (reserva) => {
   if (!reserva) return false;
   if (reserva.estado !== "pagada") return false;
