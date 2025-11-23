@@ -139,9 +139,11 @@ try {
 const frontendPath = path.join(__dirname, 'cancha_frontend_otros', 'dist');
 app.use(express.static(frontendPath));
 
-app.get('/:path(*)', (req, res) => {
+// Catch-all para SPA
+app.use((req, res) => {
   res.sendFile(path.join(frontendPath, 'index.html'));
 });
+
 
 
 // Manejo de errores
