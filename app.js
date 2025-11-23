@@ -145,7 +145,9 @@ app.use('/Uploads', express.static(path.join(__dirname, 'Uploads')));
 
 
 // Catch-all para SPA
-app.use((req, res) => {
+app.get((req, res, next) => {
+  // Si la ruta comienza con /Uploads, dejar que express.static la maneje
+  if (req.path.startsWith('/Uploads')) return next();
   res.sendFile(path.join(frontendPath, 'index.html'));
 });
 
