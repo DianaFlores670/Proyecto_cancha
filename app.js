@@ -69,12 +69,6 @@ app.use(express.urlencoded({ extended: true })); // Para manejar multipart/form-
 app.use('/Uploads', express.static(path.join(__dirname, 'Uploads')));
 
 
-
-
-
-
-
-
 // Rutas
 try {
   app.use('/usuario', usuarioRoutes);
@@ -140,6 +134,16 @@ try {
   process.exit(1); // Termina el proceso si hay un error en las rutas
 }
 
+
+// Servir frontend Vite (después de las rutas de API)
+const frontendPath = path.join(__dirname, 'cancha_frontend_otros', 'dist');
+app.use(express.static(frontendPath));
+
+app.get('*', (req, res) => {
+  res.sendFile(path.join(frontendPath, 'index.html'));
+});
+
+
 // Manejo de errores
 app.use((err, req, res, next) => {
   console.error(err.stack);
@@ -158,11 +162,6 @@ app.listen(PORT, '0.0.0.0', () => {
 // app.listen(PORT, () => {
 //   console.log(`Servidor corriendo en el puerto ${PORT}`);
 // });
-// Servir frontend Vite (después de todas las rutas de API)
-app.use(express.static(path.join(__dirname, 'cancha_frontend_otros', 'dist')));
 
-app.all('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'cancha_frontend_otros', 'dist', 'index.html'));
-});
 
 module.exports = app;
