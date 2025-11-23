@@ -431,7 +431,7 @@ const Sidebar = ({
             <img
               src={
                 empresa?.logo_imagen
-                  ? `${api.defaults.baseURL}${empresa.logo_imagen}`
+                  ? getImageUrl(empresa.logo_imagen)
                   : "/placeholder-logo.png"
               }
               alt="Logo Empresa"
