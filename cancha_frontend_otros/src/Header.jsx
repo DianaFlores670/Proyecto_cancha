@@ -1,17 +1,32 @@
 /* eslint-disable no-empty */
 /* eslint-disable no-unused-vars */
-import React, { useState, useEffect, useRef, useCallback } from "react";
+
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import api from "./services/api";
 import { FaEnvelope, FaLock } from "react-icons/fa";
-import { FaUser, FaUsersCog, FaClipboardList, FaCheckCircle } from "react-icons/fa";
-import { FaPhone, FaVenusMars, FaIdBadge, FaCalendarAlt, FaInfoCircle } from "react-icons/fa";
+import {
+  FaUser,
+  FaUsersCog,
+  FaClipboardList,
+  FaCheckCircle,
+} from "react-icons/fa";
+import {
+  FaPhone,
+  FaVenusMars,
+  FaIdBadge,
+  FaCalendarAlt,
+  FaInfoCircle,
+} from "react-icons/fa";
 import { FaUserTag, FaMapMarkerAlt, FaAlignLeft } from "react-icons/fa";
-import { FaCamera, FaKey, FaIdCard, FaTimes, FaSave } from "react-icons/fa";
-
+import { FaCamera, FaKey, FaTimes, FaSave } from "react-icons/fa";
+import { getImageUrl } from "./utils";
 
 const ROLE_PANEL_MAP = {
-  administrador: { path: "/administrador", label: "Ir a Panel Administrador Gral." },
+  administrador: {
+    path: "/administrador",
+    label: "Ir a Panel Administrador Gral.",
+  },
   admin_esp_dep: { path: "/administrador", label: "Ir a Panel Administrador" },
   control: { path: "/administrador", label: "Ir a Panel Control" },
   encargado: { path: "/administrador", label: "Ir a Panel Encargado" },
@@ -181,19 +196,18 @@ const Header = () => {
   };
 
   const fetchEspaciosEncargado_Public = async () => {
-  try {
-    const r = await api.get("/espacio_deportivo/filtro", {
-      params: { tipo: "nombre", limit: 200, offset: 0 }
-    });
+    try {
+      const r = await api.get("/espacio_deportivo/filtro", {
+        params: { tipo: "nombre", limit: 200, offset: 0 },
+      });
 
-    const datos = r.data?.datos?.espacios || [];
-    setEspaciosEncargado(datos);
-  } catch (e) {
-    console.error("Error cargando espacios para encargado:", e);
-    setEspaciosEncargado([]);
-  }
-};
-
+      const datos = r.data?.datos?.espacios || [];
+      setEspaciosEncargado(datos);
+    } catch (e) {
+      console.error("Error cargando espacios para encargado:", e);
+      setEspaciosEncargado([]);
+    }
+  };
 
   // Check login status and load user data
   useEffect(() => {
@@ -361,7 +375,7 @@ const Header = () => {
     } catch (err) {
       setLoginError(
         err.response?.data?.message ||
-        "Error al iniciar sesión. Verifica tus credenciales."
+          "Error al iniciar sesión. Verifica tus credenciales."
       );
       setLoginLoading(false);
     }
@@ -427,7 +441,7 @@ const Header = () => {
           rol,
           motivo: registerData.motivo || null,
         });
-      }else if (rol === "control") {
+      } else if (rol === "control") {
         // solicitud normal de rol
         await api.post("/solicitud-control/", {
           id_usuario: newUserId,
@@ -443,9 +457,7 @@ const Header = () => {
       setShowRegisterModal(false);
 
       setTitleSubmissionMessage(
-        rol === "cliente"
-          ? "Registro Completado"
-          : "Solicitud enviada"
+        rol === "cliente" ? "Registro Completado" : "Solicitud enviada"
       );
       setSubmissionMessage(
         rol === "cliente"
@@ -687,7 +699,6 @@ const Header = () => {
         return;
       }
 
-
       setRegisterData((prev) => ({ ...prev, [name]: value }));
       return;
     }
@@ -864,7 +875,7 @@ const Header = () => {
           ...campos,
           imagen_perfil: selectedFile
             ? response.data.datos?.usuario?.imagen_perfil ||
-            formData.imagen_perfil
+              formData.imagen_perfil
             : formData.imagen_perfil,
           datos_rol: formData.datos_especificos,
         };
@@ -934,8 +945,12 @@ const Header = () => {
           <div className="flex items-center gap-3">
             {company && company.logo_imagen ? (
               <img
-                src={getImageUrl(company.logo_imagen)}
-                alt={`${company.nombre_sistema} logo`}
+                src={
+                  company?.logo_imagen
+                    ? getImageUrl(company.logo_imagen)
+                    : "/placeholder-logo.png"
+                }
+                alt={`${company?.nombre_sistema || "Empresa"} logo`}
                 onError={handleImageError}
                 className="h-12 w-12 object-contain rounded-full border-2 border-[#01CD6C]"
               />
@@ -977,7 +992,11 @@ const Header = () => {
               >
                 {user.imagen_perfil ? (
                   <img
-                    src={getImageUrl(user.imagen_perfil)}
+                    src={
+                      user?.imagen_perfil
+                        ? getImageUrl(user.imagen_perfil)
+                        : "/placeholder-profile.png"
+                    }
                     alt="Foto perfil"
                     onError={handleImageError}
                     className="h-10 w-10 object-cover rounded-full border border-white"
@@ -1124,15 +1143,18 @@ const Header = () => {
       <div className="hidden md:flex">
         <div className="fixed top-0 left-0 w-full bg-[#0F2634]/95 backdrop-blur-md px-8 py-3 z-50 shadow-lg transition-all duration-300">
           <div className="max-w-7xl mx-auto flex justify-between items-center">
-
             {/* Logo and Title Section */}
             <div className="bg-[#0F2634] rounded-2xl shadow-sm p-2 border border-[#23475F]/20">
               <div className="flex items-center gap-4">
                 {company && company.logo_imagen && (
                   <Link to="/" className="group relative">
                     <img
-                      src={getImageUrl(company.logo_imagen)}
-                      alt={`${company.nombre_sistema} logo`}
+                      src={
+                        company?.logo_imagen
+                          ? getImageUrl(company.logo_imagen)
+                          : "/placeholder-logo.png"
+                      }
+                      alt={`${company?.nombre_sistema || "Empresa"} logo`}
                       className="h-16 w-16 object-contain rounded-full border-4 border-[#01CD6C] shadow-md"
                       onError={handleImageError}
                       aria-label="Ir a la página principal"
@@ -1205,8 +1227,16 @@ const Header = () => {
                   >
                     {user.imagen_perfil ? (
                       <img
-                        src={getImageUrl(user.imagen_perfil)}
-                        alt="Foto de perfil"
+                        src={
+                          user?.imagen_perfil
+                            ? getImageUrl(user.imagen_perfil)
+                            : "/placeholder-profile.png"
+                        }
+                        alt={
+                          user?.nombre
+                            ? `${user.nombre} foto de perfil`
+                            : "Foto de perfil"
+                        }
                         onError={handleImageError}
                         className="h-11 w-11 md:h-14 md:w-14 object-cover rounded-full border-2 border-[#01CD6C] shadow-md"
                       />
@@ -1301,7 +1331,6 @@ const Header = () => {
       {showLoginModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 animate-fadeIn">
           <div className="bg-white backdrop-blur-xl p-8 rounded-2xl shadow-2xl w-full max-w-md relative border border-white/30 animate-scaleIn">
-
             {/* Boton cerrar */}
             <button
               onClick={handleCloseLoginModal}
@@ -1318,7 +1347,6 @@ const Header = () => {
 
             {/* FORM */}
             <div className="space-y-5">
-
               {/* Correo */}
               <div>
                 <label className="block text-sm font-medium text-[#23475F] mb-1">
@@ -1370,8 +1398,9 @@ const Header = () => {
               <button
                 onClick={handleLogin}
                 disabled={loginLoading}
-                className={`w-full py-3 px-4 bg-[#01CD6C] text-white text-lg rounded-full shadow-lg hover:bg-[#00b359] transition-all font-semibold hover:translate-y-[-2px] hover:shadow-xl ${loginLoading ? "opacity-50 cursor-not-allowed" : ""
-                  }`}
+                className={`w-full py-3 px-4 bg-[#01CD6C] text-white text-lg rounded-full shadow-lg hover:bg-[#00b359] transition-all font-semibold hover:translate-y-[-2px] hover:shadow-xl ${
+                  loginLoading ? "opacity-50 cursor-not-allowed" : ""
+                }`}
                 aria-label="Iniciar sesion"
               >
                 {loginLoading ? (
@@ -1388,12 +1417,10 @@ const Header = () => {
         </div>
       )}
 
-
       {/* Register Modal */}
       {showRegisterModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 animate-fadeIn">
           <div className="bg-white backdrop-blur-xl p-8 rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto relative border border-white/40 animate-scaleIn">
-
             {/* Botón cerrar */}
             <button
               onClick={handleCloseRegisterModal}
@@ -1408,7 +1435,6 @@ const Header = () => {
             </h2>
 
             <div className="space-y-5">
-
               {/* Usuario */}
               <div>
                 <label className="block text-sm font-medium text-[#23475F] mb-1">
@@ -1504,8 +1530,9 @@ const Header = () => {
                 >
                   <FaUsersCog className="text-lg" /> Quiero un rol en el sistema
                   <svg
-                    className={`w-4 h-4 transform transition-transform ${showRoleSection ? "rotate-180" : ""
-                      }`}
+                    className={`w-4 h-4 transform transition-transform ${
+                      showRoleSection ? "rotate-180" : ""
+                    }`}
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -1546,18 +1573,23 @@ const Header = () => {
                     </div>
 
                     {/* ADMIN ESP DEPORTIVO */}
-                    {["admin_esp_dep", "encargado", "control"].includes(registerData.rol_agregar) && (
+                    {["admin_esp_dep", "encargado", "control"].includes(
+                      registerData.rol_agregar
+                    ) && (
                       <div className="mt-4 space-y-3 animate-fadeIn">
-
                         {/* ESPACIOS DEPORTIVOS */}
                         <label className="block text-sm font-medium text-[#23475F]">
                           Espacio deportivo
                         </label>
 
                         {espaciosLoading ? (
-                          <div className="text-sm text-[#23475F]">Cargando...</div>
+                          <div className="text-sm text-[#23475F]">
+                            Cargando...
+                          </div>
                         ) : espaciosError ? (
-                          <div className="text-sm text-[#A31621]">{espaciosError}</div>
+                          <div className="text-sm text-[#A31621]">
+                            {espaciosError}
+                          </div>
                         ) : (
                           <select
                             name="id_espacio"
@@ -1597,7 +1629,6 @@ const Header = () => {
                         />
                       </div>
                     )}
-
                   </div>
                 )}
               </div>
@@ -1613,8 +1644,9 @@ const Header = () => {
               <button
                 onClick={handleRegister}
                 disabled={registerLoading}
-                className={`w-full py-3 px-4 bg-gradient-to-r from-[#01CD6C] to-[#00b359] text-white text-lg rounded-full shadow-lg hover:shadow-xl hover:translate-y-[-2px] transition-all font-semibold ${registerLoading ? "opacity-50 cursor-not-allowed" : ""
-                  }`}
+                className={`w-full py-3 px-4 bg-gradient-to-r from-[#01CD6C] to-[#00b359] text-white text-lg rounded-full shadow-lg hover:shadow-xl hover:translate-y-[-2px] transition-all font-semibold ${
+                  registerLoading ? "opacity-50 cursor-not-allowed" : ""
+                }`}
               >
                 {registerLoading ? (
                   <div className="flex justify-center items-center gap-3">
@@ -1633,7 +1665,6 @@ const Header = () => {
       {showSubmissionModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 animate-fadeIn">
           <div className="bg-white/95 backdrop-blur-xl px-8 py-7 rounded-2xl shadow-2xl w-full max-w-sm relative border border-white/40 text-center animate-scaleIn">
-
             <div className="mx-auto mb-4 flex items-center justify-center">
               <div className="w-14 h-14 rounded-full bg-[#01CD6C]/10 flex items-center justify-center border border-[#01CD6C]/40">
                 <FaCheckCircle className="text-[#01CD6C] text-3xl" />
@@ -1644,9 +1675,7 @@ const Header = () => {
               {TitlesubmissionMessage}
             </h3>
 
-            <p className="text-sm text-[#23475F] mb-6">
-              {submissionMessage}
-            </p>
+            <p className="text-sm text-[#23475F] mb-6">{submissionMessage}</p>
 
             <button
               onClick={() => {
@@ -1665,7 +1694,6 @@ const Header = () => {
       {showProfileModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 animate-fadeIn">
           <div className="bg-white/95 backdrop-blur-xl rounded-2xl p-0 max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-white/40 animate-scaleIn relative">
-
             {/* Botón cerrar */}
             <button
               onClick={handleCloseProfileModal}
@@ -1679,7 +1707,11 @@ const Header = () => {
               <div className="inline-block relative">
                 {imagePreview ? (
                   <img
-                    src={imagePreview}
+                    src={
+                      imagePreview
+                        ? getImageUrl(imagePreview)
+                        : "/placeholder-profile.png"
+                    }
                     alt="Perfil"
                     className="w-28 h-28 rounded-full border-4 border-white shadow-lg object-cover"
                     onError={handleImageError}
@@ -1713,7 +1745,6 @@ const Header = () => {
 
             {/* CONTENIDO */}
             <div className="p-8 space-y-8">
-
               {/* INFORMACIÓN PERSONAL */}
               <div className="bg-white border border-gray-200 shadow-sm rounded-xl p-6">
                 <h3 className="text-xl font-semibold text-[#23475F] mb-5 flex items-center gap-2">
@@ -1749,7 +1780,8 @@ const Header = () => {
                     <p className="text-lg font-semibold text-[#23475F] flex items-center gap-2">
                       <FaVenusMars className="text-[#01CD6C]" />
                       {formData.sexo
-                        ? formData.sexo.charAt(0).toUpperCase() + formData.sexo.slice(1)
+                        ? formData.sexo.charAt(0).toUpperCase() +
+                          formData.sexo.slice(1)
                         : "No especificado"}
                     </p>
                   </div>
@@ -1759,7 +1791,8 @@ const Header = () => {
               {/* INFORMACIÓN DE CUENTA */}
               <div className="bg-white border border-gray-200 shadow-sm rounded-xl p-6">
                 <h3 className="text-xl font-semibold text-[#23475F] mb-5 flex items-center gap-2">
-                  <FaIdBadge className="text-[#01CD6C]" /> Información de la Cuenta
+                  <FaIdBadge className="text-[#01CD6C]" /> Información de la
+                  Cuenta
                 </h3>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -1775,11 +1808,14 @@ const Header = () => {
                       <p className="text-sm text-gray-500">Miembro desde</p>
                       <p className="text-lg font-semibold text-[#23475F] flex items-center gap-2">
                         <FaCalendarAlt className="text-[#01CD6C]" />
-                        {new Date(formData.fecha_creacion).toLocaleDateString("es-ES", {
-                          year: "numeric",
-                          month: "long",
-                          day: "numeric",
-                        })}
+                        {new Date(formData.fecha_creacion).toLocaleDateString(
+                          "es-ES",
+                          {
+                            year: "numeric",
+                            month: "long",
+                            day: "numeric",
+                          }
+                        )}
                       </p>
                     </div>
                   )}
@@ -1791,20 +1827,23 @@ const Header = () => {
                 Object.keys(formData.datos_especificos).length > 0 && (
                   <div className="bg-white border border-gray-200 shadow-sm rounded-xl p-6">
                     <h3 className="text-xl font-semibold text-[#23475F] mb-5 flex items-center gap-2">
-                      <FaInfoCircle className="text-[#01CD6C]" /> Información Adicional
+                      <FaInfoCircle className="text-[#01CD6C]" /> Información
+                      Adicional
                     </h3>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      {Object.entries(formData.datos_especificos).map(([key, value]) => (
-                        <div key={key}>
-                          <p className="text-sm text-gray-500 capitalize">
-                            {key.replace(/_/g, " ")}
-                          </p>
-                          <p className="text-lg font-semibold text-[#23475F]">
-                            {value || "No especificado"}
-                          </p>
-                        </div>
-                      ))}
+                      {Object.entries(formData.datos_especificos).map(
+                        ([key, value]) => (
+                          <div key={key}>
+                            <p className="text-sm text-gray-500 capitalize">
+                              {key.replace(/_/g, " ")}
+                            </p>
+                            <p className="text-lg font-semibold text-[#23475F]">
+                              {value || "No especificado"}
+                            </p>
+                          </div>
+                        )
+                      )}
                     </div>
                   </div>
                 )}
@@ -1829,11 +1868,9 @@ const Header = () => {
                 Editar Perfil
               </button>
             </div>
-
           </div>
         </div>
       )}
-
 
       {showRoleRequestModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
@@ -1849,7 +1886,8 @@ const Header = () => {
               Solicitar un nuevo rol
             </h2>
             <p className="text-sm text-gray-500 text-center mb-6">
-              Completa la informacion para enviar tu solicitud al administrador del sistema
+              Completa la informacion para enviar tu solicitud al administrador
+              del sistema
             </p>
 
             <div className="space-y-4">
@@ -1936,7 +1974,10 @@ const Header = () => {
                   rows={3}
                   value={roleRequest.motivo}
                   onChange={(e) =>
-                    setRoleRequest((prev) => ({ ...prev, motivo: e.target.value }))
+                    setRoleRequest((prev) => ({
+                      ...prev,
+                      motivo: e.target.value,
+                    }))
                   }
                   placeholder="Explique por que solicita este rol"
                 />
@@ -1956,10 +1997,11 @@ const Header = () => {
               <button
                 onClick={() => handleSendRoleRequestFromModal()}
                 disabled={roleRequestLoading || !roleRequest.rol}
-                className={`w-full py-3 rounded-full text-white font-semibold transition-all shadow-md ${roleRequestLoading || !roleRequest.rol
-                  ? "bg-gray-400 cursor-not-allowed"
-                  : "bg-gradient-to-r from-[#01CD6C] to-[#00b359] hover:shadow-lg hover:translate-y-[-1px]"
-                  }`}
+                className={`w-full py-3 rounded-full text-white font-semibold transition-all shadow-md ${
+                  roleRequestLoading || !roleRequest.rol
+                    ? "bg-gray-400 cursor-not-allowed"
+                    : "bg-gradient-to-r from-[#01CD6C] to-[#00b359] hover:shadow-lg hover:translate-y-[-1px]"
+                }`}
               >
                 {roleRequestLoading ? "Enviando..." : "Enviar Solicitud"}
               </button>
@@ -1972,7 +2014,6 @@ const Header = () => {
       {showEditProfileModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fadeIn">
           <div className="bg-white/95 backdrop-blur-xl rounded-3xl p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-white/40 animate-scaleIn relative">
-
             {/* Botón cerrar */}
             <button
               onClick={handleCloseEditProfileModal}
@@ -1985,9 +2026,14 @@ const Header = () => {
             <div className="text-center mb-8">
               {imagePreview ? (
                 <img
-                  src={imagePreview}
+                  src={
+                    imagePreview
+                      ? getImageUrl(imagePreview)
+                      : "/placeholder-profile.png"
+                  }
                   alt="Perfil"
                   className="w-24 h-24 rounded-full border-4 border-[#01CD6C] shadow-xl object-cover mx-auto"
+                  onError={handleImageError}
                 />
               ) : (
                 <div className="w-24 h-24 bg-gradient-to-br from-[#01CD6C] to-[#23475F] rounded-full border-4 border-[#01CD6C] flex items-center justify-center text-white text-3xl font-bold mx-auto shadow-xl">
@@ -1996,19 +2042,24 @@ const Header = () => {
                 </div>
               )}
 
-              <h3 className="text-3xl font-bold text-[#23475F] mt-4">Editar mi Perfil</h3>
-              <p className="text-gray-500 text-sm mt-1">Actualiza tu información personal</p>
+              <h3 className="text-3xl font-bold text-[#23475F] mt-4">
+                Editar mi Perfil
+              </h3>
+              <p className="text-gray-500 text-sm mt-1">
+                Actualiza tu información personal
+              </p>
             </div>
 
             {/* Error */}
             {editProfileError && (
               <div className="bg-red-50 border border-red-200 rounded-full px-4 py-3 text-center mb-6">
-                <p className="text-[#A31621] text-sm font-medium">{editProfileError}</p>
+                <p className="text-[#A31621] text-sm font-medium">
+                  {editProfileError}
+                </p>
               </div>
             )}
 
             <form onSubmit={handleEditProfileSubmit} className="space-y-8">
-
               {/* Subir imagen */}
               <div className="bg-white border border-gray-200 shadow-sm rounded-2xl p-6">
                 <h4 className="text-lg font-bold text-[#23475F] mb-4 flex items-center gap-2">
@@ -2022,7 +2073,9 @@ const Header = () => {
                   className="w-full border border-gray-300 rounded-full px-4 py-2 bg-white focus:ring-2 focus:ring-[#01CD6C] file:bg-[#01CD6C] file:text-white file:px-4 file:py-1 file:rounded-full file:border-0 hover:file:bg-[#00b359]"
                 />
 
-                <p className="text-xs text-gray-500 mt-2">Formatos: JPG, PNG, GIF – Máx 5MB</p>
+                <p className="text-xs text-gray-500 mt-2">
+                  Formatos: JPG, PNG, GIF – Máx 5MB
+                </p>
               </div>
 
               {/* Datos personales */}
@@ -2032,10 +2085,11 @@ const Header = () => {
                 </h4>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-
                   {/* Nombre */}
                   <div>
-                    <label className="text-sm font-medium text-[#23475F]">Nombre *</label>
+                    <label className="text-sm font-medium text-[#23475F]">
+                      Nombre *
+                    </label>
                     <input
                       name="nombre"
                       required
@@ -2048,7 +2102,9 @@ const Header = () => {
 
                   {/* Apellido */}
                   <div>
-                    <label className="text-sm font-medium text-[#23475F]">Apellido *</label>
+                    <label className="text-sm font-medium text-[#23475F]">
+                      Apellido *
+                    </label>
                     <input
                       name="apellido"
                       required
@@ -2061,7 +2117,9 @@ const Header = () => {
 
                   {/* Correo */}
                   <div>
-                    <label className="text-sm font-medium text-[#23475F]">Correo *</label>
+                    <label className="text-sm font-medium text-[#23475F]">
+                      Correo *
+                    </label>
                     <div className="flex items-center gap-2">
                       <input
                         name="correo"
@@ -2077,7 +2135,9 @@ const Header = () => {
 
                   {/* Teléfono */}
                   <div>
-                    <label className="text-sm font-medium text-[#23475F]">Teléfono</label>
+                    <label className="text-sm font-medium text-[#23475F]">
+                      Teléfono
+                    </label>
                     <div className="flex items-center gap-2">
                       <input
                         name="telefono"
@@ -2091,7 +2151,9 @@ const Header = () => {
 
                   {/* Sexo */}
                   <div>
-                    <label className="text-sm font-medium text-[#23475F]">Sexo</label>
+                    <label className="text-sm font-medium text-[#23475F]">
+                      Sexo
+                    </label>
                     <div className="flex items-center gap-2">
                       <select
                         name="sexo"
@@ -2108,7 +2170,6 @@ const Header = () => {
                       </select>
                     </div>
                   </div>
-
                 </div>
               </div>
 
@@ -2119,10 +2180,11 @@ const Header = () => {
                 </h4>
 
                 <div className="space-y-4">
-
                   {/* Nueva contraseña */}
                   <div>
-                    <label className="text-sm font-medium text-[#23475F]">Nueva</label>
+                    <label className="text-sm font-medium text-[#23475F]">
+                      Nueva
+                    </label>
                     <input
                       name="nueva_contrasena"
                       type="password"
@@ -2135,7 +2197,9 @@ const Header = () => {
 
                   {/* Confirmar */}
                   <div>
-                    <label className="text-sm font-medium text-[#23475F]">Confirmar</label>
+                    <label className="text-sm font-medium text-[#23475F]">
+                      Confirmar
+                    </label>
                     <input
                       name="confirmar_contrasena"
                       type="password"
@@ -2145,16 +2209,16 @@ const Header = () => {
                       placeholder="Confirmar contraseña"
                     />
                     {passwordMatchError && (
-                      <p className="text-[#A31621] text-sm mt-2">{passwordMatchError}</p>
+                      <p className="text-[#A31621] text-sm mt-2">
+                        {passwordMatchError}
+                      </p>
                     )}
                   </div>
-
                 </div>
               </div>
 
               {/* Botones */}
               <div className="flex justify-end gap-4 pt-4 border-t border-gray-200">
-
                 <button
                   type="button"
                   onClick={handleCloseEditProfileModal}
@@ -2171,14 +2235,11 @@ const Header = () => {
                   <FaSave />
                   {editProfileLoading ? "Guardando..." : "Guardar"}
                 </button>
-
               </div>
             </form>
-
           </div>
         </div>
       )}
-
     </>
   );
 };
