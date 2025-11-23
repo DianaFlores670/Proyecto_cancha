@@ -66,7 +66,8 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true })); // Para manejar multipart/form-data
-app.use('/Uploads', express.static(path.join(__dirname, 'Uploads')));
+app.use('/Uploads', express.static(path.join(__dirname, 'cancha_backend', 'Uploads')));
+
 
 
 // Rutas
@@ -135,8 +136,7 @@ try {
 }
 
 
-// Servir archivos estáticos de la carpeta Uploads
-app.use('/Uploads', express.static(path.join(__dirname, 'Uploads')));
+
 
 // Servir frontend Vite (después de las rutas de API)
 const frontendPath = path.join(__dirname, 'cancha_frontend_otros', 'dist');
