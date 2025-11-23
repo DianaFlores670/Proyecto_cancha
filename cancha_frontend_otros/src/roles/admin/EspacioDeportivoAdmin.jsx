@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import api from "../../services/api";
-import { getImageUrl } from "../../utils"; // ajusta la ruta según tu estructura
+// ajusta la ruta según tu estructura
 
 const norm = (v) =>
   String(v || "")
