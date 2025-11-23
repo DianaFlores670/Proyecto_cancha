@@ -649,7 +649,7 @@ const QRReserva = () => {
               </div>
               {selectedQR.id_control && (
                 <div>
-                  <label className="font-medium text-gray-700">Control asociado:</label>
+                  <label className="font-medium text-gray-700">Control asociado</label>
                   <p className="mt-1 p-2 bg-gray-50 rounded">
                     #{selectedQR.id_control} {selectedQR.control_nombre ? `- ${selectedQR.control_nombre}` : ''}
                   </p>
