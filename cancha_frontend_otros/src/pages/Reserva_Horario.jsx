@@ -94,9 +94,9 @@ const ReservaHorario = () => {
     const fullParams = { ...params, limit, offset };
     try {
       let response;
-      if (params.q) response = await api.get('/reserva_horario/buscar', { params: fullParams });
-      else if (params.tipo) response = await api.get('/reserva_horario/filtro', { params: fullParams });
-      else response = await api.get('/reserva_horario/datos-especificos', { params: fullParams });
+      if (params.q) response = await api.get('/reserva-horario/buscar', { params: fullParams });
+      else if (params.tipo) response = await api.get('/reserva-horario/filtro', { params: fullParams });
+      else response = await api.get('/reserva-horario/datos-especificos', { params: fullParams });
       if (response.data?.exito) {
         setHorarios(response.data.datos.horarios || []);
         setTotal(response.data.datos.paginacion?.total || 0);
@@ -133,7 +133,7 @@ const ReservaHorario = () => {
     if (!permissions.canDelete) return;
     if (!window.confirm('Estas seguro de eliminar este horario de reserva?')) return;
     try {
-      const response = await api.delete(`/reserva_horario/${id}`);
+      const response = await api.delete(`/reserva-horario/${id}`);
       if (response.data?.exito) fetchHorarios();
       else setError(response.data?.mensaje || 'No se pudo eliminar');
     } catch (err) {
@@ -153,7 +153,7 @@ const ReservaHorario = () => {
   const openEditModal = async (id) => {
     if (!permissions.canEdit) return;
     try {
-      const response = await api.get(`/reserva_horario/dato-individual/${id}`);
+      const response = await api.get(`/reserva-horario/dato-individual/${id}`);
       if (response.data?.exito) {
         const h = response.data.datos.horario;
         setFormData({
@@ -178,7 +178,7 @@ const ReservaHorario = () => {
   const openViewModal = async (id) => {
     if (!permissions.canView) return;
     try {
-      const response = await api.get(`/reserva_horario/dato-individual/${id}`);
+      const response = await api.get(`/reserva-horario/dato-individual/${id}`);
       if (response.data?.exito) {
         const h = response.data.datos.horario;
         setFormData({
@@ -255,8 +255,8 @@ const ReservaHorario = () => {
       if (filtered.monto !== undefined && (isNaN(filtered.monto) || filtered.monto < 0)) { setError('El monto debe ser numero no negativo'); return; }
 
       let response;
-      if (editMode) response = await api.patch(`/reserva_horario/${currentHorario.id_horario}`, filtered);
-      else response = await api.post('/reserva_horario/', filtered);
+      if (editMode) response = await api.patch(`/reserva-horario/${currentHorario.id_horario}`, filtered);
+      else response = await api.post('/reserva-horario/', filtered);
 
       if (response.data?.exito) { closeModal(); fetchHorarios(); }
       else setError(response.data?.mensaje || 'No se pudo guardar');

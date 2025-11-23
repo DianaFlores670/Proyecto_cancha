@@ -877,13 +877,15 @@ const Header = () => {
             >
               Canchas
             </Link>
-            <Link
+            {isLoggedIn && (
+              <Link
               to="/mis-reservas"
               className="bg-[#01CD6C] hover:bg-[#00b359] text-[#FFFFFF] font-semibold py-2 px-3 rounded-lg shadow-lg transition-all duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-[#01CD6C] focus:ring-opacity-50"
               aria-label="Ir a Canchas"
             >
               Mis Reservas
             </Link>
+            )}
             {!isLoggedIn && (
               <button
                 onClick={() => setShowRegisterModal(true)}
