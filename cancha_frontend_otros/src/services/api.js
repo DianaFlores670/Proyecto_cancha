@@ -1,7 +1,7 @@
 import axios from 'axios'
 
 const api = axios.create({
-  baseURL: 'http://localhost:3000',
+  baseURL: 'http://192.168.26.3:3000',//'http://localhost:3000',   aca modificar la red del wifi conectado 
   timeout: 10000
 })
 
@@ -17,6 +17,6 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => Promise.reject(error)
-)
+) 
 
 export default api
