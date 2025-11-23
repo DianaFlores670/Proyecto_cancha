@@ -75,7 +75,7 @@ app.use('/Uploads', express.static(path.join(__dirname, 'Uploads')));
 // Servir frontend compilado de Vite
 app.use(express.static(path.join(__dirname, 'cancha_frontend_otros', 'dist')));
 
-app.get('/*', (req, res) => {
+app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'cancha_frontend_otros', 'dist', 'index.html'));
 });
 
