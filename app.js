@@ -72,14 +72,6 @@ app.use('/Uploads', express.static(path.join(__dirname, 'Uploads')));
 
 
 
-// Servir frontend compilado de Vite
-app.use(express.static(path.join(__dirname, 'cancha_frontend_otros', 'dist')));
-
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'cancha_frontend_otros', 'dist', 'index.html'));
-});
-
-
 
 
 
@@ -166,5 +158,11 @@ app.listen(PORT, '0.0.0.0', () => {
 // app.listen(PORT, () => {
 //   console.log(`Servidor corriendo en el puerto ${PORT}`);
 // });
+// Servir frontend Vite (después de todas las rutas de API)
+app.use(express.static(path.join(__dirname, 'cancha_frontend_otros', 'dist')));
+
+app.all('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'cancha_frontend_otros', 'dist', 'index.html'));
+});
 
 module.exports = app;
