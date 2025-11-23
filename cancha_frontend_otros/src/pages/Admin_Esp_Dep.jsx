@@ -80,7 +80,7 @@ const AdminEspDep = () => {
 
   const fetchAdministradores = async (params = {}) => {
     if (!permissions.canView) {
-      setError('No tienes permisos para ver los administradores especiales');
+      setError('No tienes permisos para ver los administradores de Espacio Deportivo');
       return;
     }
     setLoading(true);
@@ -100,7 +100,7 @@ const AdminEspDep = () => {
         setAdministradores(response.data.datos.administradores);
         setTotal(response.data.datos.paginacion.total);
       } else {
-        setError(response.data.mensaje || 'Error al cargar administradores especiales');
+        setError(response.data.mensaje || 'Error al cargar administradores de Espacio Deportivo');
       }
     } catch (err) {
       const errorMessage = err.response?.data?.mensaje || 'Error de conexion al servidor';
@@ -133,7 +133,7 @@ const AdminEspDep = () => {
 
   const handleDelete = async (id) => {
     if (!permissions.canDelete) return;
-    if (!window.confirm('Estas seguro de eliminar este administrador especial?')) return;
+    if (!window.confirm('Estas seguro de eliminar este administrador de Espacio Deportivo?')) return;
     try {
       const response = await api.delete(`/admin_esp_dep/${id}`);
       if (response.data.exito) {
@@ -186,7 +186,7 @@ const AdminEspDep = () => {
         setViewMode(false);
         setModalOpen(true);
       } else {
-        setError(response.data.mensaje || 'No se pudo cargar el administrador especial');
+        setError(response.data.mensaje || 'No se pudo cargar el administrador de Espacio Deportivo');
       }
     } catch (err) {
       const errorMessage = err.response?.data?.mensaje || 'Error de conexion al servidor';
@@ -215,7 +215,7 @@ const AdminEspDep = () => {
         setViewMode(true);
         setModalOpen(true);
       } else {
-        setError(response.data.mensaje || 'No se pudo cargar el administrador especial');
+        setError(response.data.mensaje || 'No se pudo cargar el administrador de Espacio Deportivo');
       }
     } catch (err) {
       const errorMessage = err.response?.data?.mensaje || 'Error de conexion al servidor';
@@ -271,7 +271,7 @@ const AdminEspDep = () => {
 
   return (
     <div className="bg-white rounded-lg shadow p-6">
-      <h2 className="text-xl font-semibold mb-4">Gestion de Administradores Especiales</h2>
+      <h2 className="text-xl font-semibold mb-4">Gestion de Administradores de Espacios Deportivos</h2>
 
       <div className="flex flex-col xl:flex-row gap-4 mb-6 items-stretch">
         <div className="flex-1">
@@ -313,7 +313,7 @@ const AdminEspDep = () => {
               className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 whitespace-nowrap sm:w-auto w-full flex items-center justify-center gap-2"
             >
               <span>+</span>
-              <span>Crear Administrador Especial</span>
+              <span>Crear Administrador de Espacio Deportivo</span>
             </button>
           )}
         </div>
@@ -411,7 +411,7 @@ const AdminEspDep = () => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-8 max-w-2xl w-full max-h-[80vh] overflow-y-auto">
             <h3 className="text-xl font-semibold mb-4">
-              {viewMode ? 'Ver Datos de Administrador Especial' : editMode ? 'Editar Administrador Especial' : 'Crear Administrador Especial'}
+              {viewMode ? 'Ver Datos de Administrador de Espacio Deportivo' : editMode ? 'Editar Administrador de Espacio Deportivo' : 'Crear Administrador de Espacio Deportivo'}
             </h3>
             <form onSubmit={handleSubmit} className="grid grid-cols-2 gap-4">
               <div>

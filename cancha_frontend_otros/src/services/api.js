@@ -1,7 +1,9 @@
 import axios from 'axios'
 
 const api = axios.create({
-  baseURL: 'http://192.168.26.3:3000',//'http://localhost:3000',   aca modificar la red del wifi conectado 
+  //aca modificar la red del wifi conectado 
+  //baseURL: 'http://192.168.26.3:3000',
+  baseURL:'http://localhost:3000',   
   timeout: 10000
 })
 

@@ -1,4 +1,6 @@
+/* eslint-disable no-undef */
 import React, { useState, useEffect } from 'react';
+import api from './services/api';
 import { Routes, Route, Link, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import Usuario from './pages/Usuario';
 import Administrador from './pages/Administrador';
@@ -116,7 +118,6 @@ const pickEffectiveRole = (u) => {
   return roles[0]; // fallback: el primero válido
 };
 
-
 const Header = ({ title, toggleSidebar, isSidebarOpen }) => {
   return (
     <header className="bg-white shadow-sm border-b flex items-center justify-between px-6 py-4">
@@ -153,50 +154,68 @@ const getMainRole = (user) => {
   return null;
 };
 
-
-const Sidebar = ({ routes, onPageChange, currentPage, onLogout, user, isSidebarOpen, toggleSidebar }) => {
+const Sidebar = ({ routes, onPageChange, currentPage, onLogout, user, empresa, isSidebarOpen, toggleSidebar }) => {
   return (
-    <div className={`fixed inset-y-0 left-0 w-64 bg-white shadow-lg overflow-y-auto transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} transition-transform duration-300 ease-in-out z-50`}>
-      <div className="p-6 border-b flex justify-between items-center">
+    <div
+      className={`fixed inset-y-0 left-0 w-64 bg-white shadow-xl border-r 
+      flex flex-col transform 
+      ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"} 
+      transition-transform duration-300 ease-in-out z-50`}
+    >
+      {/* ENCABEZADO */}
+      <div className="p-6 border-b bg-gradient-to-r from-[#E8F5EE] to-[#FFFFFF] flex justify-between items-start">
         <div>
-          <h1 className="text-xl font-bold text-[#23475F]">Mi App</h1>
+          <div className="flex items-center gap-3 mb-3">
+            <img
+              src={
+                empresa?.logo_imagen
+                  ? `${api.defaults.baseURL}${empresa.logo_imagen}`
+                  : "/placeholder-logo.png"
+              }
+              alt="Logo Empresa"
+              className="w-12 h-12 rounded-xl object-cover shadow-sm border bg-[#0F2634]"
+            />
+
+            <span className="text-lg font-extrabold text-[#23475F] leading-tight tracking-wide">
+              {empresa?.nombre_sistema || "Cargando..."}
+            </span>
+          </div>
+
           {user && (
-            <p className="text-sm text-[#23475F] mt-1">Bienvenido, {user.nombre}</p>
+            <p className="text-sm text-[#23475F]/80">
+              Hola, <span className="font-medium">{user.nombre}</span>
+            </p>
           )}
-          <br />
+
           <button
             onClick={onLogout}
-            className="w-full text-[#23475F] hover:text-[#01CD6C] text-sm font-medium flex items-center"
+            className="mt-4 w-full text-[#23475F] hover:text-[#01CD6C] text-sm font-medium flex items-center gap-2 transition-all"
           >
-            <svg className="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
             </svg>
             Cerrar Sesión
           </button>
-          {(
-            getMainRole(user) === 'ADMIN_ESP_DEP' ||
-            getMainRole(user) === 'ENCARGADO' ||
-            getMainRole(user) === 'CONTROL'
-          ) && (
-              <button
-                onClick={() => (window.location.href = '/')}
-                className="w-full text-[#23475F] hover:text-[#01CD6C] text-sm font-medium flex items-center mt-3"
-              >
-                <svg className="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M5.121 17.804A9 9 0 0112 15a9 9 0 016.879 2.804M15 11a3 3 0 11-6 0 3 3 0 016 0z"
-                  />
-                </svg>
-                Volver a Vista Cliente
-              </button>
-            )}
 
+          {(getMainRole(user) === "ADMIN_ESP_DEP" ||
+            getMainRole(user) === "ENCARGADO" ||
+            getMainRole(user) === "CONTROL") && (
+            <button
+              onClick={() => (window.location.href = "/")}
+              className="mt-3 w-full text-[#23475F] hover:text-[#01CD6C] text-sm font-medium flex items-center gap-2 transition-all"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                  d="M5.121 17.804A9 9 0 0112 15a9 9 0 016.879 2.804M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+              Vista Cliente
+            </button>
+          )}
         </div>
+
         <button
-          className="text-[#23475F] hover:text-[#01CD6C] focus:outline-none"
+          className="text-[#23475F] hover:text-[#01CD6C]"
           onClick={toggleSidebar}
         >
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -204,7 +223,9 @@ const Sidebar = ({ routes, onPageChange, currentPage, onLogout, user, isSidebarO
           </svg>
         </button>
       </div>
-      <nav className="mt-6">
+
+      {/* MENÚ — scrolleable */}
+      <nav className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-[#23475F]/40 scrollbar-track-transparent">
         {routes.map((item) => (
           <Link
             key={item.id}
@@ -213,19 +234,22 @@ const Sidebar = ({ routes, onPageChange, currentPage, onLogout, user, isSidebarO
               onPageChange(item.id, item.label);
               toggleSidebar();
             }}
-            className={`w-full flex items-center px-6 py-3 text-left transition-colors duration-200 ${currentPage === item.id
-              ? 'bg-[#01CD6C] text-white border-r-2 border-[#23475F]'
-              : 'text-[#23475F] hover:bg-[#01CD6C] hover:text-white'
+            className={`flex items-center px-6 py-3 text-left text-sm font-medium transition-all
+              ${
+                currentPage === item.id
+                  ? "bg-[#01CD6C] text-white shadow-inner border-l-4 border-[#0F2634]"
+                  : "text-[#23475F] hover:bg-[#01CD6C]/15 hover:text-[#01CD6C]"
               }`}
           >
             <span className="text-lg mr-3">{item.icon}</span>
-            <span className="font-medium">{item.label}</span>
+            {item.label}
           </Link>
         ))}
       </nav>
     </div>
   );
 };
+
 
 const PaginaPrincipal = () => {
   const [currentPage, setCurrentPage] = useState('');
@@ -234,9 +258,30 @@ const PaginaPrincipal = () => {
   const [loading, setLoading] = useState(true); // Nuevo estado para carga de auth
   const [user, setUser] = useState(null);
   const [routes, setRoutes] = useState([]);
+  const [empresa, setEmpresa] = useState(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const navigate = useNavigate();
   const location = useLocation();
+
+useEffect(() => {
+  const fetchEmpresa = async () => {
+    try {
+      const res = await api.get("/empresa/dato-individual/2");
+
+      console.log("EMPRESA API:", res.data);
+
+      // OBTENER EMPRESA CORRECTAMENTE
+      const info = res.data?.datos?.empresa || null;
+
+      setEmpresa(info);
+    } catch (err) {
+      console.error("Error cargando datos de empresa:", err);
+    }
+  };
+
+  fetchEmpresa();
+}, []);
+
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -344,6 +389,7 @@ const PaginaPrincipal = () => {
           currentPage={currentPage}
           onLogout={handleLogout}
           user={user}
+          empresa={empresa}
           isSidebarOpen={isSidebarOpen}
           toggleSidebar={toggleSidebar}
         />

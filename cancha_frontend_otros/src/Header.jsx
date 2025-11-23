@@ -3,18 +3,25 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import api from "./services/api";
+import { FaEnvelope, FaLock } from "react-icons/fa";
+import { FaUser, FaUsersCog, FaClipboardList, FaCheckCircle } from "react-icons/fa";
+import { FaPhone, FaVenusMars, FaIdBadge, FaCalendarAlt, FaInfoCircle } from "react-icons/fa";
+import { FaUserTag, FaMapMarkerAlt, FaAlignLeft } from "react-icons/fa";
+import { FaCamera, FaKey, FaIdCard, FaTimes, FaSave } from "react-icons/fa";
+
 
 const ROLE_PANEL_MAP = {
+  administrador: { path: "/administrador", label: "Ir a Panel Administrador Gral." },
   admin_esp_dep: { path: "/administrador", label: "Ir a Panel Administrador" },
-  control: { path: "/control", label: "Ir a Panel Control" },
-  encargado: { path: "/encargado", label: "Ir a Panel Encargado" },
+  control: { path: "/administrador", label: "Ir a Panel Control" },
+  encargado: { path: "/administrador", label: "Ir a Panel Encargado" },
 };
 
 const getPanelEntries = (u) => {
   const raw = Array.isArray(u?.roles) ? u.roles : [];
   const list = raw
     .map((r) => (r?.rol || "").toLowerCase())
-    .filter((r) => r && r !== "cliente" && r !== "administrador");
+    .filter((r) => r && r !== "cliente" && r);
   const uniq = Array.from(new Set(list));
   return uniq.map((r) => ROLE_PANEL_MAP[r]).filter(Boolean);
 };
@@ -75,6 +82,7 @@ const Header = () => {
   const [espaciosError, setEspaciosError] = useState(null);
   const [showSubmissionModal, setShowSubmissionModal] = useState(false);
   const [submissionMessage, setSubmissionMessage] = useState("");
+  const [TitlesubmissionMessage, setTitleSubmissionMessage] = useState("");
   const [showRoleSection, setShowRoleSection] = useState(false);
   const [registerError, setRegisterError] = useState(null);
   const [registerLoading, setRegisterLoading] = useState(false);
@@ -172,41 +180,20 @@ const Header = () => {
     }
   };
 
-  const fetchEspaciosForEncargado = async () => {
-    setLoadingEspaciosEncargado(true);
-    setRoleRequestError(null);
-    try {
-      const r = await api.get("/espacio_deportivo/datos-especificos", {
-        params: { limit: 1000, offset: 0 },
-      });
+  const fetchEspaciosEncargado_Public = async () => {
+  try {
+    const r = await api.get("/espacio_deportivo/filtro", {
+      params: { tipo: "nombre", limit: 200, offset: 0 }
+    });
 
-      console.log("respuesta espacios encargado:", r.data);
+    const datos = r.data?.datos?.espacios || [];
+    setEspaciosEncargado(datos);
+  } catch (e) {
+    console.error("Error cargando espacios para encargado:", e);
+    setEspaciosEncargado([]);
+  }
+};
 
-      const datos = r.data?.datos || {};
-      const list = Array.isArray(datos.espacios)
-        ? datos.espacios
-        : Array.isArray(r.data?.espacios)
-        ? r.data.espacios
-        : Array.isArray(datos.lista)
-        ? datos.lista
-        : [];
-
-      setEspaciosEncargado(list);
-      if (list.length === 0) {
-        setRoleRequestError(
-          "No hay espacios disponibles o la respuesta esta vacia"
-        );
-      }
-    } catch (e) {
-      console.error("error cargando espacios para encargado", e);
-      setEspaciosEncargado([]);
-      setRoleRequestError(
-        e.response?.data?.mensaje || "Error al cargar espacios"
-      );
-    } finally {
-      setLoadingEspaciosEncargado(false);
-    }
-  };
 
   // Check login status and load user data
   useEffect(() => {
@@ -374,7 +361,7 @@ const Header = () => {
     } catch (err) {
       setLoginError(
         err.response?.data?.message ||
-          "Error al iniciar sesión. Verifica tus credenciales."
+        "Error al iniciar sesión. Verifica tus credenciales."
       );
       setLoginLoading(false);
     }
@@ -432,10 +419,19 @@ const Header = () => {
           id_espacio: Number(registerData.id_espacio),
           motivo: registerData.motivo || null,
         });
-      } else if (rol === "control" || rol === "encargado") {
+      } else if (rol === "encargado") {
         // solicitud normal de rol
         await api.post("/solicitud-encargado/", {
           id_usuario: newUserId,
+          id_espacio: Number(registerData.id_espacio),
+          rol,
+          motivo: registerData.motivo || null,
+        });
+      }else if (rol === "control") {
+        // solicitud normal de rol
+        await api.post("/solicitud-control/", {
+          id_usuario: newUserId,
+          id_espacio: Number(registerData.id_espacio),
           rol,
           motivo: registerData.motivo || null,
         });
@@ -445,9 +441,15 @@ const Header = () => {
       // 3) MOSTRAR MENSAJE EXITOSO
       // =============================
       setShowRegisterModal(false);
+
+      setTitleSubmissionMessage(
+        rol === "cliente"
+          ? "Registro Completado"
+          : "Solicitud enviada"
+      );
       setSubmissionMessage(
         rol === "cliente"
-          ? "Registro completado. Bienvenido."
+          ? "Bienvenido. Puede iniciar sesión."
           : "Solicitud creada. Te avisaremos por correo cuando se revise."
       );
       setShowSubmissionModal(true);
@@ -512,8 +514,8 @@ const Header = () => {
       if (!espaciosLibres.length) fetchEspaciosLibres();
     }
 
-    if (v === "encargado") {
-      fetchEspaciosForEncargado();
+    if (v === "encargado" || v === "control") {
+      fetchEspaciosEncargado_Public();
     }
   };
 
@@ -664,17 +666,27 @@ const Header = () => {
     if (name in registerData) {
       if (name === "rol_agregar") {
         const val = value;
+
         setRegisterData((prev) => ({
           ...prev,
           rol_agregar: val,
-          id_espacio: val === "admin_esp_dep" ? prev.id_espacio : "",
-          motivo: val === "admin_esp_dep" ? prev.motivo : "",
+          id_espacio: "",
+          motivo: "",
         }));
-        if (val === "admin_esp_dep" && espaciosLibres.length === 0) {
-          fetchEspaciosLibres();
+
+        // admin → usar espacios libres
+        if (val === "admin_esp_dep") {
+          if (!espaciosLibres.length) fetchEspaciosLibres();
         }
+
+        // control o encargado → usar espacios disponibles del backend
+        if (val === "control" || val === "encargado") {
+          fetchEspaciosEncargado_Public();
+        }
+
         return;
       }
+
 
       setRegisterData((prev) => ({ ...prev, [name]: value }));
       return;
@@ -852,7 +864,7 @@ const Header = () => {
           ...campos,
           imagen_perfil: selectedFile
             ? response.data.datos?.usuario?.imagen_perfil ||
-              formData.imagen_perfil
+            formData.imagen_perfil
             : formData.imagen_perfil,
           datos_rol: formData.datos_especificos,
         };
@@ -916,7 +928,7 @@ const Header = () => {
   return (
     <>
       {/* ==================== MOBILE HEADER (md:hidden) - Opción A: arriba ==================== */}
-      <div className="fixed top-0 left-0 w-full bg-[#0F2634] px-4 py-2 z-50 shadow-sm transition-transform duration-300 md:hidden">
+      <div className="fixed top-0 left-0 w-full bg-[#0F2634]/95 backdrop-blur-md px-5 py-3 z-50 shadow-lg transition-transform duration-300 md:hidden">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           {/* Left: Logo + Name + Hamburger */}
           <div className="flex items-center gap-3">
@@ -928,7 +940,7 @@ const Header = () => {
                 className="h-12 w-12 object-contain rounded-full border-2 border-[#01CD6C]"
               />
             ) : (
-              <div className="h-12 w-12 rounded-full bg-white/10 flex items-center justify-center text-white font-semibold text-lg">
+              <div className="h-12 w-12 rounded-xl bg-white/10 border border-[#01CD6C]/40 flex items-center justify-center text-white font-semibold shadow-md backdrop-blur-sm flex items-center justify-center text-white font-semibold text-lg">
                 {company?.nombre_sistema?.charAt(0) ?? "S"}
               </div>
             )}
@@ -944,7 +956,7 @@ const Header = () => {
                 setMobileUserMenu(false);
               }}
               aria-label="Abrir menú"
-              className="ml-2 text-white text-2xl focus:outline-none"
+              className="ml-2 text-white text-3xl hover:text-[#01CD6C] transition-all focus:outline-none"
             >
               {mobileMenuOpen ? "✖" : "☰"}
             </button>
@@ -998,26 +1010,35 @@ const Header = () => {
           <div className="mt-3 bg-[#0F2634] text-white px-4 pb-4">
             <nav className="flex flex-col gap-3">
               <Link
+                to="/"
+                onClick={() => setMobileMenuOpen(false)}
+                className="py-3 px-2 rounded-lg text-white font-medium hover:bg-[#01CD6C]/20 transition-all"
+              >
+                Inicio
+              </Link>
+              <Link
                 to="/espacios-deportivos"
                 onClick={() => setMobileMenuOpen(false)}
-                className="py-2 block text-white font-medium"
+                className="py-3 px-2 rounded-lg text-white font-medium hover:bg-[#01CD6C]/20 transition-all"
               >
                 Espacios Deportivos
               </Link>
               <Link
                 to="/canchas"
                 onClick={() => setMobileMenuOpen(false)}
-                className="py-2 block text-white font-medium"
+                className="py-3 px-2 rounded-lg text-white font-medium hover:bg-[#01CD6C]/20 transition-all"
               >
                 Canchas
               </Link>
-              <Link
-                to="/mis-reservas"
-                onClick={() => setMobileMenuOpen(false)}
-                className="py-2 block text-white font-medium"
-              >
-                Mis Reservas
-              </Link>
+              {isLoggedIn ? (
+                <Link
+                  to="/mis-reservas"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="py-3 px-2 rounded-lg text-white font-medium hover:bg-[#01CD6C]/20 transition-all"
+                >
+                  Mis Reservas
+                </Link>
+              ) : null}
 
               {!isLoggedIn ? (
                 <button
@@ -1070,7 +1091,7 @@ const Header = () => {
                   setMobileUserMenu(false);
                   openEditProfileModal();
                 }}
-                className="text-left px-3 py-2 hover:bg-[#01CD6C] hover:text-white rounded"
+                className="px-6 py-2 bg-gradient-to-r from-[#01CD6C] to-[#00b359] text-white rounded-full font-semibold shadow-lg hover:shadow-xl hover:translate-y-[-2px] transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Editar Perfil
               </button>
@@ -1101,8 +1122,9 @@ const Header = () => {
 
       {/* ==================== PC HEADER (hidden on mobile) - tu header original envuelto en hidden md:flex ==================== */}
       <div className="hidden md:flex">
-        <div className="fixed top-0 left-0 w-full bg-[#0F2634] px-6 py-2 z-50 shadow-sm transition-transform duration-300">
+        <div className="fixed top-0 left-0 w-full bg-[#0F2634]/95 backdrop-blur-md px-8 py-3 z-50 shadow-lg transition-all duration-300">
           <div className="max-w-7xl mx-auto flex justify-between items-center">
+
             {/* Logo and Title Section */}
             <div className="bg-[#0F2634] rounded-2xl shadow-sm p-2 border border-[#23475F]/20">
               <div className="flex items-center gap-4">
@@ -1133,30 +1155,39 @@ const Header = () => {
             {/* Navigation and User Buttons */}
             <div className="flex items-center gap-4">
               <Link
+                to="/"
+                className="bg-[#01CD6C] hover:bg-[#00b359] text-white font-semibold py-2 px-4 rounded-full shadow-md hover:shadow-lg transition-all duration-300 hover:-translate-y-[2px]"
+                aria-label="Ir a Espacios Deportivos"
+              >
+                Inicio
+              </Link>
+              <Link
                 to="/espacios-deportivos"
-                className="bg-[#01CD6C] hover:bg-[#00b359] text-[#FFFFFF] font-semibold py-2 px-3 rounded-lg shadow-lg transition-all duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-[#01CD6C] focus:ring-opacity-50"
+                className="bg-[#01CD6C] hover:bg-[#00b359] text-white font-semibold py-2 px-4 rounded-full shadow-md hover:shadow-lg transition-all duration-300 hover:-translate-y-[2px]"
                 aria-label="Ir a Espacios Deportivos"
               >
                 Espacios Deportivos
               </Link>
               <Link
                 to="/canchas"
-                className="bg-[#01CD6C] hover:bg-[#00b359] text-[#FFFFFF] font-semibold py-2 px-3 rounded-lg shadow-lg transition-all duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-[#01CD6C] focus:ring-opacity-50"
+                className="bg-[#01CD6C] hover:bg-[#00b359] text-white font-semibold py-2 px-4 rounded-full shadow-md hover:shadow-lg transition-all duration-300 hover:-translate-y-[2px]"
                 aria-label="Ir a Canchas"
               >
                 Canchas
               </Link>
-              <Link
-                to="/mis-reservas"
-                className="bg-[#01CD6C] hover:bg-[#00b359] text-[#FFFFFF] font-semibold py-2 px-3 rounded-lg shadow-lg transition-all duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-[#01CD6C] focus:ring-opacity-50"
-                aria-label="Ir a Canchas"
-              >
-                Mis Reservas
-              </Link>
+              {isLoggedIn && (
+                <Link
+                  to="/mis-reservas"
+                  className="bg-[#01CD6C] hover:bg-[#00b359] text-white font-semibold py-2 px-4 rounded-full shadow-md hover:shadow-lg transition-all duration-300 hover:-translate-y-[2px]"
+                  aria-label="Ir a Canchas"
+                >
+                  Mis Reservas
+                </Link>
+              )}
               {!isLoggedIn && (
                 <button
                   onClick={() => setShowRegisterModal(true)}
-                  className="bg-[#01CD6C] hover:bg-[#00b359] text-[#FFFFFF] font-semibold py-2 px-3 rounded-lg shadow-lg transition-all duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-[#01CD6C] focus:ring-opacity-50"
+                  className="bg-[#01CD6C] hover:bg-[#00b359] text-white font-semibold py-2 px-4 rounded-full shadow-md hover:shadow-lg transition-all duration-300 hover:-translate-y-[2px]"
                   aria-label="Registrarse"
                 >
                   Registrarse
@@ -1177,7 +1208,7 @@ const Header = () => {
                         src={getImageUrl(user.imagen_perfil)}
                         alt="Foto de perfil"
                         onError={handleImageError}
-                        className="h-10 w-10 md:h-12 md:w-12 object-cover rounded-full ring-2 ring-white/10"
+                        className="h-11 w-11 md:h-14 md:w-14 object-cover rounded-full border-2 border-[#01CD6C] shadow-md"
                       />
                     ) : (
                       <div className="h-10 w-10 md:h-12 md:w-12 bg-white/10 text-white rounded-full flex items-center justify-center ring-2 ring-white/10">
@@ -1194,7 +1225,7 @@ const Header = () => {
                   </button>
 
                   {showMenu && (
-                    <div className="absolute right-0 mt-2 w-56 bg-[#FFFFFF] rounded-lg shadow-lg z-50">
+                    <div className="absolute right-0 mt-3 w-60 bg-white rounded-xl shadow-xl border border-gray-100 z-50 transition-all duration-200">
                       <div className="px-4 py-3 text-[#23475F] font-medium border-b border-gray-200">
                         {user?.nombre || "Sin nombre"}{" "}
                         {user?.apellido || "Sin apellido"}
@@ -1255,7 +1286,7 @@ const Header = () => {
               ) : (
                 <button
                   onClick={() => setShowLoginModal(true)}
-                  className="bg-[#01CD6C] hover:bg-[#00b359] text-white font-semibold py-2 px-3 rounded-lg shadow-lg transition-all duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-[#01CD6C] focus:ring-opacity-50"
+                  className="bg-[#01CD6C] hover:bg-[#00b359] text-white font-semibold py-2 px-4 rounded-full shadow-md hover:shadow-lg transition-all duration-300 hover:-translate-y-[2px]"
                   aria-label="Iniciar sesión"
                 >
                   Iniciar Sesión
@@ -1268,164 +1299,197 @@ const Header = () => {
 
       {/* Login Modal */}
       {showLoginModal && (
-        <div className="fixed inset-0 bg-[#0F2634] bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-[#FFFFFF] p-8 rounded-lg shadow-lg w-full max-w-md relative">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 animate-fadeIn">
+          <div className="bg-white backdrop-blur-xl p-8 rounded-2xl shadow-2xl w-full max-w-md relative border border-white/30 animate-scaleIn">
+
+            {/* Boton cerrar */}
             <button
               onClick={handleCloseLoginModal}
-              className="absolute top-2 right-2 text-[#23475F] hover:text-[#01CD6C] text-2xl"
-              aria-label="Cerrar modal de inicio de sesión"
+              className="absolute top-3 right-3 text-[#23475F] hover:text-[#01CD6C] text-3xl transition-all"
+              aria-label="Cerrar modal de inicio de sesion"
             >
-              &times;
+              ×
             </button>
-            <h2 className="text-2xl font-bold text-center text-[#23475F] mb-6">
-              Iniciar Sesión
+
+            {/* Titulo */}
+            <h2 className="text-3xl font-bold text-center text-[#23475F] mb-6">
+              Iniciar Sesion
             </h2>
-            <div className="space-y-4">
+
+            {/* FORM */}
+            <div className="space-y-5">
+
+              {/* Correo */}
               <div>
-                <label
-                  htmlFor="correo"
-                  className="block text-sm font-medium text-[#23475F]"
-                >
+                <label className="block text-sm font-medium text-[#23475F] mb-1">
                   Correo
                 </label>
-                <input
-                  id="correo"
-                  type="email"
-                  value={correo}
-                  onChange={(e) => setCorreo(e.target.value)}
-                  required
-                  className="mt-1 w-full px-3 py-2 border border-[#23475F] rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-[#01CD6C]"
-                  placeholder="Ingrese su correo"
-                  aria-label="Correo electrónico"
-                />
+                <div className="flex items-center gap-3 bg-white border border-[#23475F]/40 rounded-full px-3 py-2 shadow-sm focus-within:ring-2 focus-within:ring-[#01CD6C] transition-all">
+                  <FaEnvelope className="text-[#01CD6C] text-lg" />
+                  <input
+                    id="correo"
+                    type="email"
+                    value={correo}
+                    onChange={(e) => setCorreo(e.target.value)}
+                    required
+                    placeholder="example@mail.com"
+                    aria-label="Correo electronico"
+                    className="w-full bg-transparent outline-none text-[#23475F]"
+                  />
+                </div>
               </div>
+
+              {/* Contrasena */}
               <div>
-                <label
-                  htmlFor="contrasena"
-                  className="block text-sm font-medium text-[#23475F]"
-                >
-                  Contraseña
+                <label className="block text-sm font-medium text-[#23475F] mb-1">
+                  Contrasena
                 </label>
-                <input
-                  id="contrasena"
-                  type="password"
-                  value={contrasena}
-                  onChange={(e) => setContrasena(e.target.value)}
-                  required
-                  className="mt-1 w-full px-3 py-2 border border-[#23475F] rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-[#01CD6C]"
-                  placeholder="Ingrese su contraseña"
-                  aria-label="Contraseña"
-                />
+                <div className="flex items-center gap-3 bg-white border border-[#23475F]/40 rounded-full px-3 py-2 shadow-sm focus-within:ring-2 focus-within:ring-[#01CD6C] transition-all">
+                  <FaLock className="text-[#01CD6C] text-lg" />
+                  <input
+                    id="contrasena"
+                    type="password"
+                    value={contrasena}
+                    onChange={(e) => setContrasena(e.target.value)}
+                    required
+                    placeholder="••••••••"
+                    aria-label="Contrasena"
+                    className="w-full bg-transparent outline-none text-[#23475F]"
+                  />
+                </div>
               </div>
+
+              {/* Error */}
               {loginError && (
-                <p className="text-[#A31621] text-sm">{loginError}</p>
+                <p className="text-[#A31621] text-sm text-center font-medium">
+                  {loginError}
+                </p>
               )}
+
+              {/* Boton Login */}
               <button
                 onClick={handleLogin}
                 disabled={loginLoading}
-                className={`w-full py-2 px-4 bg-[#01CD6C] text-[#FFFFFF] rounded-md hover:bg-[#00b359] focus:outline-none focus:ring-2 focus:ring-[#23475F] ${
-                  loginLoading ? "opacity-50 cursor-not-allowed" : ""
-                }`}
-                aria-label="Iniciar sesión"
+                className={`w-full py-3 px-4 bg-[#01CD6C] text-white text-lg rounded-full shadow-lg hover:bg-[#00b359] transition-all font-semibold hover:translate-y-[-2px] hover:shadow-xl ${loginLoading ? "opacity-50 cursor-not-allowed" : ""
+                  }`}
+                aria-label="Iniciar sesion"
               >
-                {loginLoading ? "Cargando..." : "Iniciar Sesión"}
+                {loginLoading ? (
+                  <div className="flex justify-center items-center gap-3">
+                    <span className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full"></span>
+                    Cargando...
+                  </div>
+                ) : (
+                  "Iniciar Sesion"
+                )}
               </button>
             </div>
           </div>
         </div>
       )}
 
+
       {/* Register Modal */}
       {showRegisterModal && (
-        <div className="fixed inset-0 bg-[#0F2634] bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-[#FFFFFF] p-8 rounded-lg shadow-lg w-full max-w-md relative">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 animate-fadeIn">
+          <div className="bg-white backdrop-blur-xl p-8 rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto relative border border-white/40 animate-scaleIn">
+
+            {/* Botón cerrar */}
             <button
               onClick={handleCloseRegisterModal}
-              className="absolute top-2 right-2 text-[#23475F] hover:text-[#01CD6C] text-2xl"
-              aria-label="Cerrar modal de registro"
+              className="absolute top-3 right-3 text-[#23475F] hover:text-[#01CD6C] text-3xl transition-all"
             >
-              &times;
+              ×
             </button>
-            <h2 className="text-2xl font-bold text-center text-[#23475F] mb-6">
-              Registrarse como Usuario
+
+            {/* Título */}
+            <h2 className="text-3xl font-bold text-center text-[#23475F] mb-6">
+              Crear cuenta
             </h2>
-            <div className="space-y-4">
+
+            <div className="space-y-5">
+
+              {/* Usuario */}
               <div>
-                <label
-                  htmlFor="register-usuario"
-                  className="block text-sm font-medium text-[#23475F]"
-                >
+                <label className="block text-sm font-medium text-[#23475F] mb-1">
                   Usuario
                 </label>
-                <input
-                  id="register-usuario"
-                  name="usuario"
-                  type="text"
-                  value={registerData.usuario}
-                  onChange={handleInputChange}
-                  required
-                  className="mt-1 w-full px-3 py-2 border border-[#23475F] rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-[#01CD6C]"
-                  placeholder="Ingrese su usuario"
-                  aria-label="Nombre de usuario"
-                />
+                <div className="flex items-center gap-3 bg-white border border-[#23475F]/40 rounded-full px-3 py-2 shadow-sm focus-within:ring-2 focus-within:ring-[#01CD6C] transition-all">
+                  <FaUser className="text-[#01CD6C] text-lg" />
+                  <input
+                    id="register-usuario"
+                    name="usuario"
+                    type="text"
+                    value={registerData.usuario}
+                    onChange={handleInputChange}
+                    required
+                    placeholder="Tu nombre de usuario"
+                    className="w-full bg-transparent outline-none text-[#23475F]"
+                  />
+                </div>
               </div>
+
+              {/* Correo */}
               <div>
-                <label
-                  htmlFor="register-correo"
-                  className="block text-sm font-medium text-[#23475F]"
-                >
+                <label className="block text-sm font-medium text-[#23475F] mb-1">
                   Correo
                 </label>
-                <input
-                  id="register-correo"
-                  name="correo"
-                  type="email"
-                  value={registerData.correo}
-                  onChange={handleInputChange}
-                  required
-                  className="mt-1 w-full px-3 py-2 border border-[#23475F] rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-[#01CD6C]"
-                  placeholder="Ingrese su correo"
-                  aria-label="Correo electrónico"
-                />
+                <div className="flex items-center gap-3 bg-white border border-[#23475F]/40 rounded-full px-3 py-2 shadow-sm focus-within:ring-2 focus-within:ring-[#01CD6C] transition-all">
+                  <FaEnvelope className="text-[#01CD6C] text-lg" />
+                  <input
+                    id="register-correo"
+                    name="correo"
+                    type="email"
+                    value={registerData.correo}
+                    onChange={handleInputChange}
+                    required
+                    placeholder="correo@email.com"
+                    className="w-full bg-transparent outline-none text-[#23475F]"
+                  />
+                </div>
               </div>
+
+              {/* Contraseña */}
               <div>
-                <label
-                  htmlFor="register-contrasena"
-                  className="block text-sm font-medium text-[#23475F]"
-                >
+                <label className="block text-sm font-medium text-[#23475F] mb-1">
                   Contraseña
                 </label>
-                <input
-                  id="register-contrasena"
-                  name="contrasena"
-                  type="password"
-                  value={registerData.contrasena}
-                  onChange={handleInputChange}
-                  required
-                  className="mt-1 w-full px-3 py-2 border border-[#23475F] rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-[#01CD6C]"
-                  placeholder="Ingrese su contraseña"
-                  aria-label="Contraseña"
-                />
+                <div className="flex items-center gap-3 bg-white border border-[#23475F]/40 rounded-full px-3 py-2 shadow-sm focus-within:ring-2 focus-within:ring-[#01CD6C] transition-all">
+                  <FaLock className="text-[#01CD6C] text-lg" />
+                  <input
+                    id="register-contrasena"
+                    name="contrasena"
+                    type="password"
+                    value={registerData.contrasena}
+                    onChange={handleInputChange}
+                    required
+                    placeholder="••••••••"
+                    className="w-full bg-transparent outline-none text-[#23475F]"
+                  />
+                </div>
               </div>
+
+              {/* Confirmar contraseña */}
               <div>
-                <label
-                  htmlFor="register-confirmar-contrasena"
-                  className="block text-sm font-medium text-[#23475F]"
-                >
-                  Confirmar Contraseña
+                <label className="block text-sm font-medium text-[#23475F] mb-1">
+                  Confirmar contraseña
                 </label>
-                <input
-                  id="register-confirmar-contrasena"
-                  name="confirmarContrasena"
-                  type="password"
-                  value={registerData.confirmarContrasena}
-                  onChange={handleInputChange}
-                  required
-                  className="mt-1 w-full px-3 py-2 border border-[#23475F] rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-[#01CD6C]"
-                  placeholder="Confirme su contraseña"
-                  aria-label="Confirmar contraseña"
-                />
+                <div className="flex items-center gap-3 bg-white border border-[#23475F]/40 rounded-full px-3 py-2 shadow-sm focus-within:ring-2 focus-within:ring-[#01CD6C] transition-all">
+                  <FaLock className="text-[#01CD6C] text-lg" />
+                  <input
+                    id="register-confirmar-contrasena"
+                    name="confirmarContrasena"
+                    type="password"
+                    value={registerData.confirmarContrasena}
+                    onChange={handleInputChange}
+                    required
+                    placeholder="Repite tu contraseña"
+                    className="w-full bg-transparent outline-none text-[#23475F]"
+                  />
+                </div>
               </div>
+
+              {/* ==== EXPANDIBLE: Solicitud de Rol ==== */}
               <div>
                 <button
                   type="button"
@@ -1436,13 +1500,12 @@ const Header = () => {
                       fetchEspaciosLibres();
                     }
                   }}
-                  className="text-[#01CD6C] hover:text-[#00b359] text-sm font-medium flex items-center gap-2"
+                  className="text-[#01CD6C] hover:text-[#00b359] text-sm font-medium flex items-center gap-2 transition-all"
                 >
-                  Quiero ser parte del sistema
+                  <FaUsersCog className="text-lg" /> Quiero un rol en el sistema
                   <svg
-                    className={`w-4 h-4 transform transition-transform ${
-                      showRoleSection ? "rotate-180" : ""
-                    }`}
+                    className={`w-4 h-4 transform transition-transform ${showRoleSection ? "rotate-180" : ""
+                      }`}
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -1455,89 +1518,112 @@ const Header = () => {
                     />
                   </svg>
                 </button>
-                {showRoleSection && (
-                  <div className="mt-2">
-                    <label
-                      htmlFor="rol_agregar"
-                      className="block text-sm font-medium text-[#23475F]"
-                    >
-                      Solicitar Rol
-                    </label>
-                    <select
-                      id="rol_agregar"
-                      name="rol_agregar"
-                      value={registerData.rol_agregar}
-                      onChange={handleInputChange}
-                      className="mt-1 w-full px-3 py-2 border border-[#23475F] rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-[#01CD6C]"
-                    >
-                      <option value="cliente">Cliente (por defecto)</option>
-                      {rolesDisponibles
-                        .filter((rol) => rol.valor !== "cliente")
-                        .map((rol) => (
-                          <option key={rol.valor} value={rol.valor}>
-                            {rol.etiqueta}
-                          </option>
-                        ))}
-                    </select>
 
-                    {registerData.rol_agregar === "admin_esp_dep" && (
-                      <div className="mt-4 space-y-3">
+                {showRoleSection && (
+                  <div className="mt-3 bg-white/80 rounded-2xl p-4 border border-[#01CD6C]/40 shadow-inner animate-fadeIn">
+                    {/* Select rol */}
+                    <label className="block text-sm font-medium text-[#23475F] mb-1">
+                      Solicitar rol
+                    </label>
+                    <div className="flex items-center gap-3 bg-white border border-[#23475F]/40 rounded-full px-3 py-2 shadow-sm focus-within:ring-2 focus-within:ring-[#01CD6C] transition-all">
+                      <FaClipboardList className="text-[#01CD6C] text-lg" />
+                      <select
+                        id="rol_agregar"
+                        name="rol_agregar"
+                        value={registerData.rol_agregar}
+                        onChange={handleInputChange}
+                        className="w-full bg-transparent outline-none text-[#23475F] cursor-pointer"
+                      >
+                        <option value="cliente">Cliente (por defecto)</option>
+                        {rolesDisponibles
+                          .filter((rol) => rol.valor !== "cliente")
+                          .map((rol) => (
+                            <option key={rol.valor} value={rol.valor}>
+                              {rol.etiqueta}
+                            </option>
+                          ))}
+                      </select>
+                    </div>
+
+                    {/* ADMIN ESP DEPORTIVO */}
+                    {["admin_esp_dep", "encargado", "control"].includes(registerData.rol_agregar) && (
+                      <div className="mt-4 space-y-3 animate-fadeIn">
+
+                        {/* ESPACIOS DEPORTIVOS */}
                         <label className="block text-sm font-medium text-[#23475F]">
-                          Seleccionar espacio deportivo
+                          Espacio deportivo
                         </label>
+
                         {espaciosLoading ? (
-                          <div className="text-sm text-[#23475F]">
-                            Cargando espacios...
-                          </div>
+                          <div className="text-sm text-[#23475F]">Cargando...</div>
                         ) : espaciosError ? (
-                          <div className="text-sm text-[#A31621]">
-                            {espaciosError}
-                          </div>
+                          <div className="text-sm text-[#A31621]">{espaciosError}</div>
                         ) : (
                           <select
                             name="id_espacio"
                             value={registerData.id_espacio}
                             onChange={handleInputChange}
-                            className="mt-1 w-full px-3 py-2 border border-[#23475F] rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-[#01CD6C]"
+                            className="w-full px-3 py-2 border border-[#23475F]/40 rounded-full focus:ring-[#01CD6C] focus:outline-none bg-white"
                           >
                             <option value="">Seleccione un espacio</option>
-                            {espaciosLibres.map((e) => (
-                              <option key={e.id_espacio} value={e.id_espacio}>
-                                {e.nombre}{" "}
-                                {e.direccion ? `- ${e.direccion}` : ""}
-                              </option>
-                            ))}
+
+                            {registerData.rol_agregar === "admin_esp_dep" &&
+                              espaciosLibres.map((e) => (
+                                <option key={e.id_espacio} value={e.id_espacio}>
+                                  {e.nombre}
+                                </option>
+                              ))}
+
+                            {registerData.rol_agregar !== "admin_esp_dep" &&
+                              espaciosEncargado.map((e) => (
+                                <option key={e.id_espacio} value={e.id_espacio}>
+                                  {e.nombre}
+                                </option>
+                              ))}
                           </select>
                         )}
 
+                        {/* MOTIVO (OPCIONAL) */}
                         <label className="block text-sm font-medium text-[#23475F]">
-                          Motivo de solicitud (opcional)
+                          Motivo (opcional)
                         </label>
                         <textarea
                           name="motivo"
                           value={registerData.motivo}
                           onChange={handleInputChange}
                           rows={3}
-                          className="mt-1 w-full px-3 py-2 border border-[#23475F] rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-[#01CD6C]"
-                          placeholder="Explique brevemente por que solicita administrar el espacio"
+                          placeholder="Explica por que deseas este rol"
+                          className="w-full px-3 py-2 border border-[#23475F]/40 rounded-xl bg-white focus:ring-[#01CD6C] focus:outline-none"
                         />
                       </div>
                     )}
+
                   </div>
                 )}
               </div>
+
+              {/* Errores */}
               {registerError && (
-                <p className="text-[#A31621] text-sm">{registerError}</p>
+                <p className="text-[#A31621] text-sm font-semibold text-center">
+                  {registerError}
+                </p>
               )}
+
+              {/* Botón Registrar */}
               <button
                 onClick={handleRegister}
                 disabled={registerLoading}
-                className={`w-full py-2 px-4 bg-[#01CD6C] text-[#FFFFFF] rounded-md hover:bg-[#00b359] focus:outline-none focus:ring-2 focus:ring-[#23475F] ${
-                  registerLoading ? "opacity-50 cursor-not-allowed" : ""
-                }`}
-                aria-label="Registrarse"
+                className={`w-full py-3 px-4 bg-gradient-to-r from-[#01CD6C] to-[#00b359] text-white text-lg rounded-full shadow-lg hover:shadow-xl hover:translate-y-[-2px] transition-all font-semibold ${registerLoading ? "opacity-50 cursor-not-allowed" : ""
+                  }`}
               >
-                {registerLoading ? "Cargando..." : "Registrarse"}
+                {registerLoading ? (
+                  <div className="flex justify-center items-center gap-3">
+                    <span className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full"></span>
+                    Cargando...
+                  </div>
+                ) : (
+                  "Registrarse"
+                )}
               </button>
             </div>
           </div>
@@ -1545,18 +1631,29 @@ const Header = () => {
       )}
 
       {showSubmissionModal && (
-        <div className="fixed inset-0 bg-[#0F2634] bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-8 rounded-lg shadow-lg w-full max-w-md relative text-center">
-            <h3 className="text-2xl font-bold text-[#23475F] mb-4">
-              Solicitud enviada
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 animate-fadeIn">
+          <div className="bg-white/95 backdrop-blur-xl px-8 py-7 rounded-2xl shadow-2xl w-full max-w-sm relative border border-white/40 text-center animate-scaleIn">
+
+            <div className="mx-auto mb-4 flex items-center justify-center">
+              <div className="w-14 h-14 rounded-full bg-[#01CD6C]/10 flex items-center justify-center border border-[#01CD6C]/40">
+                <FaCheckCircle className="text-[#01CD6C] text-3xl" />
+              </div>
+            </div>
+
+            <h3 className="text-2xl font-bold text-[#23475F] mb-2">
+              {TitlesubmissionMessage}
             </h3>
-            <p className="text-[#23475F] mb-6">{submissionMessage}</p>
+
+            <p className="text-sm text-[#23475F] mb-6">
+              {submissionMessage}
+            </p>
+
             <button
               onClick={() => {
                 setShowSubmissionModal(false);
                 navigate("/espacios-deportivos");
               }}
-              className="w-full py-2 px-4 bg-[#01CD6C] text-white rounded-md hover:bg-[#00b359] focus:outline-none focus:ring-2 focus:ring-[#23475F]"
+              className="w-full py-3 px-4 bg-gradient-to-r from-[#01CD6C] to-[#00b359] text-white rounded-xl shadow-lg hover:shadow-xl hover:translate-y-[-2px] transition-all font-semibold"
             >
               Entendido
             </button>
@@ -1566,44 +1663,47 @@ const Header = () => {
 
       {/* Profile Modal */}
       {showProfileModal && (
-        <div className="fixed inset-0 bg-[#0F2634] bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-[#FFFFFF] rounded-2xl p-8 max-w-2xl w-full max-h-[85vh] overflow-y-auto relative shadow-2xl">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 animate-fadeIn">
+          <div className="bg-white/95 backdrop-blur-xl rounded-2xl p-0 max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-white/40 animate-scaleIn relative">
+
+            {/* Botón cerrar */}
             <button
               onClick={handleCloseProfileModal}
-              className="absolute top-4 right-4 text-[#23475F] hover:text-[#01CD6C] text-2xl transition-colors duration-200"
-              aria-label="Cerrar modal de perfil"
+              className="absolute top-4 right-4 text-[#23475F] hover:text-[#01CD6C] text-3xl transition-all"
             >
-              &times;
+              ×
             </button>
 
-            {/* Profile Header */}
-            <div className="text-center mb-8">
-              <div className="relative inline-block">
+            {/* HEADER */}
+            <div className="bg-gradient-to-r from-[#01CD6C] to-[#23475F] text-white rounded-t-2xl p-10 text-center shadow-lg">
+              <div className="inline-block relative">
                 {imagePreview ? (
                   <img
                     src={imagePreview}
                     alt="Perfil"
-                    className="w-24 h-24 object-cover rounded-full border-4 border-[#01CD6C] shadow-lg mx-auto"
+                    className="w-28 h-28 rounded-full border-4 border-white shadow-lg object-cover"
                     onError={handleImageError}
                   />
                 ) : (
-                  <div className="w-24 h-24 bg-gradient-to-br from-[#01CD6C] to-[#23475F] rounded-full border-4 border-[#01CD6C] flex items-center justify-center text-white text-2xl font-bold mx-auto">
+                  <div className="w-28 h-28 rounded-full bg-white/20 border-4 border-white flex items-center justify-center text-3xl font-bold shadow-lg">
                     {formData.nombre?.charAt(0)}
                     {formData.apellido?.charAt(0)}
                   </div>
                 )}
               </div>
-              <h2 className="text-3xl font-bold text-[#23475F] mt-4">
+
+              <h2 className="text-3xl font-bold mt-4">
                 {formData.nombre} {formData.apellido}
               </h2>
-              <p className="text-[#666] text-lg">{formData.usuario}</p>
 
-              {/* Role Badges */}
-              <div className="flex justify-center flex-wrap gap-2 mt-3">
+              <p className="text-white/80 text-lg">{formData.usuario}</p>
+
+              {/* Roles */}
+              <div className="flex justify-center flex-wrap gap-2 mt-4">
                 {(user?.roles ?? []).map((r, i) => (
                   <span
-                    key={`${r.tabla || r.rol || "rol"}-${i}`}
-                    className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-gradient-to-r from-[#01CD6C] to-[#23475F] text-white font-medium shadow-sm"
+                    key={i}
+                    className="bg-white/20 backdrop-blur-sm px-4 py-1 rounded-full text-sm font-semibold shadow-sm border border-white/30"
                   >
                     {formatRole(r.rol)}
                   </span>
@@ -1611,588 +1711,474 @@ const Header = () => {
               </div>
             </div>
 
-            {profileError ? (
-              <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-center">
-                <p className="text-[#A31621] text-sm">{profileError}</p>
+            {/* CONTENIDO */}
+            <div className="p-8 space-y-8">
+
+              {/* INFORMACIÓN PERSONAL */}
+              <div className="bg-white border border-gray-200 shadow-sm rounded-xl p-6">
+                <h3 className="text-xl font-semibold text-[#23475F] mb-5 flex items-center gap-2">
+                  <FaUser className="text-[#01CD6C]" /> Información Personal
+                </h3>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <p className="text-sm text-gray-500">Nombre completo</p>
+                    <p className="text-lg font-semibold text-[#23475F]">
+                      {formData.nombre} {formData.apellido}
+                    </p>
+                  </div>
+
+                  <div>
+                    <p className="text-sm text-gray-500">Correo electrónico</p>
+                    <p className="text-lg font-semibold text-[#23475F] break-all flex items-center gap-2">
+                      <FaEnvelope className="text-[#01CD6C]" />
+                      {formData.correo}
+                    </p>
+                  </div>
+
+                  <div>
+                    <p className="text-sm text-gray-500">Teléfono</p>
+                    <p className="text-lg font-semibold text-[#23475F] flex items-center gap-2">
+                      <FaPhone className="text-[#01CD6C]" />
+                      {formData.telefono || "No especificado"}
+                    </p>
+                  </div>
+
+                  <div>
+                    <p className="text-sm text-gray-500">Sexo</p>
+                    <p className="text-lg font-semibold text-[#23475F] flex items-center gap-2">
+                      <FaVenusMars className="text-[#01CD6C]" />
+                      {formData.sexo
+                        ? formData.sexo.charAt(0).toUpperCase() + formData.sexo.slice(1)
+                        : "No especificado"}
+                    </p>
+                  </div>
+                </div>
               </div>
-            ) : (
-              <div className="space-y-6">
-                {/* Personal Information */}
-                <div className="bg-gray-50 rounded-xl p-6 border border-gray-200">
-                  <h3 className="text-xl font-semibold text-[#23475F] mb-4 flex items-center">
-                    <span className="w-2 h-6 bg-[#01CD6C] rounded-full mr-3"></span>
-                    Información Personal
-                  </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-1">
-                      <span className="text-sm font-medium text-[#666] block">
-                        Nombre completo
-                      </span>
-                      <p className="text-[#23475F] font-semibold text-lg">
-                        {formData.nombre} {formData.apellido}
-                      </p>
-                    </div>
-                    <div className="space-y-1">
-                      <span className="text-sm font-medium text-[#666] block">
-                        Correo electrónico
-                      </span>
-                      <p className="text-[#23475F] font-semibold text-lg break-all">
-                        {formData.correo}
-                      </p>
-                    </div>
-                    <div className="space-y-1">
-                      <span className="text-sm font-medium text-[#666] block">
-                        Teléfono
-                      </span>
-                      <p className="text-[#23475F] font-semibold text-lg">
-                        {formData.telefono || "No especificado"}
-                      </p>
-                    </div>
-                    <div className="space-y-1">
-                      <span className="text-sm font-medium text-[#666] block">
-                        Sexo
-                      </span>
-                      <p className="text-[#23475F] font-semibold text-lg">
-                        {formData.sexo
-                          ? formData.sexo.charAt(0).toUpperCase() +
-                            formData.sexo.slice(1)
-                          : "No especificado"}
-                      </p>
-                    </div>
-                  </div>
-                </div>
 
-                {/* Account Information */}
-                <div className="bg-gray-50 rounded-xl p-6 border border-gray-200">
-                  <h3 className="text-xl font-semibold text-[#23475F] mb-4 flex items-center">
-                    <span className="w-2 h-6 bg-[#01CD6C] rounded-full mr-3"></span>
-                    Información de la Cuenta
-                  </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-1">
-                      <span className="text-sm font-medium text-[#666] block">
-                        Usuario
-                      </span>
-                      <p className="text-[#23475F] font-semibold text-lg">
-                        {formData.usuario}
-                      </p>
-                    </div>
-                    {formData.fecha_creacion && (
-                      <div className="space-y-1">
-                        <span className="text-sm font-medium text-[#666] block">
-                          Miembro desde
-                        </span>
-                        <p className="text-[#23475F] font-semibold text-lg">
-                          {new Date(formData.fecha_creacion).toLocaleDateString(
-                            "es-ES",
-                            {
-                              year: "numeric",
-                              month: "long",
-                              day: "numeric",
-                            }
-                          )}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                </div>
+              {/* INFORMACIÓN DE CUENTA */}
+              <div className="bg-white border border-gray-200 shadow-sm rounded-xl p-6">
+                <h3 className="text-xl font-semibold text-[#23475F] mb-5 flex items-center gap-2">
+                  <FaIdBadge className="text-[#01CD6C]" /> Información de la Cuenta
+                </h3>
 
-                {/* Role-Specific Data */}
-                {formData.datos_especificos &&
-                  Object.keys(formData.datos_especificos).length > 0 && (
-                    <div className="bg-gray-50 rounded-xl p-6 border border-gray-200">
-                      <h3 className="text-xl font-semibold text-[#23475F] mb-4 flex items-center">
-                        <span className="w-2 h-6 bg-[#01CD6C] rounded-full mr-3"></span>
-                        Información Adicional
-                      </h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {Object.entries(formData.datos_especificos).map(
-                          ([key, value]) => (
-                            <div key={key} className="space-y-1">
-                              <span className="text-sm font-medium text-[#666] block capitalize">
-                                {key.replace(/_/g, " ")}
-                              </span>
-                              <p className="text-[#23475F] font-semibold text-lg">
-                                {value || "No especificado"}
-                              </p>
-                            </div>
-                          )
-                        )}
-                      </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <p className="text-sm text-gray-500">Usuario</p>
+                    <p className="text-lg font-semibold text-[#23475F]">
+                      {formData.usuario}
+                    </p>
+                  </div>
+
+                  {formData.fecha_creacion && (
+                    <div>
+                      <p className="text-sm text-gray-500">Miembro desde</p>
+                      <p className="text-lg font-semibold text-[#23475F] flex items-center gap-2">
+                        <FaCalendarAlt className="text-[#01CD6C]" />
+                        {new Date(formData.fecha_creacion).toLocaleDateString("es-ES", {
+                          year: "numeric",
+                          month: "long",
+                          day: "numeric",
+                        })}
+                      </p>
                     </div>
                   )}
+                </div>
               </div>
-            )}
 
-            {/* Action Buttons */}
-            <div className="flex justify-center gap-4 mt-8 pt-6 border-t border-gray-200">
+              {/* DATOS ESPECÍFICOS */}
+              {formData.datos_especificos &&
+                Object.keys(formData.datos_especificos).length > 0 && (
+                  <div className="bg-white border border-gray-200 shadow-sm rounded-xl p-6">
+                    <h3 className="text-xl font-semibold text-[#23475F] mb-5 flex items-center gap-2">
+                      <FaInfoCircle className="text-[#01CD6C]" /> Información Adicional
+                    </h3>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {Object.entries(formData.datos_especificos).map(([key, value]) => (
+                        <div key={key}>
+                          <p className="text-sm text-gray-500 capitalize">
+                            {key.replace(/_/g, " ")}
+                          </p>
+                          <p className="text-lg font-semibold text-[#23475F]">
+                            {value || "No especificado"}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+            </div>
+
+            {/* BOTONES */}
+            <div className="flex justify-center gap-4 p-6 border-t border-gray-200">
               <button
                 onClick={handleCloseProfileModal}
-                className="bg-gray-500 text-white px-6 py-3 rounded-xl hover:bg-gray-600 transition-colors duration-200 font-semibold shadow-sm"
+                className="px-6 py-2 border border-gray-400 text-gray-700 rounded-full font-semibold hover:bg-gray-100 transition-all flex items-center gap-2"
               >
                 Cerrar
               </button>
+
               <button
                 onClick={() => {
                   setShowProfileModal(false);
                   openEditProfileModal();
                 }}
-                className="bg-[#01CD6C] text-white px-6 py-3 rounded-xl hover:bg-[#00b359] transition-colors duration-200 font-semibold shadow-sm flex items-center gap-2"
+                className="bg-gradient-to-r from-[#01CD6C] to-[#00b359] text-white px-6 py-3 rounded-full hover:shadow-xl hover:translate-y-[-2px] transition-all font-semibold flex items-center gap-2"
               >
-                <svg
-                  className="w-4 h-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                  />
-                </svg>
                 Editar Perfil
               </button>
             </div>
+
           </div>
         </div>
       )}
 
+
       {showRoleRequestModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg shadow w-full max-w-lg relative">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-white/95 backdrop-blur-xl px-8 py-7 rounded-3xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto relative border border-white/40">
             <button
               onClick={() => setShowRoleRequestModal(false)}
-              className="absolute top-2 right-2 text-gray-700 text-2xl"
+              className="absolute top-4 right-4 text-gray-700 hover:text-[#01CD6C] text-2xl bg-gray-100 hover:bg-gray-200 rounded-full w-9 h-9 flex items-center justify-center transition-all"
             >
               &times;
             </button>
 
-            <h2 className="text-xl font-bold text-center mb-4">
+            <h2 className="text-2xl font-bold text-center mb-2 text-[#23475F]">
               Solicitar un nuevo rol
             </h2>
+            <p className="text-sm text-gray-500 text-center mb-6">
+              Completa la informacion para enviar tu solicitud al administrador del sistema
+            </p>
 
-            {/* SELECT ROL */}
-            <label className="block text-sm font-medium mb-1">Rol</label>
-            <select
-              className="w-full border rounded px-3 py-2 mb-4"
-              value={roleRequest.rol}
-              onChange={handleRoleSelect}
-            >
-              <option value="">Seleccione un rol</option>
-              {availableRoles
-                .filter((r) => r.valor !== "cliente")
-                .map((r) => (
-                  <option key={r.valor} value={r.valor}>
-                    {r.etiqueta}
-                  </option>
-                ))}
-            </select>
-
-            {/* SELECT ESPACIO */}
-            {roleRequest.rol === "admin_esp_dep" && (
-              <>
-                <label className="block text-sm font-medium mb-1">
-                  Espacio deportivo
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-1 text-[#23475F] flex items-center gap-2">
+                  <FaUserTag className="text-[#01CD6C]" />
+                  Rol
                 </label>
                 <select
-                  className="w-full border rounded px-3 py-2 mb-4"
-                  value={roleRequest.id_espacio}
-                  onChange={(e) =>
-                    setRoleRequest((prev) => ({
-                      ...prev,
-                      id_espacio: e.target.value,
-                    }))
-                  }
+                  className="w-full border border-gray-300 rounded-full px-4 py-2.5 bg-white/80 focus:outline-none focus:ring-2 focus:ring-[#01CD6C] focus:border-[#01CD6C] text-sm"
+                  value={roleRequest.rol}
+                  onChange={handleRoleSelect}
                 >
-                  <option value="">Seleccione</option>
-                  {espaciosLibres.map((e) => (
-                    <option key={e.id_espacio} value={e.id_espacio}>
-                      {e.nombre}
-                    </option>
-                  ))}
+                  <option value="">Seleccione un rol</option>
+                  {availableRoles
+                    .filter((r) => r.valor !== "cliente")
+                    .map((r) => (
+                      <option key={r.valor} value={r.valor}>
+                        {r.etiqueta}
+                      </option>
+                    ))}
                 </select>
-              </>
-            )}
+              </div>
 
-            {roleRequest.rol === "encargado" && (
-              <>
-                <label className="block text-sm font-medium mb-1">
-                  Espacio deportivo
+              {roleRequest.rol === "admin_esp_dep" && (
+                <div>
+                  <label className="block text-sm font-medium mb-1 text-[#23475F] flex items-center gap-2">
+                    <FaMapMarkerAlt className="text-[#01CD6C]" />
+                    Espacio deportivo
+                  </label>
+                  <select
+                    className="w-full border border-gray-300 rounded-full px-4 py-2.5 bg-white/80 focus:outline-none focus:ring-2 focus:ring-[#01CD6C] focus:border-[#01CD6C] text-sm mb-1"
+                    value={roleRequest.id_espacio}
+                    onChange={(e) =>
+                      setRoleRequest((prev) => ({
+                        ...prev,
+                        id_espacio: e.target.value,
+                      }))
+                    }
+                  >
+                    <option value="">Seleccione</option>
+                    {espaciosLibres.map((e) => (
+                      <option key={e.id_espacio} value={e.id_espacio}>
+                        {e.nombre}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {roleRequest.rol === "encargado" && (
+                <div>
+                  <label className="block text-sm font-medium mb-1 text-[#23475F] flex items-center gap-2">
+                    <FaMapMarkerAlt className="text-[#01CD6C]" />
+                    Espacio deportivo
+                  </label>
+                  <select
+                    className="w-full border border-gray-300 rounded-full px-4 py-2.5 bg-white/80 focus:outline-none focus:ring-2 focus:ring-[#01CD6C] focus:border-[#01CD6C] text-sm mb-1"
+                    value={roleRequest.id_espacio}
+                    onChange={(e) =>
+                      setRoleRequest((prev) => ({
+                        ...prev,
+                        id_espacio: e.target.value,
+                      }))
+                    }
+                  >
+                    <option value="">Seleccione</option>
+                    {espaciosEncargado.map((e) => (
+                      <option key={e.id_espacio} value={e.id_espacio}>
+                        {e.nombre}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-sm font-medium mb-1 text-[#23475F] flex items-center gap-2">
+                  <FaAlignLeft className="text-[#01CD6C]" />
+                  Motivo
                 </label>
-                <select
-                  className="w-full border rounded px-3 py-2 mb-4"
-                  value={roleRequest.id_espacio}
+                <textarea
+                  className="w-full border border-gray-300 rounded-xl px-4 py-2.5 bg-white/80 focus:outline-none focus:ring-2 focus:ring-[#01CD6C] focus:border-[#01CD6C] text-sm min-h-[90px]"
+                  rows={3}
+                  value={roleRequest.motivo}
                   onChange={(e) =>
-                    setRoleRequest((prev) => ({
-                      ...prev,
-                      id_espacio: e.target.value,
-                    }))
+                    setRoleRequest((prev) => ({ ...prev, motivo: e.target.value }))
                   }
-                >
-                  <option value="">Seleccione</option>
-                  {espaciosEncargado.map((e) => (
-                    <option key={e.id_espacio} value={e.id_espacio}>
-                      {e.nombre}
-                    </option>
-                  ))}
-                </select>
-              </>
-            )}
+                  placeholder="Explique por que solicita este rol"
+                />
+              </div>
 
-            {/* MOTIVO */}
-            <label className="block text-sm font-medium mb-1">Motivo</label>
-            <textarea
-              className="w-full border rounded px-3 py-2 mb-4"
-              rows={3}
-              value={roleRequest.motivo}
-              onChange={(e) =>
-                setRoleRequest((prev) => ({ ...prev, motivo: e.target.value }))
-              }
-              placeholder="Explique por que solicita este rol"
-            />
+              {roleRequestError && (
+                <p className="text-red-600 text-sm mb-1 bg-red-50 border border-red-100 rounded-full px-4 py-2 text-center">
+                  {roleRequestError}
+                </p>
+              )}
+              {roleRequestSuccess && (
+                <p className="text-green-700 text-sm mb-1 bg-green-50 border border-green-100 rounded-full px-4 py-2 text-center">
+                  {roleRequestSuccess}
+                </p>
+              )}
 
-            {/* ERRORES / EXITO */}
-            {roleRequestError && (
-              <p className="text-red-600 text-sm mb-3">{roleRequestError}</p>
-            )}
-            {roleRequestSuccess && (
-              <p className="text-green-600 text-sm mb-3">
-                {roleRequestSuccess}
-              </p>
-            )}
-
-            {/* BOTON ENVIAR */}
-            <button
-              onClick={() => handleSendRoleRequestFromModal()}
-              disabled={roleRequestLoading || !roleRequest.rol}
-              className={`w-full py-2 rounded text-white font-semibold ${
-                roleRequestLoading || !roleRequest.rol
+              <button
+                onClick={() => handleSendRoleRequestFromModal()}
+                disabled={roleRequestLoading || !roleRequest.rol}
+                className={`w-full py-3 rounded-full text-white font-semibold transition-all shadow-md ${roleRequestLoading || !roleRequest.rol
                   ? "bg-gray-400 cursor-not-allowed"
-                  : "bg-[#01CD6C] hover:bg-[#00b359]"
-              }`}
-            >
-              {roleRequestLoading ? "Enviando..." : "Enviar Solicitud"}
-            </button>
+                  : "bg-gradient-to-r from-[#01CD6C] to-[#00b359] hover:shadow-lg hover:translate-y-[-1px]"
+                  }`}
+              >
+                {roleRequestLoading ? "Enviando..." : "Enviar Solicitud"}
+              </button>
+            </div>
           </div>
         </div>
       )}
 
       {/* Edit Profile Modal */}
       {showEditProfileModal && (
-        <div className="fixed inset-0 bg-[#0F2634] bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-[#FFFFFF] rounded-2xl p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto relative shadow-2xl">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fadeIn">
+          <div className="bg-white/95 backdrop-blur-xl rounded-3xl p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-white/40 animate-scaleIn relative">
+
+            {/* Botón cerrar */}
             <button
               onClick={handleCloseEditProfileModal}
-              className="absolute top-6 right-6 text-[#23475F] hover:text-[#01CD6C] text-2xl transition-colors duration-200 bg-gray-100 hover:bg-gray-200 w-8 h-8 rounded-full flex items-center justify-center"
-              aria-label="Cerrar modal de edición de perfil"
+              className="absolute top-5 right-5 text-[#23475F] hover:text-[#01CD6C] text-2xl bg-gray-100 rounded-full w-10 h-10 flex items-center justify-center transition-all hover:bg-gray-200"
             >
-              &times;
+              <FaTimes />
             </button>
 
-            {/* Modal Header */}
+            {/* HEADER */}
             <div className="text-center mb-8">
-              <div className="relative inline-block mb-4">
-                {imagePreview ? (
-                  <img
-                    src={imagePreview}
-                    alt="Vista previa de perfil"
-                    className="w-20 h-20 object-cover rounded-full border-4 border-[#01CD6C] shadow-lg mx-auto"
-                    onError={handleImageError}
-                  />
-                ) : (
-                  <div className="w-20 h-20 bg-gradient-to-br from-[#01CD6C] to-[#23475F] rounded-full border-4 border-[#01CD6C] flex items-center justify-center text-white text-xl font-bold mx-auto">
-                    {formData.nombre?.charAt(0)}
-                    {formData.apellido?.charAt(0)}
-                  </div>
-                )}
-              </div>
-              <h3 className="text-2xl font-bold text-[#23475F] mb-2">
-                Editar Mi Perfil
-              </h3>
-              <p className="text-[#666]">Actualiza tu información personal</p>
+              {imagePreview ? (
+                <img
+                  src={imagePreview}
+                  alt="Perfil"
+                  className="w-24 h-24 rounded-full border-4 border-[#01CD6C] shadow-xl object-cover mx-auto"
+                />
+              ) : (
+                <div className="w-24 h-24 bg-gradient-to-br from-[#01CD6C] to-[#23475F] rounded-full border-4 border-[#01CD6C] flex items-center justify-center text-white text-3xl font-bold mx-auto shadow-xl">
+                  {formData.nombre?.charAt(0)}
+                  {formData.apellido?.charAt(0)}
+                </div>
+              )}
+
+              <h3 className="text-3xl font-bold text-[#23475F] mt-4">Editar mi Perfil</h3>
+              <p className="text-gray-500 text-sm mt-1">Actualiza tu información personal</p>
             </div>
 
+            {/* Error */}
             {editProfileError && (
-              <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-6 text-center">
-                <p className="text-[#A31621] text-sm font-medium">
-                  {editProfileError}
-                </p>
+              <div className="bg-red-50 border border-red-200 rounded-full px-4 py-3 text-center mb-6">
+                <p className="text-[#A31621] text-sm font-medium">{editProfileError}</p>
               </div>
             )}
 
-            <form onSubmit={handleEditProfileSubmit} className="space-y-6">
-              {/* Profile Picture Section */}
-              <div className="bg-gradient-to-br from-gray-50 to-white rounded-xl p-5 border border-gray-200 shadow-sm">
-                <h3>
-                  <b>Subir una imagen</b>
-                </h3>
-                <div className="flex flex-col items-center gap-4">
-                  <div className="w-full">
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleFileChange}
-                      className="w-full px-3 py-2 border-2 border-dashed border-gray-300 rounded-lg focus:border-[#01CD6C] focus:ring-2 focus:ring-[#01CD6C] focus:ring-opacity-20 transition-all duration-200 file:mr-3 file:py-1 file:px-3 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-[#01CD6C] file:text-white hover:file:bg-[#00b359]"
-                    />
-                    <p className="text-xs text-gray-500 mt-2 text-center">
-                      Formatos: JPG, PNG, GIF. Máx: 5MB
-                    </p>
-                  </div>
-                </div>
+            <form onSubmit={handleEditProfileSubmit} className="space-y-8">
+
+              {/* Subir imagen */}
+              <div className="bg-white border border-gray-200 shadow-sm rounded-2xl p-6">
+                <h4 className="text-lg font-bold text-[#23475F] mb-4 flex items-center gap-2">
+                  <FaCamera className="text-[#01CD6C]" /> Foto de Perfil
+                </h4>
+
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleFileChange}
+                  className="w-full border border-gray-300 rounded-full px-4 py-2 bg-white focus:ring-2 focus:ring-[#01CD6C] file:bg-[#01CD6C] file:text-white file:px-4 file:py-1 file:rounded-full file:border-0 hover:file:bg-[#00b359]"
+                />
+
+                <p className="text-xs text-gray-500 mt-2">Formatos: JPG, PNG, GIF – Máx 5MB</p>
               </div>
 
-              {/* Personal Information */}
-              <div className="bg-gradient-to-br from-gray-50 to-white rounded-xl p-5 border border-gray-200 shadow-sm">
-                <h4 className="text-lg font-semibold text-[#23475F] mb-3 flex items-center">
-                  <svg
-                    className="w-5 h-5 mr-2 text-[#01CD6C]"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-                    />
-                  </svg>
-                  Información Personal
+              {/* Datos personales */}
+              <div className="bg-white border border-gray-200 shadow-sm rounded-2xl p-6">
+                <h4 className="text-lg font-bold text-[#23475F] mb-4 flex items-center gap-2">
+                  <FaUser className="text-[#01CD6C]" /> Información Personal
                 </h4>
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label className="block text-sm font-medium text-[#23475F]">
-                      Nombre *
-                    </label>
+
+                  {/* Nombre */}
+                  <div>
+                    <label className="text-sm font-medium text-[#23475F]">Nombre *</label>
                     <input
                       name="nombre"
+                      required
                       value={formData.nombre}
                       onChange={handleInputChange}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-[#01CD6C] focus:ring-2 focus:ring-[#01CD6C] focus:ring-opacity-20 transition-all duration-200 bg-white"
-                      required
+                      className="w-full mt-1 px-4 py-2 border border-gray-300 rounded-full focus:ring-2 focus:ring-[#01CD6C]"
                       placeholder="Tu nombre"
                     />
                   </div>
-                  <div className="space-y-2">
-                    <label className="block text-sm font-medium text-[#23475F]">
-                      Apellido *
-                    </label>
+
+                  {/* Apellido */}
+                  <div>
+                    <label className="text-sm font-medium text-[#23475F]">Apellido *</label>
                     <input
                       name="apellido"
+                      required
                       value={formData.apellido}
                       onChange={handleInputChange}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-[#01CD6C] focus:ring-2 focus:ring-[#01CD6C] focus:ring-opacity-20 transition-all duration-200 bg-white"
-                      required
+                      className="w-full mt-1 px-4 py-2 border border-gray-300 rounded-full focus:ring-2 focus:ring-[#01CD6C]"
                       placeholder="Tu apellido"
                     />
                   </div>
-                  <div className="space-y-2">
-                    <label className="block text-sm font-medium text-[#23475F]">
-                      Correo Electrónico *
-                    </label>
-                    <input
-                      name="correo"
-                      value={formData.correo}
-                      onChange={handleInputChange}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-[#01CD6C] focus:ring-2 focus:ring-[#01CD6C] focus:ring-opacity-20 transition-all duration-200 bg-white"
-                      type="email"
-                      required
-                      placeholder="tu@email.com"
-                    />
+
+                  {/* Correo */}
+                  <div>
+                    <label className="text-sm font-medium text-[#23475F]">Correo *</label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        name="correo"
+                        type="email"
+                        required
+                        value={formData.correo}
+                        onChange={handleInputChange}
+                        className="w-full mt-1 px-4 py-2 border border-gray-300 rounded-full focus:ring-2 focus:ring-[#01CD6C]"
+                        placeholder="email@ejemplo.com"
+                      />
+                    </div>
                   </div>
-                  <div className="space-y-2">
-                    <label className="block text-sm font-medium text-[#23475F]">
-                      Usuario
-                    </label>
-                    <input
-                      name="usuario"
-                      value={formData.usuario}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100 text-gray-600 cursor-not-allowed"
-                      readOnly
-                      title="El usuario no se puede modificar"
-                    />
-                    <p className="text-xs text-gray-500">
-                      Usuario no modificable
-                    </p>
+
+                  {/* Teléfono */}
+                  <div>
+                    <label className="text-sm font-medium text-[#23475F]">Teléfono</label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        name="telefono"
+                        value={formData.telefono}
+                        onChange={handleInputChange}
+                        className="w-full mt-1 px-4 py-2 border border-gray-300 rounded-full focus:ring-2 focus:ring-[#01CD6C]"
+                        placeholder="Ej: 77777777"
+                      />
+                    </div>
                   </div>
-                  <div className="space-y-2">
-                    <label className="block text-sm font-medium text-[#23475F]">
-                      Teléfono
-                    </label>
-                    <input
-                      name="telefono"
-                      value={formData.telefono}
-                      onChange={handleInputChange}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-[#01CD6C] focus:ring-2 focus:ring-[#01CD6C] focus:ring-opacity-20 transition-all duration-200 bg-white"
-                      placeholder="+1 (555) 000-0000"
-                    />
+
+                  {/* Sexo */}
+                  <div>
+                    <label className="text-sm font-medium text-[#23475F]">Sexo</label>
+                    <div className="flex items-center gap-2">
+                      <select
+                        name="sexo"
+                        value={formData.sexo}
+                        onChange={handleInputChange}
+                        className="w-full mt-1 px-4 py-2 border border-gray-300 rounded-full cursor-pointer focus:ring-2 focus:ring-[#01CD6C]"
+                      >
+                        <option value="">Selecciona</option>
+                        {sexosPermitidos.map((sexo) => (
+                          <option key={sexo} value={sexo}>
+                            {sexo.charAt(0).toUpperCase() + sexo.slice(1)}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
-                  <div className="space-y-2">
-                    <label className="block text-sm font-medium text-[#23475F]">
-                      Sexo
-                    </label>
-                    <select
-                      name="sexo"
-                      value={formData.sexo}
-                      onChange={handleInputChange}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-[#01CD6C] focus:ring-2 focus:ring-[#01CD6C] focus:ring-opacity-20 transition-all duration-200 bg-white appearance-none cursor-pointer"
-                    >
-                      <option value="">Selecciona tu sexo</option>
-                      {sexosPermitidos.map((sexo) => (
-                        <option key={sexo} value={sexo}>
-                          {sexo.charAt(0).toUpperCase() + sexo.slice(1)}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+
                 </div>
               </div>
 
-              {/* Change Password */}
-              <div className="bg-gradient-to-br from-gray-50 to-white rounded-xl p-5 border border-gray-200 shadow-sm">
-                <h4 className="text-lg font-semibold text-[#23475F] mb-3 flex items-center">
-                  <svg
-                    className="w-5 h-5 mr-2 text-[#01CD6C]"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-                    />
-                  </svg>
-                  Cambiar Contraseña
+              {/* Cambiar contraseña */}
+              <div className="bg-white border border-gray-200 shadow-sm rounded-2xl p-6">
+                <h4 className="text-lg font-bold text-[#23475F] mb-4 flex items-center gap-2">
+                  <FaKey className="text-[#01CD6C]" /> Cambiar Contraseña
                 </h4>
+
                 <div className="space-y-4">
-                  <div className="space-y-2">
-                    <label className="block text-sm font-medium text-[#23475F]">
-                      Nueva Contraseña
-                    </label>
+
+                  {/* Nueva contraseña */}
+                  <div>
+                    <label className="text-sm font-medium text-[#23475F]">Nueva</label>
                     <input
                       name="nueva_contrasena"
                       type="password"
                       value={passwordData.nueva_contrasena}
                       onChange={handleInputChange}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-[#01CD6C] focus:ring-2 focus:ring-[#01CD6C] focus:ring-opacity-20 transition-all duration-200 bg-white"
-                      placeholder="Dejar en blanco para no cambiar"
-                      aria-describedby={
-                        passwordMatchError ? "password-error" : undefined
-                      }
+                      className="w-full px-4 py-2 border border-gray-300 rounded-full focus:ring-2 focus:ring-[#01CD6C]"
+                      placeholder="Dejar vacío si no deseas cambiarla"
                     />
                   </div>
-                  <div className="space-y-2">
-                    <label className="block text-sm font-medium text-[#23475F]">
-                      Confirmar Nueva Contraseña
-                    </label>
+
+                  {/* Confirmar */}
+                  <div>
+                    <label className="text-sm font-medium text-[#23475F]">Confirmar</label>
                     <input
                       name="confirmar_contrasena"
                       type="password"
                       value={passwordData.confirmar_contrasena}
                       onChange={handleInputChange}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-[#01CD6C] focus:ring-2 focus:ring-[#01CD6C] focus:ring-opacity-20 transition-all duration-200 bg-white"
-                      placeholder="Confirmar nueva contraseña"
-                      aria-describedby={
-                        passwordMatchError ? "password-error" : undefined
-                      }
+                      className="w-full px-4 py-2 border border-gray-300 rounded-full focus:ring-2 focus:ring-[#01CD6C]"
+                      placeholder="Confirmar contraseña"
                     />
                     {passwordMatchError && (
-                      <p
-                        id="password-error"
-                        className="text-[#A31621] text-sm mt-2"
-                      >
-                        {passwordMatchError}
-                      </p>
+                      <p className="text-[#A31621] text-sm mt-2">{passwordMatchError}</p>
                     )}
                   </div>
-                  <p className="text-xs text-gray-500">
-                    Solo completa estos campos si deseas cambiar tu contraseña
-                  </p>
+
                 </div>
               </div>
 
-              {/* Action Buttons */}
-              <div className="flex flex-col sm:flex-row justify-end gap-3 pt-6 border-t border-gray-200">
+              {/* Botones */}
+              <div className="flex justify-end gap-4 pt-4 border-t border-gray-200">
+
                 <button
                   type="button"
                   onClick={handleCloseEditProfileModal}
-                  className="px-6 py-2 border-2 border-gray-400 text-gray-700 rounded-lg hover:bg-gray-50 hover:border-gray-500 transition-all duration-200 font-semibold shadow-sm flex items-center justify-center gap-2"
+                  className="px-6 py-2 border border-gray-400 text-gray-700 rounded-full font-semibold hover:bg-gray-100 transition-all flex items-center gap-2"
                 >
-                  <svg
-                    className="w-4 h-4"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M6 18L18 6M6 6l12 12"
-                    />
-                  </svg>
                   Cancelar
                 </button>
+
                 <button
                   type="submit"
-                  className={`px-6 py-2 bg-gradient-to-r from-[#01CD6C] to-[#00b359] text-white rounded-lg hover:from-[#00b359] hover:to-[#01CD6C] transition-all duration-200 font-semibold shadow-lg flex items-center justify-center gap-2 ${
-                    editProfileLoading
-                      ? "opacity-50 cursor-not-allowed"
-                      : "hover:shadow-lg transform hover:scale-105"
-                  }`}
                   disabled={editProfileLoading}
+                  className="px-6 py-2 bg-gradient-to-r from-[#01CD6C] to-[#00b359] text-white rounded-full font-semibold shadow-lg hover:shadow-xl hover:translate-y-[-2px] transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {editProfileLoading ? (
-                    <>
-                      <svg
-                        className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                      >
-                        <circle
-                          className="opacity-25"
-                          cx="12"
-                          cy="12"
-                          r="10"
-                          stroke="currentColor"
-                          strokeWidth="4"
-                        ></circle>
-                        <path
-                          className="opacity-75"
-                          fill="currentColor"
-                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                        ></path>
-                      </svg>
-                      Guardando...
-                    </>
-                  ) : (
-                    <>
-                      <svg
-                        className="w-4 h-4"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M5 13l4 4L19 7"
-                        />
-                      </svg>
-                      Guardar Cambios
-                    </>
-                  )}
+                  <FaSave />
+                  {editProfileLoading ? "Guardando..." : "Guardar"}
                 </button>
+
               </div>
             </form>
+
           </div>
         </div>
       )}
+
     </>
   );
 };

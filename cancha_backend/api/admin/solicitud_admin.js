@@ -69,7 +69,7 @@ const listarSolicitudesPorEstado = async ({ estado, limite, offset }) => {
     FROM solicitud_admin_esp_dep s
     JOIN usuario u ON u.id_persona = s.id_usuario
     JOIN espacio_deportivo e ON e.id_espacio = s.id_espacio
-    WHERE s.estado = $1
+    WHERE s.estado::text = $1
     ORDER BY s.fecha_solicitud ASC
     LIMIT $2 OFFSET $3
   `;
@@ -420,7 +420,7 @@ const filtrarSolicitudesEstadoController = async (req, res) => {
       FROM solicitud_admin_esp_dep s
       JOIN usuario u ON u.id_persona = s.id_usuario
       JOIN espacio_deportivo e ON e.id_espacio = s.id_espacio
-      WHERE s.estado = $1
+      WHERE s.estado::text = $1
       ORDER BY s.fecha_solicitud DESC
       LIMIT $2 OFFSET $3
     `;
@@ -428,8 +428,9 @@ const filtrarSolicitudesEstadoController = async (req, res) => {
     const qt = `
       SELECT COUNT(*)
       FROM solicitud_admin_esp_dep
-      WHERE estado = $1
+      WHERE estado::text = $1
     `;
+
 
     const [r1, r2] = await Promise.all([
       pool.query(q, [estado, limite, offset]),
@@ -453,35 +454,36 @@ const buscarSolicitudController = async (req, res) => {
     const limite = parseInt(req.query.limit) || 10;
     const offset = parseInt(req.query.offset) || 0;
 
-    const query = `
-      SELECT 
-        s.*,
-        u.usuario AS usuario_nombre,
-        u.correo,
-        e.nombre AS espacio_nombre
-      FROM solicitud_admin_esp_dep s
-      JOIN usuario u ON u.id_persona = s.id_usuario
-      JOIN espacio_deportivo e ON e.id_espacio = s.id_espacio
-      WHERE u.usuario ILIKE $1
-         OR u.correo ILIKE $1
-         OR e.nombre ILIKE $1
-         OR s.estado ILIKE $1
-         OR CAST(s.id_solicitud AS TEXT) ILIKE $1
-      ORDER BY s.fecha_solicitud DESC
-      LIMIT $2 OFFSET $3
-    `;
+const query = `
+  SELECT 
+    s.*,
+    u.usuario AS usuario_nombre,
+    u.correo,
+    e.nombre AS espacio_nombre
+  FROM solicitud_admin_esp_dep s
+  JOIN usuario u ON u.id_persona = s.id_usuario
+  JOIN espacio_deportivo e ON e.id_espacio = s.id_espacio
+  WHERE u.usuario ILIKE $1
+     OR u.correo ILIKE $1
+     OR e.nombre ILIKE $1
+     OR s.estado::text ILIKE $1
+     OR CAST(s.id_solicitud AS TEXT) ILIKE $1
+  ORDER BY s.fecha_solicitud DESC
+  LIMIT $2 OFFSET $3
+`;
 
-    const queryTotal = `
-      SELECT COUNT(*)
-      FROM solicitud_admin_esp_dep s
-      JOIN usuario u ON u.id_persona = s.id_usuario
-      JOIN espacio_deportivo e ON e.id_espacio = s.id_espacio
-      WHERE u.usuario ILIKE $1
-         OR u.correo ILIKE $1
-         OR e.nombre ILIKE $1
-         OR s.estado ILIKE $1
-         OR CAST(s.id_solicitud AS TEXT) ILIKE $1
-    `;
+const queryTotal = `
+  SELECT COUNT(*)
+  FROM solicitud_admin_esp_dep s
+  JOIN usuario u ON u.id_persona = s.id_usuario
+  JOIN espacio_deportivo e ON e.id_espacio = s.id_espacio
+  WHERE u.usuario ILIKE $1
+     OR u.correo ILIKE $1
+     OR e.nombre ILIKE $1
+     OR s.estado::text ILIKE $1
+     OR CAST(s.id_solicitud AS TEXT) ILIKE $1
+`;
+
 
     const [r1, r2] = await Promise.all([
       pool.query(query, [q, limite, offset]),
