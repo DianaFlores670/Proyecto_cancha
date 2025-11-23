@@ -11,14 +11,15 @@ const {
 } = require('../../lib/mailer');
 
 const router = express.Router();
-const respuesta = (exito, mensaje, datos = null) => ({ exito, mensaje, datos });
+
+const respuesta = (ok, msg, data = null) => ({ exito: ok, mensaje: msg, datos: data });
 
 /* ============================================================
-   ========================= MODELOS ===========================
+   ============================ MODELOS ========================
    ============================================================ */
 
 /**
- * Retorna lista de administradores (para correo)
+ * Obtener correos de administradores
  */
 const getCorreosAdmins = async () => {
     const q = `
@@ -28,12 +29,11 @@ const getCorreosAdmins = async () => {
     WHERE u.correo IS NOT NULL AND u.correo <> ''
   `;
     const { rows } = await pool.query(q);
-    const set = new Set(rows.map(r => r.correo).filter(Boolean));
-    return Array.from(set);
+    return [...new Set(rows.map(r => r.correo).filter(Boolean))];
 };
 
 /**
- * Obtener espacios disponibles (ningún filtro, los muestra todos)
+ * Obtener lista completa de espacios deportivos
  */
 const getEspacios = async () => {
     const q = `
@@ -46,13 +46,13 @@ const getEspacios = async () => {
 };
 
 /**
- * Verifica que NO exista duplicado:
- * - usuario ya encargado del espacio
- * - solicitud pendiente
- * - solicitud aprobada anterior
+ * Validar duplicados:
+ * - Ya es encargado del espacio
+ * - Ya tiene solicitud pendiente
+ * - Ya tiene solicitud aprobada previamente
  */
 const validarDuplicado = async (id_usuario, id_espacio) => {
-    // Ya es encargado de ese espacio
+
     const chk1 = await pool.query(
         `SELECT 1 FROM encargado WHERE id_encargado=$1 AND id_espacio=$2`,
         [id_usuario, id_espacio]
@@ -60,7 +60,6 @@ const validarDuplicado = async (id_usuario, id_espacio) => {
     if (chk1.rowCount > 0)
         throw new Error('Ya eres encargado de este espacio');
 
-    // Solicitud pendiente
     const chk2 = await pool.query(
         `SELECT 1 FROM solicitud_rol
      WHERE id_usuario=$1 AND rol_destino='encargado'
@@ -70,7 +69,6 @@ const validarDuplicado = async (id_usuario, id_espacio) => {
     if (chk2.rowCount > 0)
         throw new Error('Ya existe una solicitud pendiente');
 
-    // Solicitud ya aprobada previamente
     const chk3 = await pool.query(
         `SELECT 1 FROM solicitud_rol
      WHERE id_usuario=$1 AND rol_destino='encargado'
@@ -84,7 +82,8 @@ const validarDuplicado = async (id_usuario, id_espacio) => {
 /**
  * Crear solicitud
  */
-const crearSolicitudEncargado = async ({ id_usuario, id_espacio, motivo }) => {
+const crearSolicitud = async ({ id_usuario, id_espacio, motivo }) => {
+
     await validarDuplicado(id_usuario, id_espacio);
 
     const q = `
@@ -92,12 +91,13 @@ const crearSolicitudEncargado = async ({ id_usuario, id_espacio, motivo }) => {
     VALUES ($1, 'encargado', $2, $3)
     RETURNING *
   `;
+
     const { rows } = await pool.query(q, [id_usuario, id_espacio, motivo]);
     return rows[0];
 };
 
 /**
- * Aprobar solicitud (rol ENCARGADO)
+ * Aprobar solicitud
  */
 const aprobarSolicitud = async ({ id_solicitud, adminId }) => {
     const client = await pool.connect();
@@ -105,11 +105,11 @@ const aprobarSolicitud = async ({ id_solicitud, adminId }) => {
     try {
         await client.query('BEGIN');
 
-        // Obtener solicitud
         const solRes = await client.query(
             `SELECT * FROM solicitud_rol WHERE id_solicitud=$1 FOR UPDATE`,
             [id_solicitud]
         );
+
         if (!solRes.rowCount) throw new Error('Solicitud no encontrada');
 
         const sol = solRes.rows[0];
@@ -119,51 +119,34 @@ const aprobarSolicitud = async ({ id_solicitud, adminId }) => {
         const id_usuario = sol.id_usuario;
         const id_espacio = sol.id_espacio;
 
-        /* ======================================================
-           1. Insertar en ENCARGADO
-           ====================================================== */
-
         await client.query(
             `INSERT INTO encargado(id_encargado, id_espacio, fecha_inicio, estado)
-             VALUES ($1, $2, CURRENT_DATE, true)`,
+       VALUES ($1, $2, CURRENT_DATE, true)`,
             [id_usuario, id_espacio]
         );
 
-        /* ======================================================
-           2. Insertar en CLIENTE si no existe
-           ====================================================== */
-
         const chkCliente = await client.query(
-            `SELECT 1 FROM cliente WHERE id_cliente = $1`,
+            `SELECT 1 FROM cliente WHERE id_cliente=$1`,
             [id_usuario]
         );
 
         if (!chkCliente.rowCount) {
             await client.query(
-                `INSERT INTO cliente (id_cliente)
-                 VALUES ($1)`,
+                `INSERT INTO cliente(id_cliente) VALUES($1)`,
                 [id_usuario]
             );
         }
 
-        /* ======================================================
-           3. Actualizar estado de solicitud
-           ====================================================== */
-
         await client.query(
             `UPDATE solicitud_rol
-             SET estado='aprobada',
-                 decidido_por_admin=$1,
-                 fecha_decision=NOW()
-             WHERE id_solicitud=$2`,
+       SET estado='aprobada',
+           decidido_por_admin=$1,
+           fecha_decision=NOW()
+       WHERE id_solicitud=$2`,
             [adminId, id_solicitud]
         );
 
         await client.query('COMMIT');
-
-        /* ======================================================
-           4. Info para correo
-           ====================================================== */
 
         const u = await pool.query(
             `SELECT usuario, correo FROM usuario WHERE id_persona=$1`,
@@ -188,11 +171,11 @@ const aprobarSolicitud = async ({ id_solicitud, adminId }) => {
     }
 };
 
-
 /**
  * Rechazar solicitud
  */
 const rechazarSolicitud = async ({ id_solicitud, comentario, adminId }) => {
+
     const q = `
     UPDATE solicitud_rol
     SET estado='rechazada',
@@ -202,8 +185,10 @@ const rechazarSolicitud = async ({ id_solicitud, comentario, adminId }) => {
     WHERE id_solicitud=$3 AND estado='pendiente'
     RETURNING *
   `;
+
     const { rows } = await pool.query(q, [comentario, adminId, id_solicitud]);
-    if (!rows.length) throw new Error('Solicitud no encontrada o ya procesada');
+    if (!rows.length)
+        throw new Error('Solicitud no encontrada o ya procesada');
 
     const sol = rows[0];
 
@@ -225,19 +210,16 @@ const rechazarSolicitud = async ({ id_solicitud, comentario, adminId }) => {
 };
 
 /**
- * Obtener solicitudes por estado
+ * Listar solicitudes por estado
  */
 const listarSolicitudes = async ({ estado, limite, offset }) => {
     const q = `
-    SELECT s.*, 
-           u.usuario AS usuario_nombre,
-           u.correo,
-           e.nombre AS espacio_nombre
+    SELECT s.*, u.usuario AS usuario_nombre, u.correo, e.nombre AS espacio_nombre
     FROM solicitud_rol s
     JOIN usuario u ON u.id_persona = s.id_usuario
     JOIN espacio_deportivo e ON e.id_espacio = s.id_espacio
     WHERE s.rol_destino='encargado' AND s.estado=$1
-    ORDER BY s.fecha_solicitud DESC
+    ORDER BY fecha_solicitud DESC
     LIMIT $2 OFFSET $3
   `;
     const { rows } = await pool.query(q, [estado, limite, offset]);
@@ -248,24 +230,26 @@ const listarSolicitudes = async ({ estado, limite, offset }) => {
  * Buscar solicitudes
  */
 const buscarSolicitudes = async ({ q, limite, offset }) => {
+
     const like = `%${q}%`;
-    const sql = `
-    SELECT s.*,
-           u.usuario AS usuario_nombre,
-           u.correo,
-           e.nombre AS espacio_nombre
+
+const sql = `
+    SELECT s.*, u.usuario AS usuario_nombre, u.correo, e.nombre AS espacio_nombre
     FROM solicitud_rol s
     JOIN usuario u ON u.id_persona = s.id_usuario
     JOIN espacio_deportivo e ON e.id_espacio = s.id_espacio
     WHERE s.rol_destino='encargado'
-      AND (u.usuario ILIKE $1
-        OR u.correo ILIKE $1
-        OR e.nombre ILIKE $1
-        OR s.estado ILIKE $1
-        OR CAST(s.id_solicitud AS TEXT) ILIKE $1)
-    ORDER BY s.fecha_solicitud DESC
+      AND (
+           u.usuario ILIKE $1 OR
+           u.correo ILIKE $1 OR
+           e.nombre ILIKE $1 OR
+           s.estado::text ILIKE $1 OR
+           CAST(s.id_solicitud AS TEXT) ILIKE $1
+      )
+    ORDER BY fecha_solicitud DESC
     LIMIT $2 OFFSET $3
   `;
+
     const { rows } = await pool.query(sql, [like, limite, offset]);
     return rows;
 };
@@ -275,10 +259,7 @@ const buscarSolicitudes = async ({ q, limite, offset }) => {
  */
 const obtenerDetalle = async (id) => {
     const q = `
-    SELECT s.*,
-           u.usuario AS usuario_nombre,
-           u.correo,
-           e.nombre AS espacio_nombre
+    SELECT s.*, u.usuario AS usuario_nombre, u.correo, e.nombre AS espacio_nombre
     FROM solicitud_rol s
     JOIN usuario u ON u.id_persona = s.id_usuario
     JOIN espacio_deportivo e ON e.id_espacio = s.id_espacio
@@ -289,29 +270,23 @@ const obtenerDetalle = async (id) => {
 };
 
 /**
- * Datos paginados (general)
+ * Datos generales paginados
  */
-const obtenerDatosSolicitudesEncargado = async (limite = 10, offset = 0) => {
+const obtenerDatosSolicitudesEncargado = async (limite, offset) => {
     const q = `
-    SELECT 
-      s.*,
-      u.usuario AS usuario_nombre,
-      u.correo,
-      e.nombre AS espacio_nombre
+    SELECT s.*, u.usuario AS usuario_nombre, u.correo, e.nombre AS espacio_nombre
     FROM solicitud_rol s
     JOIN usuario u ON u.id_persona = s.id_usuario
     JOIN espacio_deportivo e ON e.id_espacio = s.id_espacio
     WHERE s.rol_destino='encargado'
-    ORDER BY s.fecha_solicitud DESC
+    ORDER BY fecha_solicitud DESC
     LIMIT $1 OFFSET $2
   `;
-
     const qt = `
     SELECT COUNT(*) 
     FROM solicitud_rol 
     WHERE rol_destino='encargado'
   `;
-
     const [r1, r2] = await Promise.all([
         pool.query(q, [limite, offset]),
         pool.query(qt)
@@ -323,28 +298,23 @@ const obtenerDatosSolicitudesEncargado = async (limite = 10, offset = 0) => {
     };
 };
 
-/**
- * Filtrar por estado con paginación
- */
 const filtrarSolicitudesEncargado = async (estado, limite, offset) => {
     const q = `
-    SELECT 
-      s.*,
-      u.usuario AS usuario_nombre,
-      u.correo,
-      e.nombre AS espacio_nombre
+    SELECT s.*, u.usuario AS usuario_nombre, u.correo, e.nombre AS espacio_nombre
     FROM solicitud_rol s
     JOIN usuario u ON u.id_persona = s.id_usuario
     JOIN espacio_deportivo e ON e.id_espacio = s.id_espacio
-    WHERE s.rol_destino='encargado' AND s.estado=$1
-    ORDER BY s.fecha_solicitud DESC
+    WHERE s.rol_destino='encargado'
+      AND s.estado::text = $1
+    ORDER BY fecha_solicitud DESC
     LIMIT $2 OFFSET $3
   `;
 
     const qt = `
     SELECT COUNT(*)
-    FROM solicitud_rol 
-    WHERE rol_destino='encargado' AND estado=$1
+    FROM solicitud_rol
+    WHERE rol_destino='encargado'
+      AND estado::text = $1
   `;
 
     const [r1, r2] = await Promise.all([
@@ -358,28 +328,25 @@ const filtrarSolicitudesEncargado = async (estado, limite, offset) => {
     };
 };
 
+
 /* ============================================================
-   ======================== CONTROLADORES ======================
+   ======================== CONTROLADORES =====================
    ============================================================ */
 
-/**
- * Crear solicitud
- */
 const crearSolicitudController = async (req, res) => {
     try {
-        const id_usuario = req.user.id_persona;
-        const { id_espacio, motivo } = req.body;
+        const { id_usuario, id_espacio, motivo } = req.body;
+
+        if (!id_usuario) {
+            return res.status(400).json(respuesta(false, 'id_usuario es obligatorio'));
+        }
+
 
         if (!id_espacio)
             return res.status(400).json(respuesta(false, 'Debe seleccionar un espacio'));
 
-        const sol = await crearSolicitudEncargado({
-            id_usuario,
-            id_espacio,
-            motivo
-        });
+        const sol = await crearSolicitud({ id_usuario, id_espacio, motivo });
 
-        // enviar correo a administradores
         try {
             await notifyAdminNuevaSolicitudRol({
                 id_solicitud: sol.id_solicitud,
@@ -395,9 +362,6 @@ const crearSolicitudController = async (req, res) => {
     }
 };
 
-/**
- * Aprobar
- */
 const aprobarSolicitudController = async (req, res) => {
     try {
         const id_solicitud = Number(req.params.id);
@@ -405,7 +369,6 @@ const aprobarSolicitudController = async (req, res) => {
 
         const out = await aprobarSolicitud({ id_solicitud, adminId });
 
-        // enviar correo
         try {
             await notifyUsuarioResultadoRol({
                 to: out.to,
@@ -421,20 +384,13 @@ const aprobarSolicitudController = async (req, res) => {
     }
 };
 
-/**
- * Rechazar
- */
 const rechazarSolicitudController = async (req, res) => {
     try {
-        const { comentario } = req.body;
         const id_solicitud = Number(req.params.id);
         const adminId = req.user.id_persona;
+        const { comentario } = req.body;
 
-        const out = await rechazarSolicitud({
-            id_solicitud,
-            comentario,
-            adminId
-        });
+        const out = await rechazarSolicitud({ id_solicitud, comentario, adminId });
 
         try {
             await notifyUsuarioResultadoRol({
@@ -452,56 +408,52 @@ const rechazarSolicitudController = async (req, res) => {
     }
 };
 
-/**
- * Listar solicitudes por estado
- */
 const listarController = async (req, res) => {
     try {
         const estado = req.query.estado || 'pendiente';
-        const limit = Number(req.query.limit || 10);
+        const limite = Number(req.query.limit || 10);
         const offset = Number(req.query.offset || 0);
 
-        const rows = await listarSolicitudes({ estado, limite: limit, offset });
+        const rows = await listarSolicitudes({ estado, limite, offset });
 
         res.json(respuesta(true, 'Solicitudes obtenidas', {
             solicitudes: rows,
-            paginacion: { limite: limit, offset }
+            paginacion: { limite, offset }
         }));
+
     } catch {
         res.status(500).json(respuesta(false, 'Error interno'));
     }
 };
 
-/**
- * Buscar
- */
 const buscarController = async (req, res) => {
     try {
         const q = req.query.q || '';
-        const limit = Number(req.query.limit || 10);
+        const limite = Number(req.query.limit || 10);
         const offset = Number(req.query.offset || 0);
 
-        const rows = await buscarSolicitudes({ q, limite: limit, offset });
+        const rows = await buscarSolicitudes({ q, limite, offset });
+
         res.json(respuesta(true, 'Resultados', {
             solicitudes: rows,
-            paginacion: { limit, offset }
+            paginacion: { limite, offset }
         }));
+
     } catch {
         res.status(500).json(respuesta(false, 'Error interno'));
     }
 };
 
-/**
- * Detalle individual
- */
-const obtenerDetalleController = async (req, res) => {
+const detalleController = async (req, res) => {
     try {
         const id = Number(req.params.id);
         const sol = await obtenerDetalle(id);
 
-        if (!sol) return res.status(404).json(respuesta(false, 'Solicitud no encontrada'));
+        if (!sol)
+            return res.status(404).json(respuesta(false, 'Solicitud no encontrada'));
 
         res.json(respuesta(true, 'Solicitud obtenida', { solicitud: sol }));
+
     } catch {
         res.status(500).json(respuesta(false, 'Error interno'));
     }
@@ -509,14 +461,14 @@ const obtenerDetalleController = async (req, res) => {
 
 const datosGeneralesController = async (req, res) => {
     try {
-        const limite = parseInt(req.query.limit) || 10;
-        const offset = parseInt(req.query.offset) || 0;
+        const limite = Number(req.query.limit || 10);
+        const offset = Number(req.query.offset || 0);
 
-        const { solicitudes, total } = await obtenerDatosSolicitudesEncargado(limite, offset);
+        const out = await obtenerDatosSolicitudesEncargado(limite, offset);
 
         res.json(respuesta(true, 'Solicitudes obtenidas', {
-            solicitudes,
-            paginacion: { limite, offset, total }
+            solicitudes: out.solicitudes,
+            paginacion: { limite, offset, total: out.total }
         }));
 
     } catch (e) {
@@ -524,18 +476,17 @@ const datosGeneralesController = async (req, res) => {
     }
 };
 
-
 const filtrarController = async (req, res) => {
     try {
         const estado = String(req.query.estado || '').toLowerCase();
-        const limite = parseInt(req.query.limit) || 10;
-        const offset = parseInt(req.query.offset) || 0;
+        const limite = Number(req.query.limit || 10);
+        const offset = Number(req.query.offset || 0);
 
-        const { solicitudes, total } = await filtrarSolicitudesEncargado(estado, limite, offset);
+        const out = await filtrarSolicitudesEncargado(estado, limite, offset);
 
         res.json(respuesta(true, 'Solicitudes filtradas', {
-            solicitudes,
-            paginacion: { limite, offset, total }
+            solicitudes: out.solicitudes,
+            paginacion: { limite, offset, total: out.total }
         }));
 
     } catch (e) {
@@ -545,17 +496,16 @@ const filtrarController = async (req, res) => {
 
 
 /* ============================================================
-   ============================ RUTAS ==========================
+   ============================= RUTAS =========================
    ============================================================ */
 
-router.post('/', verifyToken, crearSolicitudController);
+router.post('/', crearSolicitudController);
 
 router.get('/', verifyToken, checkRole(['ADMINISTRADOR']), listarController);
 router.get('/buscar', verifyToken, checkRole(['ADMINISTRADOR']), buscarController);
-router.get('/dato-individual/:id', verifyToken, checkRole(['ADMINISTRADOR']), obtenerDetalleController);
+router.get('/dato-individual/:id', verifyToken, checkRole(['ADMINISTRADOR']), detalleController);
 
 router.get('/datos-especificos', verifyToken, checkRole(['ADMINISTRADOR']), datosGeneralesController);
-
 router.get('/filtro', verifyToken, checkRole(['ADMINISTRADOR']), filtrarController);
 
 router.post('/:id/aprobar', verifyToken, checkRole(['ADMINISTRADOR']), aprobarSolicitudController);

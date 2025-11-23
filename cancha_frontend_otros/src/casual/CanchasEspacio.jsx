@@ -73,15 +73,15 @@ const Cancha = () => {
 
       if (!resp.data?.exito) {
         setReviews([]);
-        setReviewsError(resp.data?.mensaje || 'No se pudieron cargar las resenas');
+        setReviewsError(resp.data?.mensaje || 'No se pudieron cargar las reseñas');
       } else {
         const datos = resp.data.datos || {};
         setReviews(datos.resenas || []);
       }
     } catch (e) {
-      console.error('Error al cargar resenas publicas', e);
+      console.error('Error al cargar reseñas publicas', e);
       setReviews([]);
-      setReviewsError('Error al cargar las resenas');
+      setReviewsError('Error al cargar las reseñas');
     } finally {
       setReviewsLoading(false);
     }
@@ -137,246 +137,317 @@ const Cancha = () => {
     return full + empty;
   };
 
-  return (
-    <div className="min-h-screen bg-[#FFFFFF] p-6 font-sans">
-      <Header />
-      <div className="max-w-7xl mx-auto mt-28">
-        <div className="max-w-7xl mx-auto mb-8">
-          <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-            <div className="flex flex-col md:flex-row gap-4 w-full">
-              <form onSubmit={handleSearch} className="w-full md:w-1/2">
-                <div className="relative">
-                  <input
-                    type="text"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    placeholder="Buscar canchas por nombre o ubicacion..."
-                    className="w-full px-4 py-2 border border-[#23475F] rounded-md text-[#23475F] focus:outline-none focus:ring-2 focus:ring-[#01CD6C]"
-                  />
-                  <button
-                    type="submit"
-                    className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-[#01CD6C] text-[#FFFFFF] px-3 py-1 rounded-md hover:bg-[#00b359]"
-                  >
-                    Buscar
-                  </button>
-                </div>
-              </form>
-              <div className="w-full md:w-1/3">
-                <select
-                  value={filter}
-                  onChange={handleFilterChange}
-                  className="w-full px-4 py-2 border border-[#23475F] rounded-md text-[#23475F] focus:outline-none focus:ring-2 focus:ring-[#01CD6C]"
-                >
-                  <option value="default">Sin filtro</option>
-                  <option value="nombre">Ordenar por Nombre</option>
-                  <option value="monto">Ordenar por Precio</option>
-                  <option value="disciplina">Ordenar por Disciplina</option>
-                </select>
-              </div>
+return (
+  <div className="min-h-screen bg-[#F6F8FA] p-6 font-sans">
+    <Header />
+
+    <div className="max-w-7xl mx-auto mt-28">
+
+      {/* BUSCADOR + SELECT + VOLVER */}
+      <div className="flex flex-col md:flex-row justify-between items-center gap-6 mb-10">
+
+        <div className="flex flex-col md:flex-row gap-4 w-full">
+
+          {/* BUSCADOR PREMIUM */}
+          <form onSubmit={handleSearch} className="w-full md:w-1/2">
+            <div className="relative group">
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Buscar canchas por nombre o ubicacion..."
+                className="w-full px-5 py-3 pl-12 bg-white/80 backdrop-blur-sm 
+                           border border-[#23475F]/30 rounded-xl shadow-sm text-[#23475F]
+                           focus:outline-none focus:ring-4 focus:ring-[#01CD6C]/30 transition-all"
+              />
+
+              <svg
+                className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-[#23475F]/60"
+                fill="none" stroke="currentColor" strokeWidth="2"
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round"
+                      d="M21 21l-4.35-4.35M10 18a8 8 0 100-16 8 8 0 000 16z"/>
+              </svg>
+
+              <button
+                type="submit"
+                className="absolute right-2 top-1/2 -translate-y-1/2 
+                           bg-[#01CD6C] text-white px-4 py-1.5 rounded-lg shadow 
+                           hover:bg-[#00b359] active:scale-95 transition-all"
+              >
+                Buscar
+              </button>
             </div>
-            <Link
-              to="/espacios-deportivos"
-              className="inline-flex items-center gap-2 whitespace-nowrap bg-[#23475F] hover:bg-[#01CD6C] text-[#FFFFFF] font-semibold py-2 px-8 rounded-md transition-all duration-300"
+          </form>
+
+          {/* SELECT PREMIUM */}
+          <div className="w-full md:w-1/3">
+            <select
+              value={filter}
+              onChange={handleFilterChange}
+              className="w-full px-4 py-3 bg-white border border-[#23475F]/30 rounded-xl shadow-sm 
+                         text-[#23475F] focus:outline-none focus:ring-4 focus:ring-[#01CD6C]/30 transition-all"
             >
-              <span>←</span>
-              <span>Volver a Espacios</span>
-            </Link>
+              <option value="default">Sin filtro</option>
+              <option value="nombre">Nombre</option>
+              <option value="monto">Precio</option>
+              <option value="disciplina">Disciplina</option>
+            </select>
           </div>
+
         </div>
 
-        <div className="max-w-7xl mx-auto">
-          <h1 className="text-3xl font-bold text-[#0F2634] mb-6">Canchas Disponibles</h1>
-          
-          {loading ? (
-            <div className="flex justify-center items-center h-64">
-              <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-[#01CD6C]" />
-            </div>
-          ) : error ? (
-            <div className="bg-[#A31621] text-[#FFFFFF] p-4 rounded-lg shadow-sm">
-              <p className="font-medium">{error}</p>
-            </div>
-          ) : (
-            <>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-8">
-                {canchas.map((cancha) => (
-                  <div
-                    key={cancha.id_cancha}
-                    className="bg-[#FFFFFF] rounded-2xl shadow-sm p-6 border border-[#23475F]/20 hover:shadow-md transition-shadow duration-300"
-                  >
-                    {cancha.imagen_cancha && (
-                      <img
-                        src={getImageUrl(cancha.imagen_cancha)}
-                        alt={cancha.nombre}
-                        className="w-full h-48 object-cover rounded-lg mb-4"
-                        onError={handleImageError}
-                      />
-                    )}
-                    <h3 className="text-xl font-semibold text-[#0F2634] mb-2">{cancha.nombre}</h3>
-                    <p className="text-[#23475F] mb-2">
-                      <span className="font-medium">Ubicacion:</span> {cancha.ubicacion}
-                    </p>
-                    <p className="text-[#01CD6C] font-semibold text-lg mb-2">
-                      Bs. {cancha.monto_por_hora} / hora
-                    </p>
-                    {cancha.disciplinas && cancha.disciplinas.length > 0 && (
-                      <p className="text-[#23475F] mb-4">
-                        <span className="font-medium">Disciplinas:</span>{' '}
-                        {cancha.disciplinas.map((d) => d.nombre).join(', ')}
-                      </p>
-                    )}
-                    <div className="flex items-center justify-between">
-                      <button
-                        onClick={() => fetchCanchaDetails(cancha.id_cancha)}
-                        className="bg-[#23475F] hover:bg-[#01CD6C] text-[#FFFFFF] py-2 px-4 rounded-md hover:bg-[#00b359] focus:outline-none focus:ring-2 focus:ring-[#23475F] text-sm"
-                      >
-                        Mas Informacion
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
+        {/* BOTON VOLVER */}
+        <Link
+          to="/espacios-deportivos"
+          className="inline-flex items-center gap-2 bg-[#23475F] text-white font-semibold 
+                     py-3 px-8 rounded-xl shadow hover:bg-[#01CD6C] active:scale-95 
+                     transition-all whitespace-nowrap"
+        >
+          <span className="text-lg">←</span>
+          <span>Volver a Espacios</span>
+        </Link>
 
-              {totalPages > 1 && (
-                <div className="flex justify-center mt-8">
-                  <div className="flex gap-2 bg-[#FFFFFF] p-4 rounded-lg shadow-sm">
-                    <button
-                      onClick={() => handlePageChange(currentPage - 1)}
-                      disabled={currentPage === 1}
-                      className={`px-4 py-2 rounded-md ${
-                        currentPage === 1
-                          ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                          : 'bg-[#23475F] text-[#FFFFFF] hover:bg-[#01CD6C]'
-                      }`}
-                    >
-                      ← Anterior
-                    </button>
-                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                      const pageNum = Math.max(1, Math.min(totalPages, currentPage - 2 + i));
-                      return (
-                        <button
-                          key={pageNum}
-                          onClick={() => handlePageChange(pageNum)}
-                          className={`px-4 py-2 rounded-md ${
-                            currentPage === pageNum
-                              ? 'bg-[#01CD6C] text-[#FFFFFF]'
-                              : 'bg-[#23475F] text-[#FFFFFF] hover:bg-[#01CD6C]'
-                          }`}
-                        >
-                          {pageNum}
-                        </button>
-                      );
-                    })}
-                    <button
-                      onClick={() => handlePageChange(currentPage + 1)}
-                      disabled={currentPage === totalPages}
-                      className={`px-4 py-2 rounded-md ${
-                        currentPage === totalPages
-                          ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                          : 'bg-[#23475F] text-[#FFFFFF] hover:bg-[#01CD6C]'
-                      }`}
-                    >
-                      Siguiente →
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {canchas.length === 0 && !loading && (
-                <div className="text-center py-12">
-                  <p className="text-[#23475F] text-lg mb-4">No se encontraron canchas</p>
-                  <p className="text-[#23475F] text-sm">
-                    Intenta con diferentes criterios de busqueda o filtros
-                  </p>
-                </div>
-              )}
-            </>
-          )}
-        </div>
       </div>
 
+      {/* TITULO */}
+      <h1 className="text-4xl font-extrabold tracking-tight text-[#0F2634] mb-10">
+        Canchas Disponibles
+      </h1>
+
+      {/* LOADING */}
+      {loading ? (
+        <div className="flex justify-center items-center h-72">
+          <div className="animate-spin h-14 w-14 border-4 border-[#01CD6C] border-t-transparent rounded-full"></div>
+        </div>
+      ) : error ? (
+        <div className="bg-[#A31621] text-white p-4 rounded-xl shadow-md">
+          <p>{error}</p>
+        </div>
+      ) : (
+        <>
+          {/* CARDS PREMIUM */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10 mb-10">
+
+            {canchas.map((cancha) => (
+              <div
+                key={cancha.id_cancha}
+                className="bg-white rounded-3xl shadow-md border border-[#23475F]/10 p-6 
+                           hover:shadow-xl hover:-translate-y-1 transition-all duration-300"
+              >
+                {cancha.imagen_cancha ? (
+                  <img
+                    src={getImageUrl(cancha.imagen_cancha)}
+                    alt={cancha.nombre}
+                    className="w-full h-56 object-cover rounded-2xl shadow-sm mb-5"
+                  />
+                ) : (
+                  <div className="w-full h-56 bg-gray-200 rounded-2xl mb-5 flex items-center justify-center">
+                    <span className="text-gray-500">Sin imagen</span>
+                  </div>
+                )}
+
+                <h3 className="text-xl font-bold text-[#0F2634] mb-2">{cancha.nombre}</h3>
+                <p className="text-[#23475F] text-sm mb-1">
+                  <span className="font-semibold">Ubicacion:</span> {cancha.ubicacion}
+                </p>
+
+                <p className="text-[#01CD6C] font-bold text-lg mb-3">
+                  Bs. {cancha.monto_por_hora} / hora
+                </p>
+
+                {cancha.disciplinas?.length > 0 && (
+                  <p className="text-[#23475F] text-sm mb-4">
+                    <span className="font-semibold">Disciplinas:</span>{" "}
+                    {cancha.disciplinas.map((d) => d.nombre).join(", ")}
+                  </p>
+                )}
+
+                <button
+                  onClick={() => fetchCanchaDetails(cancha.id_cancha)}
+                  className="w-full bg-[#23475F] text-white py-2.5 rounded-full shadow 
+                             hover:bg-[#01CD6C] active:scale-95 transition-all"
+                >
+                  Mas informacion
+                </button>
+              </div>
+            ))}
+
+          </div>
+
+          {/* PAGINACION */}
+          {totalPages > 1 && (
+            <div className="flex justify-center mt-10">
+              <div className="flex items-center gap-2 bg-white shadow-md rounded-2xl p-4 border border-[#23475F]/10">
+
+                {/* ANTERIOR */}
+                <button
+                  onClick={() => handlePageChange(currentPage - 1)}
+                  disabled={currentPage === 1}
+                  className={`px-4 py-2 rounded-xl text-sm ${
+                    currentPage === 1
+                      ? "bg-gray-200 text-gray-400 cursor-not-allowed"
+                      : "bg-[#23475F] text-white hover:bg-[#01CD6C]"
+                  }`}
+                >
+                  ←
+                </button>
+
+                {/* NUMEROS */}
+                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                  const pageNum = Math.max(1, Math.min(totalPages, currentPage - 2 + i));
+                  return (
+                    <button
+                      key={pageNum}
+                      onClick={() => handlePageChange(pageNum)}
+                      className={`px-4 py-2 rounded-xl text-sm ${
+                        currentPage === pageNum
+                          ? "bg-[#01CD6C] text-white"
+                          : "bg-[#23475F] text-white hover:bg-[#01CD6C]"
+                      }`}
+                    >
+                      {pageNum}
+                    </button>
+                  );
+                })}
+
+                {/* SIGUIENTE */}
+                <button
+                  onClick={() => handlePageChange(currentPage + 1)}
+                  disabled={currentPage === totalPages}
+                  className={`px-4 py-2 rounded-xl text-sm ${
+                    currentPage === totalPages
+                      ? "bg-gray-200 text-gray-400 cursor-not-allowed"
+                      : "bg-[#23475F] text-white hover:bg-[#01CD6C]"
+                  }`}
+                >
+                  →
+                </button>
+
+              </div>
+            </div>
+          )}
+
+          {/* VACIO */}
+          {canchas.length === 0 && !loading && (
+            <div className="text-center py-20">
+              <p className="text-[#23475F] text-lg mb-2">No se encontraron canchas</p>
+              <p className="text-[#23475F] text-sm">Intenta con otros filtros o palabras</p>
+            </div>
+          )}
+
+        </>
+      )}
+
+      {/* MODAL PREMIUM — CANCHAS */}
       {modalOpen && selectedCancha && (
-        <div className="fixed inset-0 bg-[#0F2634] bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-[#FFFFFF] p-6 rounded-lg shadow-lg w-full max-w-4xl relative max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 px-4">
+          <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+
             <button
               onClick={handleCloseModal}
-              className="absolute top-2 right-2 text-[#23475F] hover:text-[#01CD6C] text-2xl"
+              className="absolute top-4 right-4 w-9 h-9 flex items-center justify-center rounded-full 
+                         bg-black/70 text-white text-xl shadow-sm
+                         hover:bg-[#01CD6C] transition-all duration-200"
             >
               &times;
             </button>
-            <h2 className="text-2xl font-bold text-[#0F2634] mb-4">{selectedCancha.nombre}</h2>
-            
-            <div className="space-y-6">
-              {selectedCancha.imagen_cancha && (
-                <div className="text-center">
+
+            <div className="p-6 md:p-10 space-y-8">
+
+              <h2 className="text-center text-3xl font-extrabold tracking-tight text-[#0F2634]">
+                {selectedCancha.nombre}
+              </h2>
+
+              {selectedCancha.imagen_cancha ? (
+                <div className="flex justify-center">
                   <img
                     src={getImageUrl(selectedCancha.imagen_cancha)}
                     alt={selectedCancha.nombre}
-                    className="w-full max-w-md h-64 object-cover rounded-lg mx-auto"
-                    onError={handleImageError}
+                    className="w-full max-w-xl h-64 md:h-72 object-cover rounded-2xl shadow-md"
                   />
+                </div>
+              ) : (
+                <div className="w-full max-w-xl h-64 bg-gray-200 rounded-2xl mx-auto flex items-center justify-center">
+                  <span className="text-gray-500">Sin imagen</span>
                 </div>
               )}
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-3">
+              {/* === INFO PRINCIPAL === */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+
+                <div className="space-y-2 text-sm">
                   <p className="text-[#23475F]">
-                    <span className="font-medium text-[#0F2634]">Espacio Deportivo:</span>{' '}
+                    <span className="font-semibold text-[#0F2634]">Espacio Deportivo:</span>{" "}
                     <span className="text-[#01CD6C]">{selectedCancha.espacio_nombre}</span>
                   </p>
+
                   <p className="text-[#23475F]">
-                    <span className="font-medium text-[#0F2634]">Direccion del Espacio:</span>{' '}
+                    <span className="font-semibold text-[#0F2634]">Direccion:</span>{" "}
                     {selectedCancha.espacio_direccion}
                   </p>
+
                   <p className="text-[#23475F]">
-                    <span className="font-medium text-[#0F2634]">Ubicacion en el Espacio:</span>{' '}
+                    <span className="font-semibold text-[#0F2634]">Ubicacion:</span>{" "}
                     {selectedCancha.ubicacion}
                   </p>
-                </div>
-                
-                <div className="space-y-3">
-                  <p className="text-[#23475F] text-2xl font-bold text-center">
-                    <span className="text-[#01CD6C]">Bs. {selectedCancha.monto_por_hora}</span>{' '}
-                    <span className="text-sm text-[#23475F]">por hora</span>
+
+                  <p className="text-[#23475F]">
+                    <span className="font-semibold text-[#0F2634]">ID Cancha:</span>{" "}
+                    <span className="text-[#01CD6C] font-mono">{selectedCancha.id_cancha}</span>
                   </p>
+                </div>
+
+                <div className="space-y-4 text-center">
+                  <p className="text-3xl font-bold text-[#01CD6C]">
+                    Bs. {selectedCancha.monto_por_hora}
+                    <span className="text-sm text-[#23475F] font-medium"> / hora</span>
+                  </p>
+
                   {selectedCancha.capacidad && (
-                    <p className="text-[#23475F] text-center bg-[#01CD6C]/10 p-2 rounded-lg">
-                      <span className="font-medium text-[#0F2634]">Capacidad:</span>{' '}
-                      <span className="text-[#01CD6C] font-semibold">
-                        {selectedCancha.capacidad} personas
-                      </span>
+                    <p className="p-3 rounded-xl bg-[#01CD6C]/10 font-semibold">
+                      Capacidad:{" "}
+                      <span className="text-[#01CD6C]">{selectedCancha.capacidad} personas</span>
                     </p>
                   )}
+
                   {selectedCancha.estado && (
                     <p
-                      className={`text-center p-2 rounded-lg ${
-                        selectedCancha.estado === 'disponible'
-                          ? 'bg-[#01CD6C]/10 text-[#01CD6C]'
-                          : 'bg-[#A31621]/10 text-[#A31621]'
+                      className={`p-3 rounded-xl font-semibold ${
+                        selectedCancha.estado === "disponible"
+                          ? "bg-[#01CD6C]/10 text-[#01CD6C]"
+                          : "bg-[#A31621]/10 text-[#A31621]"
                       }`}
                     >
-                      <span className="font-medium text-[#0F2634]">Estado:</span>{' '}
-                      <span className="font-semibold">{selectedCancha.estado}</span>
+                      Estado: {selectedCancha.estado}
                     </p>
                   )}
                 </div>
+
               </div>
 
-              {selectedCancha.disciplinas && selectedCancha.disciplinas.length > 0 && (
-                <div className="bg-[#F8F9FA] p-4 rounded-lg">
-                  <h3 className="text-lg font-semibold text-[#0F2634] mb-3">Disciplinas Disponibles</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {selectedCancha.disciplinas.map((disciplina) => (
+              {/* === DISCIPLINAS === */}
+              {selectedCancha.disciplinas?.length > 0 && (
+                <div className="bg-[#F9FAFB] border border-[#E5E7EB] p-6 rounded-2xl shadow-sm">
+                  <h3 className="text-lg font-bold text-[#0F2634] mb-4">
+                    Disciplinas Disponibles
+                  </h3>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {selectedCancha.disciplinas.map((disc) => (
                       <div
-                        key={disciplina.id_disciplina}
-                        className="bg-[#FFFFFF] p-3 rounded-md border border-[#23475F]/20"
+                        key={disc.id_disciplina}
+                        className="bg-white border border-[#23475F]/10 rounded-xl p-4 shadow-sm"
                       >
-                        <h4 className="font-medium text-[#0F2634] mb-1">{disciplina.nombre}</h4>
-                        <p className="text-[#23475F] text-sm mb-2">
-                          {disciplina.descripcion || 'Sin descripcion disponible'}
+                        <h4 className="font-semibold text-[#0F2634] mb-1">{disc.nombre}</h4>
+                        <p className="text-sm text-[#23475F] mb-2">
+                          {disc.descripcion || "Sin descripcion disponible"}
                         </p>
-                        {disciplina.frecuencia_practica && (
-                          <p className="text-[#01CD6C] text-sm font-medium">
-                            Frecuencia: {disciplina.frecuencia_practica}
+
+                        {disc.frecuencia_practica && (
+                          <p className="text-xs text-[#01CD6C] font-semibold">
+                            Frecuencia: {disc.frecuencia_practica}
                           </p>
                         )}
                       </div>
@@ -385,49 +456,45 @@ const Cancha = () => {
                 </div>
               )}
 
-              <div className="mt-6 pt-4 border-t border-[#23475F]/20">
-                <h3 className="text-lg font-semibold text-[#0F2634] mb-3">Resenas de clientes</h3>
+              {/* === RESENAS === */}
+              <div className="bg-[#F9FAFB] border border-[#E5E7EB] p-6 rounded-2xl shadow-sm">
+                <h3 className="text-lg font-bold text-[#0F2634] mb-4">
+                  Reseñas de clientes
+                </h3>
 
                 {reviewsLoading && (
-                  <p className="text-sm text-[#23475F]">Cargando resenas...</p>
+                  <p className="text-sm text-[#23475F]">Cargando reseñas...</p>
                 )}
 
-                {reviewsError && !reviewsLoading && (
+                {reviewsError && (
                   <p className="text-sm text-red-600">{reviewsError}</p>
                 )}
 
                 {!reviewsLoading && !reviewsError && reviews.length === 0 && (
-                  <p className="text-sm text-[#64748B]">
-                    Aun no hay resenas para esta cancha.
-                  </p>
+                  <p className="text-sm text-[#64748B]">Aun no hay reseñas para esta cancha.</p>
                 )}
 
                 {!reviewsLoading && !reviewsError && reviews.length > 0 && (
-                  <div className="space-y-4 max-h-64 overflow-y-auto pr-2">
+                  <div className="space-y-4 max-h-64 overflow-y-auto pr-1">
                     {reviews.map((rev) => (
                       <div
                         key={rev.id_resena}
-                        className="bg-[#FFFFFF] border border-[#23475F]/10 rounded-md p-3"
+                        className="bg-white border border-[#23475F]/10 rounded-xl p-4 shadow-sm"
                       >
                         <div className="flex items-center justify-between mb-1">
-                          <div className="text-sm font-semibold text-[#0F2634]">
+                          <span className="text-sm font-semibold text-[#0F2634]">
                             👤 {rev.cliente_nombre} {rev.cliente_apellido}
-                          </div>
-                          <div className="text-xs text-[#64748B]">
-                            {rev.fecha_creacion
-                              ? String(rev.fecha_creacion).substring(0, 10)
-                              : ''}
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-1 mb-1">
-                          {Array.from({ length: 5 }, (_, i) => (
-                            <span key={i} className="text-[#01CD6C] text-s">
-                              {i < rev.estrellas ? "★" : "☆"}
-                            </span>
-                          ))}
-                          <span className="text-[#01CD6C] text-s font-semibold ml-1">
-                            {rev.estrellas}/5
                           </span>
+                          <span className="text-xs text-gray-500">
+                            {rev.fecha_creacion?.substring(0, 10)}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-1 text-[#01CD6C] mb-1">
+                          {Array.from({ length: 5 }, (_, i) => (
+                            <span key={i}>{i < rev.estrellas ? "★" : "☆"}</span>
+                          ))}
+                          <span className="ml-1 text-xs font-semibold">{rev.estrellas}/5</span>
                         </div>
 
                         {rev.comentario && (
@@ -441,26 +508,35 @@ const Cancha = () => {
                 )}
               </div>
 
-              <div className="flex flex-col sm:flex-row gap-4 mt-4">
+              {/* === BOTONES === */}
+              <div className="flex flex-col sm:flex-row gap-4 pt-4">
                 <button
                   onClick={handleCloseModal}
-                  className="flex-1 bg-[#23475F] hover:bg-[#01CD6C] text-[#FFFFFF] py-3 px-6 rounded-md transition-all duration-300 text-center font-semibold"
+                  className="flex-1 bg-[#23475F] text-white py-3 rounded-full font-semibold shadow 
+                             hover:bg-[#01CD6C] active:scale-95 transition-all text-center"
                 >
                   Cerrar
                 </button>
+
                 <Link
                   to={`/reservar/${selectedCancha.id_cancha}`}
-                  className="flex-1 bg-[#01CD6C] hover:bg-[#00b359] text-[#FFFFFF] py-3 px-6 rounded-md transition-all duration-300 text-center font-semibold shadow-lg hover:shadow-xl"
+                  className="flex-1 bg-[#01CD6C] text-white py-3 rounded-full font-semibold shadow-lg
+                             hover:bg-[#00b359] hover:shadow-xl active:scale-95 transition-all 
+                             text-center"
                 >
                   Reservar Ahora
                 </Link>
               </div>
+
             </div>
           </div>
         </div>
       )}
+
     </div>
-  );
+  </div>
+);
+
 };
 
 export default Cancha;

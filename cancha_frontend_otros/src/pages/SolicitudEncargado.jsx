@@ -432,98 +432,243 @@ const SolicitudEncargado = () => {
                 </>
             )}
 
-            {/* MODAL - VIEW */}
-            {viewOpen && current && (
-                <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-                    <div className="bg-white p-6 rounded-lg shadow w-full max-w-xl max-h-[80vh] overflow-y-auto">
-                        <h3 className="text-lg font-semibold mb-4">Detalle de Solicitud</h3>
+{/* MODAL - VIEW */}
+{viewOpen && current && (
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+    <div className="w-full max-w-xl max-h-[80vh] overflow-y-auto rounded-2xl bg-white shadow-2xl border border-gray-100 transform transition-all duration-200">
+      <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
+        <div>
+          <h3 className="text-lg font-semibold text-gray-900">Detalle de solicitud</h3>
+          <p className="text-xs text-gray-500">
+            Revisa la informacion de la solicitud seleccionada
+          </p>
+        </div>
+        <span
+          className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium
+            ${
+              current.estado === "aprobada"
+                ? "bg-emerald-50 text-emerald-700 border border-emerald-100"
+                : current.estado === "rechazada"
+                ? "bg-red-50 text-red-700 border border-red-100"
+                : current.estado === "pendiente"
+                ? "bg-amber-50 text-amber-700 border border-amber-100"
+                : "bg-gray-50 text-gray-700 border border-gray-100"
+            }
+          `}
+        >
+          <span className="mr-1 h-1.5 w-1.5 rounded-full bg-current" />
+          {current.estado || "Sin estado"}
+        </span>
+      </div>
 
-                        <div className="space-y-2">
-                            <p><b>ID:</b> {current.id_solicitud}</p>
-                            <p><b>Usuario:</b> {current.usuario_nombre}</p>
-                            <p><b>Correo:</b> {current.correo}</p>
-                            <p><b>Espacio:</b> {current.espacio_nombre}</p>
-                            <p><b>Estado:</b> {current.estado}</p>
-                            <p><b>Motivo:</b> {current.motivo || "-"}</p>
-                            <p><b>Comentario decisión:</b> {current.comentario_decision || "-"}</p>
-                            <p><b>Fecha solicitud:</b>
-                                {current.fecha_solicitud
-                                    ? new Date(current.fecha_solicitud).toLocaleString()
-                                    : "-"}
-                            </p>
-                        </div>
+      <div className="px-6 py-5">
+        <div className="space-y-3 text-sm text-gray-800">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-400">
+                Id solicitud
+              </div>
+              <div className="font-semibold text-gray-900">
+                {current.id_solicitud}
+              </div>
+            </div>
 
-                        <button
-                            onClick={closeView}
-                            className="mt-4 bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600"
-                        >
-                            Cerrar
-                        </button>
-                    </div>
-                </div>
-            )}
+            <div className="space-y-1">
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-400">
+                Usuario
+              </div>
+              <div className="font-semibold text-gray-900">
+                {current.usuario_nombre || "-"}
+              </div>
+            </div>
 
-            {/* MODAL - APROBAR */}
-            {approveOpen && current && (
-                <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-                    <div className="bg-white p-6 rounded-lg shadow w-full max-w-lg">
-                        <h3 className="text-lg font-semibold mb-4">Aprobar Solicitud</h3>
+            <div className="space-y-1">
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-400">
+                Correo
+              </div>
+              <div>{current.correo || "-"}</div>
+            </div>
 
-                        <textarea
-                            rows={4}
-                            value={approveComment}
-                            onChange={(e) => setApproveComment(e.target.value)}
-                            className="w-full border rounded px-3 py-2 bg-gray-100"
-                            placeholder="Comentario de aprobacion (opcional)"
-                        />
+            <div className="space-y-1">
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-400">
+                Espacio
+              </div>
+              <div>{current.espacio_nombre || "-"}</div>
+            </div>
 
-                        <div className="flex justify-end gap-2 mt-4">
-                            <button onClick={closeApprove} className="bg-gray-500 text-white px-4 py-2 rounded">
-                                Cancelar
-                            </button>
-                            <button
-                                onClick={confirmApprove}
-                                disabled={loadingAction}
-                                className="bg-blue-600 text-white px-4 py-2 rounded"
-                            >
-                                {loadingAction ? "Procesando..." : "Confirmar"}
-                            </button>
+            <div className="space-y-1">
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-400">
+                Fecha solicitud
+              </div>
+              <div>
+                {current.fecha_solicitud
+                  ? new Date(current.fecha_solicitud).toLocaleString()
+                  : "-"}
+              </div>
+            </div>
 
-                        </div>
-                    </div>
-                </div>
-            )}
+            <div className="space-y-1">
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-400">
+                Fecha decision
+              </div>
+              <div>
+                {current.fecha_decision
+                  ? new Date(current.fecha_decision).toLocaleString()
+                  : "-"}
+              </div>
+            </div>
+          </div>
 
-            {/* MODAL - RECHAZAR */}
-            {rejectOpen && current && (
-                <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-                    <div className="bg-white p-6 rounded-lg shadow w-full max-w-lg">
-                        <h3 className="text-lg font-semibold mb-4">Rechazar Solicitud</h3>
+          <div className="space-y-2">
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-400">
+              Motivo
+            </div>
+            <div className="rounded-xl border border-gray-100 bg-gray-50 px-3 py-2 text-sm whitespace-pre-wrap">
+              {current.motivo || "-"}
+            </div>
+          </div>
 
-                        <textarea
-                            rows={4}
-                            value={rejectComment}
-                            onChange={(e) => setRejectComment(e.target.value)}
-                            className="w-full border rounded px-3 py-2 bg-gray-100"
-                            placeholder="Motivo del rechazo (opcional)"
-                        />
+          <div className="space-y-2">
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-400">
+              Comentario decision
+            </div>
+            <div className="rounded-xl border border-gray-100 bg-gray-50 px-3 py-2 text-sm whitespace-pre-wrap">
+              {current.comentario_decision || "-"}
+            </div>
+          </div>
+        </div>
+      </div>
 
-                        <div className="flex justify-end gap-2 mt-4">
-                            <button onClick={closeReject} className="bg-gray-500 text-white px-4 py-2 rounded">
-                                Cancelar
-                            </button>
-                            <button
-                                onClick={confirmReject}
-                                disabled={loadingAction}
-                                className="bg-red-600 text-white px-4 py-2 rounded"
-                            >
-                                {loadingAction ? "Procesando..." : "Rechazar"}
-                            </button>
+      <div className="flex items-center justify-end gap-3 border-t border-gray-100 px-6 py-4">
+        <button
+          onClick={closeView}
+          className="inline-flex items-center justify-center rounded-full border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+        >
+          Cerrar
+        </button>
+      </div>
+    </div>
+  </div>
+)}
 
-                        </div>
-                    </div>
-                </div>
-            )}
+{/* MODAL - APROBAR */}
+{approveOpen && current && (
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+    <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl border border-gray-100 transform transition-all duration-200">
+      <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
+        <div>
+          <h3 className="text-lg font-semibold text-gray-900">Aprobar solicitud</h3>
+          <p className="text-xs text-gray-500">
+            Confirma la aprobacion y agrega un comentario si lo ves necesario
+          </p>
+        </div>
+        <div className="rounded-full bg-emerald-50 text-emerald-600 px-3 py-1 text-xs font-medium flex items-center gap-2">
+          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+          Aprobar
+        </div>
+      </div>
+
+      <div className="px-6 py-4 space-y-4">
+        <div className="rounded-xl bg-gray-50 border border-gray-100 px-3 py-2 text-xs text-gray-600 flex flex-col gap-1">
+          <span className="font-semibold text-gray-800 text-sm">
+            {current.usuario_nombre || "Usuario sin nombre"}
+          </span>
+          <span>Solicitud #{current.id_solicitud}</span>
+          <span>{current.espacio_nombre || "Sin espacio asignado"} </span>
+        </div>
+
+        <div>
+          <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-400 mb-1.5">
+            Comentario decision (opcional)
+          </div>
+          <textarea
+            rows={4}
+            value={approveComment}
+            onChange={(e) => setApproveComment(e.target.value)}
+            className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/60 focus:border-emerald-500 transition"
+            placeholder="Comentario de aprobacion"
+          />
+        </div>
+      </div>
+
+      <div className="flex items-center justify-end gap-3 border-t border-gray-100 px-6 py-4">
+        <button
+          onClick={closeApprove}
+          className="inline-flex items-center justify-center rounded-full border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+        >
+          Cancelar
+        </button>
+        <button
+          onClick={confirmApprove}
+          disabled={loadingAction}
+          className="inline-flex items-center justify-center rounded-full bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+        >
+          {loadingAction ? "Procesando..." : "Confirmar"}
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+
+{/* MODAL - RECHAZAR */}
+{rejectOpen && current && (
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+    <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl border border-gray-100 transform transition-all duration-200">
+      <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
+        <div>
+          <h3 className="text-lg font-semibold text-gray-900">Rechazar solicitud</h3>
+          <p className="text-xs text-gray-500">
+            Explica de forma breve el motivo del rechazo
+          </p>
+        </div>
+        <div className="rounded-full bg-red-50 text-red-600 px-3 py-1 text-xs font-medium flex items-center gap-2">
+          <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
+          Rechazar
+        </div>
+      </div>
+
+      <div className="px-6 py-4 space-y-4">
+        <div className="rounded-xl bg-gray-50 border border-gray-100 px-3 py-2 text-xs text-gray-600 flex flex-col gap-1">
+          <span className="font-semibold text-gray-800 text-sm">
+            {current.usuario_nombre || "Usuario sin nombre"}
+          </span>
+          <span>Solicitud #{current.id_solicitud}</span>
+          <span>{current.espacio_nombre || "Sin espacio asignado"} </span>
+        </div>
+
+        <div>
+          <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-400 mb-1.5">
+            Comentario decision (opcional)
+          </div>
+          <textarea
+            rows={4}
+            value={rejectComment}
+            onChange={(e) => setRejectComment(e.target.value)}
+            className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-red-500/60 focus:border-red-500 transition"
+            placeholder="Motivo del rechazo"
+          />
+        </div>
+      </div>
+
+      <div className="flex items-center justify-end gap-3 border-t border-gray-100 px-6 py-4">
+        <button
+          onClick={closeReject}
+          className="inline-flex items-center justify-center rounded-full border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+        >
+          Cancelar
+        </button>
+        <button
+          onClick={confirmReject}
+          disabled={loadingAction}
+          className="inline-flex items-center justify-center rounded-full bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+        >
+          {loadingAction ? "Procesando..." : "Rechazar"}
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+
 
         </div>
     );

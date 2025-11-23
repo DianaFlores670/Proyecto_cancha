@@ -141,18 +141,10 @@ const ReservaHorario = () => {
     const fullParams = { ...params, limit, offset };
     try {
       let response;
-      if (params.q)
-        response = await api.get("/reserva-horario/buscar", {
-          params: fullParams,
-        });
-      else if (params.tipo)
-        response = await api.get("/reserva-horario/filtro", {
-          params: fullParams,
-        });
-      else
-        response = await api.get("/reserva-horario/datos-especificos", {
-          params: fullParams,
-        });
+      if (params.q) response = await api.get('/reserva-horario/buscar', { params: fullParams });
+      else if (params.tipo) response = await api.get('/reserva-horario/filtro', { params: fullParams });
+      else response = await api.get('/reserva-horario/datos-especificos', { params: fullParams });
+
       if (response.data?.exito) {
         setHorarios(response.data.datos.horarios || []);
         setTotal(response.data.datos.paginacion?.total || 0);
@@ -361,12 +353,8 @@ const ReservaHorario = () => {
       }
 
       let response;
-      if (editMode)
-        response = await api.patch(
-          `/reserva-horario/${currentHorario.id_horario}`,
-          filtered
-        );
-      else response = await api.post("/reserva-horario/", filtered);
+      if (editMode) response = await api.patch(`/reserva-horario/${currentHorario.id_horario}`, filtered);
+      else response = await api.post('/reserva-horario/', filtered);
 
       if (response.data?.exito) {
         closeModal();

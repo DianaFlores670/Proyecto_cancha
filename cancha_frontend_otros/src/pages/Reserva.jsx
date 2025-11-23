@@ -81,23 +81,29 @@ const Reserva = () => {
 
   useEffect(() => {
     const fetchClientes = async () => {
-      try {
-        const response = await api.get('/cliente/datos-especificos');
-        if (response.data?.exito) setClientes(response.data.datos.clientes || []);
-        else setError(response.data?.mensaje || 'Error al obtener clientes');
-      } catch (err) {
-        setError(err.response?.data?.mensaje || 'Error de conexion al obtener clientes');
-      }
-    };
+  try {
+    const response = await api.get('/cliente/datos-especificos', {
+      params: { limit: 1000, offset: 0 }
+    });
+    if (response.data?.exito) setClientes(response.data.datos.clientes || []);
+    else setError(response.data?.mensaje || 'Error al obtener clientes');
+  } catch (err) {
+    setError(err.response?.data?.mensaje || 'Error de conexion al obtener clientes');
+  }
+};
+
     const fetchCanchas = async () => {
-      try {
-        const response = await api.get('/cancha/datos-especificos');
-        if (response.data?.exito) setCanchas(response.data.datos.canchas || []);
-        else setError(response.data?.mensaje || 'Error al obtener canchas');
-      } catch (err) {
-        setError(err.response?.data?.mensaje || 'Error de conexion al obtener canchas');
-      }
-    };
+  try {
+    const response = await api.get('/cancha/datos-especificos', {
+      params: { limit: 1000, offset: 0 }
+    });
+    if (response.data?.exito) setCanchas(response.data.datos.canchas || []);
+    else setError(response.data?.mensaje || 'Error al obtener canchas');
+  } catch (err) {
+    setError(err.response?.data?.mensaje || 'Error de conexion al obtener canchas');
+  }
+};
+
     if (permissions.canView) {
       fetchClientes();
       fetchCanchas();
