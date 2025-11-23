@@ -1,18 +1,33 @@
 /* eslint-disable no-unused-vars */
-import React, { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { FaBullseye, FaStar, FaCheckCircle, FaFlag, FaUserShield, FaEnvelope, FaPhoneAlt, FaMapMarkerAlt } from "react-icons/fa";
-import api from './services/api';
-import Header from './Header';
-import PaginaPrincipal from './pagina_principal';
-import EspaciosDeportivos from './casual/EspaciosDeportivos';
-import CanchasEspacio from './casual/CanchasEspacio';
-import Cancha from './casual/Cancha';
-import ReservarCliente from './roles/cliente/ReservarCliente';
-import ReservaDetalleCompartida from './roles/cliente/ReservaDetalleCompartida';
-import MisReservasCliente from './roles/cliente/MisReservasCliente';
-import ComprobantePagoCliente from './roles/cliente/ComprobantePagoCliente';
-import UnirseReserva from './roles/deportista/UnirseReserva';
+import React, { useState, useEffect } from "react";
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  Navigate,
+} from "react-router-dom";
+import {
+  FaBullseye,
+  FaStar,
+  FaCheckCircle,
+  FaFlag,
+  FaUserShield,
+  FaEnvelope,
+  FaPhoneAlt,
+  FaMapMarkerAlt,
+} from "react-icons/fa";
+import api from "./services/api";
+import Header from "./Header";
+import PaginaPrincipal from "./pagina_principal";
+import EspaciosDeportivos from "./casual/EspaciosDeportivos";
+import CanchasEspacio from "./casual/CanchasEspacio";
+import Cancha from "./casual/Cancha";
+import ReservarCliente from "./roles/cliente/ReservarCliente";
+import ReservaDetalleCompartida from "./roles/cliente/ReservaDetalleCompartida";
+import MisReservasCliente from "./roles/cliente/MisReservasCliente";
+import ComprobantePagoCliente from "./roles/cliente/ComprobantePagoCliente";
+import UnirseReserva from "./roles/deportista/UnirseReserva";
+import { getImageUrl } from "./utils"; // ajusta la ruta según tu estructura
 
 // Componente ProtectedRoute para verificar roles
 const ProtectedRoute = ({ children }) => {
@@ -21,8 +36,8 @@ const ProtectedRoute = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    const userData = localStorage.getItem('user');
+    const token = localStorage.getItem("token");
+    const userData = localStorage.getItem("user");
 
     if (!token || !userData) {
       setIsAuthenticated(false);
@@ -35,9 +50,9 @@ const ProtectedRoute = ({ children }) => {
       setUserRole(parsedUser.role);
       setIsAuthenticated(true);
     } catch (error) {
-      console.error('Error parsing user data:', error);
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
+      console.error("Error parsing user data:", error);
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
       setIsAuthenticated(false);
     } finally {
       setLoading(false);
@@ -59,7 +74,7 @@ const ProtectedRoute = ({ children }) => {
     return <Navigate to="/" replace />;
   }
 
-  if (userRole === 'CLIENTE' || userRole === 'DEPORTISTA') {
+  if (userRole === "CLIENTE" || userRole === "DEPORTISTA") {
     return <Navigate to="/espacios-deportivos" replace />;
   }
 
@@ -72,20 +87,20 @@ const AppContent = () => {
   const [error, setError] = useState(null);
 
   const getImageUrl = (path) => {
-    if (!path) return '';
-    const base = api.defaults.baseURL.replace(/\/$/, '');
-    const cleanPath = path.replace(/^\//, '');
+    if (!path) return "";
+    const base = api.defaults.baseURL.replace(/\/$/, "");
+    const cleanPath = path.replace(/^\//, "");
     return `${base}/${cleanPath}`;
   };
 
   useEffect(() => {
     const fetchCompanyData = async () => {
       try {
-        const response = await api.get('/empresa/dato-individual/2');
+        const response = await api.get("/empresa/dato-individual/2");
         setCompany(response.data.datos.empresa);
         setLoading(false);
       } catch (err) {
-        setError('Error al cargar los datos de la empresa');
+        setError("Error al cargar los datos de la empresa");
         setLoading(false);
       }
     };
@@ -94,8 +109,8 @@ const AppContent = () => {
   }, []);
 
   const handleImageError = (e) => {
-    console.error('Error cargando imagen:', e.target.src);
-    e.target.style.display = 'none';
+    console.error("Error cargando imagen:", e.target.src);
+    e.target.style.display = "none";
   };
 
   if (loading) {
@@ -111,7 +126,10 @@ const AppContent = () => {
 
   if (error) {
     return (
-      <div className="bg-[#A31621]/10 border-l-4 border-[#A31621] text-[#A31621] p-4 m-4 rounded-lg shadow-sm" role="alert">
+      <div
+        className="bg-[#A31621]/10 border-l-4 border-[#A31621] text-[#A31621] p-4 m-4 rounded-lg shadow-sm"
+        role="alert"
+      >
         <p className="font-medium">{error}</p>
       </div>
     );
@@ -125,7 +143,9 @@ const AppContent = () => {
       <section className="relative w-full h-[90vh] flex items-center justify-center overflow-hidden">
         {company.imagen_hero || company.imagen_1 ? (
           <img
-            src={getImageUrl(company.imagen_hero || company.imagen_1)}
+            src={
+              getImageUrl(company.imagen_hero) || getImageUrl(company.imagen_1)
+            }
             alt="Hero"
             className="absolute inset-0 w-full h-full object-cover"
             onError={handleImageError}
@@ -171,7 +191,10 @@ const AppContent = () => {
               >
                 {company[`imagen_${n}`] ? (
                   <img
-                    src={getImageUrl(company[`imagen_${n}`])}
+                    src={
+                      getImageUrl(company[`imagen_${n}`]) ||
+                      "/placeholder-image.png"
+                    }
                     alt={`Servicio ${n}`}
                     className="w-full h-48 object-cover rounded-2xl mb-6"
                     onError={handleImageError}
@@ -190,15 +213,13 @@ const AppContent = () => {
                   <a
                     href="/espacios-deportivos"
                     className="text-[#01CD6C] font-bold hover:underline"
-                  >
-                  </a>
+                  ></a>
                 </div>
               </div>
             ))}
           </div>
         </div>
       </section>
-
 
       {/* ===================== SOBRE LA EMPRESA ===================== */}
       <section className="py-20 bg-white">
@@ -241,7 +262,6 @@ const AppContent = () => {
         </div>
       </section>
 
-
       {/* ===================== OBJETIVOS ===================== */}
       <section className="py-24 bg-white">
         <div className="max-w-5xl mx-auto px-6">
@@ -250,7 +270,6 @@ const AppContent = () => {
           </h2>
 
           <div className="relative border-l-4 border-[#01CD6C]/40 pl-8 space-y-5">
-
             {/* Objetivo Principal */}
             <div className="relative">
               <span className="absolute -left-[34px] top-0 bg-[#01CD6C] text-white w-10 h-10 flex items-center justify-center rounded-full shadow-md">
@@ -329,9 +348,7 @@ const AppContent = () => {
 
             <div>
               <div className="flex items-center gap-2 mb-2">
-                <h4 className="text-3xl font-bold">
-                  {company.nombre_sistema}
-                </h4>
+                <h4 className="text-3xl font-bold">{company.nombre_sistema}</h4>
               </div>
               <p className="text-[#01CD6C] flex items-center gap-2">
                 <FaUserShield className="text-[#01CD6C] text-xl" />
@@ -378,14 +395,12 @@ const AppContent = () => {
         </div>
 
         <div className="text-center mt-10 border-t border-[#23475F] pt-6 text-sm text-white/80">
-          &copy; {new Date().getFullYear()} {company.nombre_sistema}.
-          Registrado el {new Date(company.fecha_registrado).toLocaleDateString("es-ES")}
+          &copy; {new Date().getFullYear()} {company.nombre_sistema}. Registrado
+          el {new Date(company.fecha_registrado).toLocaleDateString("es-ES")}
         </div>
       </footer>
-
     </div>
   );
-
 };
 
 const App = () => {
@@ -397,9 +412,15 @@ const App = () => {
         <Route path="/canchas-espacio/:id" element={<CanchasEspacio />} />
         <Route path="/canchas" element={<Cancha />} />
         <Route path="/reservar/:idCancha" element={<ReservarCliente />} />
-        <Route path="/reserva-detalle/:idReserva" element={<ReservaDetalleCompartida />} />
+        <Route
+          path="/reserva-detalle/:idReserva"
+          element={<ReservaDetalleCompartida />}
+        />
         <Route path="/mis-reservas" element={<MisReservasCliente />} />
-        <Route path="/comprobante-pago/:idPago" element={<ComprobantePagoCliente />} />
+        <Route
+          path="/comprobante-pago/:idPago"
+          element={<ComprobantePagoCliente />}
+        />
         <Route path="/unirse-reserva" element={<UnirseReserva />} />
         <Route
           path="/administrador/*"
@@ -409,7 +430,6 @@ const App = () => {
             </ProtectedRoute>
           }
         />
-        
       </Routes>
     </Router>
   );
