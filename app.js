@@ -135,17 +135,15 @@ try {
 }
 
 
-// Servir frontend Vite (después de las rutas de API)
-const frontendPath = path.join(__dirname, 'cancha_frontend_otros', 'dist');
-app.use(express.static(frontendPath));
- 
-
 // Servir archivos estáticos de la carpeta Uploads
 app.use('/Uploads', express.static(path.join(__dirname, 'Uploads')));
 
+// Servir frontend Vite (después de las rutas de API)
+const frontendPath = path.join(__dirname, 'cancha_frontend_otros', 'dist');
+app.use(express.static(frontendPath));
 
 // Catch-all para SPA
-app.get((req, res, next) => {
+app.use((req, res, next) => {
   // Si la ruta comienza con /Uploads, dejar que express.static la maneje
   if (req.path.startsWith('/Uploads')) return next();
   res.sendFile(path.join(frontendPath, 'index.html'));
