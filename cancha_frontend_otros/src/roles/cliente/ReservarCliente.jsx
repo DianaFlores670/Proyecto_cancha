@@ -3,7 +3,6 @@ import React, { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import api from "../../services/api";
 import Header from "../../Header";
-import { getImageUrl } from "../../utils";
 
 const BASE_SLOTS = [
   { id: "06-07", start: "06:00:00", end: "07:00:00", label: "06:00 - 07:00" },

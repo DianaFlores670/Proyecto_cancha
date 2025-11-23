@@ -1,36 +1,52 @@
 /* eslint-disable no-unused-vars */
 /* eslint-disable no-empty */
-import React, { useState, useEffect } from 'react';
-import api from '../../services/api';
-import { FaChevronDown, FaChevronRight } from 'react-icons/fa';
-import { useNavigate } from 'react-router-dom';
-import DashboardAdminEsp from './DashboardAdminEsp';
+import React, { useState, useEffect } from "react";
+import api from "../../services/api";
+import { FaChevronDown, FaChevronRight } from "react-icons/fa";
+import { useNavigate } from "react-router-dom";
+import DashboardAdminEsp from "./DashboardAdminEsp";
 
-const norm = (v) => String(v || '').trim().toUpperCase().replace(/\s+/g, '_');
+const norm = (v) =>
+  String(v || "")
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, "_");
 
 const readUser = () => {
-  try { return JSON.parse(localStorage.getItem('user') || '{}'); } catch { return {}; }
+  try {
+    return JSON.parse(localStorage.getItem("user") || "{}");
+  } catch {
+    return {};
+  }
 };
 
 const readTokenPayload = () => {
   try {
-    const t = localStorage.getItem('token');
-    if (!t || t.split('.').length !== 3) return {};
-    const b = t.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
-    const pad = '='.repeat((4 - (b.length % 4)) % 4);
+    const t = localStorage.getItem("token");
+    if (!t || t.split(".").length !== 3) return {};
+    const b = t.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+    const pad = "=".repeat((4 - (b.length % 4)) % 4);
     return JSON.parse(atob(b + pad));
-  } catch { return {}; }
+  } catch {
+    return {};
+  }
 };
 
 const pickRole = (u, p) => {
   const bag = new Set();
-  const arr = Array.isArray(u?.roles) ? u.roles : (u?.role ? [u.role] : []);
-  arr.forEach(r => bag.add(norm(typeof r === 'string' ? r : r?.rol || r?.role || r?.nombre || r?.name)));
-  const parr = Array.isArray(p?.roles) ? p.roles : (p?.rol ? [p.rol] : []);
-  parr.forEach(r => bag.add(norm(r)));
+  const arr = Array.isArray(u?.roles) ? u.roles : u?.role ? [u.role] : [];
+  arr.forEach((r) =>
+    bag.add(
+      norm(
+        typeof r === "string" ? r : r?.rol || r?.role || r?.nombre || r?.name
+      )
+    )
+  );
+  const parr = Array.isArray(p?.roles) ? p.roles : p?.rol ? [p.rol] : [];
+  parr.forEach((r) => bag.add(norm(r)));
   const list = Array.from(bag);
-  if (list.includes('ADMIN_ESP_DEP')) return 'ADMIN_ESP_DEP';
-  return list[0] || 'DEFAULT';
+  if (list.includes("ADMIN_ESP_DEP")) return "ADMIN_ESP_DEP";
+  return list[0] || "DEFAULT";
 };
 
 const resolveAdminId = (u, p) => {
@@ -43,7 +59,6 @@ const resolveAdminId = (u, p) => {
   if (Number.isInteger(p?.id)) return p.id;
   return null;
 };
-
 
 const EspaciosView = () => {
   const [idAdminEspDep, setIdAdminEspDep] = useState(null);
@@ -64,32 +79,36 @@ const EspaciosView = () => {
     if (!idAdminEspDep) return;
     setLoading(true);
     try {
-      const r = await api.get('/espacio-admin/mis-espacios', { params: { id_admin_esp_dep: idAdminEspDep } });
+      const r = await api.get("/espacio-admin/mis-espacios", {
+        params: { id_admin_esp_dep: idAdminEspDep },
+      });
       if (r.data?.exito) setEspacios(r.data.datos?.espacios || []);
-      else setError(r.data?.mensaje || 'Error al cargar espacios');
+      else setError(r.data?.mensaje || "Error al cargar espacios");
     } catch (e) {
-      setError(e.response?.data?.mensaje || 'Error de conexion');
+      setError(e.response?.data?.mensaje || "Error de conexion");
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => { fetchEspacios(); }, [idAdminEspDep]);
+  useEffect(() => {
+    fetchEspacios();
+  }, [idAdminEspDep]);
 
   const toggleExpand = async (idEspacio) => {
-    setExpanded(prev => ({
+    setExpanded((prev) => ({
       ...prev,
-      [idEspacio]: !prev[idEspacio]
+      [idEspacio]: !prev[idEspacio],
     }));
   };
 
-const handleVerReservas = (idCancha) => {
-  navigate(`/administrador/reserva?cancha=${idCancha}`);
-};
+  const handleVerReservas = (idCancha) => {
+    navigate(`/administrador/reserva?cancha=${idCancha}`);
+  };
 
-const handleVerResenas = (idCancha) => {
-  navigate(`/administrador/resena?cancha=${idCancha}`);
-};
+  const handleVerResenas = (idCancha) => {
+    navigate(`/administrador/resena?cancha=${idCancha}`);
+  };
 
   if (loading) return <p>Cargando espacios...</p>;
   if (error) return <p className="text-red-500">{error}</p>;
@@ -111,13 +130,19 @@ const handleVerResenas = (idCancha) => {
             >
               <div>
                 <h3 className="text-lg font-medium">{esp.nombre}</h3>
-                <p className="text-sm text-gray-600">{esp.direccion || 'Sin dirección registrada'}</p>
+                <p className="text-sm text-gray-600">
+                  {esp.direccion || "Sin dirección registrada"}
+                </p>
               </div>
               <div className="flex items-center gap-3">
-                <span className="text-sm text-gray-500">{esp.total_canchas || 0} canchas</span>
-                {expanded[esp.id_espacio]
-                  ? <FaChevronDown className="w-4 h-4 text-gray-600" />
-                  : <FaChevronRight className="w-4 h-4 text-gray-600" />}
+                <span className="text-sm text-gray-500">
+                  {esp.total_canchas || 0} canchas
+                </span>
+                {expanded[esp.id_espacio] ? (
+                  <FaChevronDown className="w-4 h-4 text-gray-600" />
+                ) : (
+                  <FaChevronRight className="w-4 h-4 text-gray-600" />
+                )}
               </div>
             </div>
 
@@ -142,17 +167,20 @@ const handleVerResenas = (idCancha) => {
                           <td className="px-4 py-2">{c.capacidad}</td>
                           <td className="px-4 py-2">Bs. {c.monto_por_hora}</td>
                           <td className="px-4 py-2">
-                            <span className={`px-2 py-1 rounded text-xs ${c.estado === 'disponible'
-                              ? 'bg-green-100 text-green-700'
-                              : c.estado === 'mantenimiento'
-                                ? 'bg-yellow-100 text-yellow-700'
-                                : 'bg-red-100 text-red-700'
-                              }`}>
+                            <span
+                              className={`px-2 py-1 rounded text-xs ${
+                                c.estado === "disponible"
+                                  ? "bg-green-100 text-green-700"
+                                  : c.estado === "mantenimiento"
+                                  ? "bg-yellow-100 text-yellow-700"
+                                  : "bg-red-100 text-red-700"
+                              }`}
+                            >
                               {c.estado}
                             </span>
                           </td>
                           <td className="px-4 py-2">
-                            {(c.disciplinas || []).join(', ') || '-'}
+                            {(c.disciplinas || []).join(", ") || "-"}
                           </td>
                           <td className="px-4 py-2 flex gap-2">
                             <button
@@ -173,7 +201,9 @@ const handleVerResenas = (idCancha) => {
                     </tbody>
                   </table>
                 ) : (
-                  <p className="text-gray-500 mt-2">No hay canchas registradas en este espacio.</p>
+                  <p className="text-gray-500 mt-2">
+                    No hay canchas registradas en este espacio.
+                  </p>
                 )}
               </div>
             )}
