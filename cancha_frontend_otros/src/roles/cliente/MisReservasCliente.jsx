@@ -5,6 +5,8 @@ import { Link } from "react-router-dom";
 import api from "../../services/api";
 import Header from "../../Header";
 
+import { getImageUrl } from "../../utils";
+
 const canLeaveReview = (reserva) => {
   if (!reserva) return false;
   if (reserva.estado !== "pagada") return false;
@@ -16,7 +18,8 @@ const canLeaveReview = (reserva) => {
 };
 
 const getUserRoles = (u) => {
-  if (Array.isArray(u?.roles)) return u.roles.map((r) => String(r?.rol ?? r).toUpperCase());
+  if (Array.isArray(u?.roles))
+    return u.roles.map((r) => String(r?.rol ?? r).toUpperCase());
   if (u?.role) return [String(u.role).toUpperCase()];
   return [];
 };
@@ -30,7 +33,9 @@ const pickRoleForThisPage = (u) => {
 const getImageUrl = (path) => {
   if (!path) return "";
   try {
-    const base = api.defaults.baseURL ? api.defaults.baseURL.replace(/\/$/, "") : "";
+    const base = api.defaults.baseURL
+      ? api.defaults.baseURL.replace(/\/$/, "")
+      : "";
     const clean = String(path).replace(/^\//, "");
     return `${base}/${clean}`;
   } catch (e) {
@@ -92,10 +97,13 @@ const MisReservasCliente = () => {
 
       let idFromRoles = null;
       if (Array.isArray(u?.roles)) {
-        const cl = u.roles.find((rr) => String(rr?.rol ?? rr).toUpperCase() === "CLIENTE");
+        const cl = u.roles.find(
+          (rr) => String(rr?.rol ?? rr).toUpperCase() === "CLIENTE"
+        );
         idFromRoles = cl?.datos?.id_cliente ?? null;
       }
-      const finalIdCliente = r === "CLIENTE" ? idFromRoles ?? u.id_persona ?? null : null;
+      const finalIdCliente =
+        r === "CLIENTE" ? idFromRoles ?? u.id_persona ?? null : null;
       setIdCliente(finalIdCliente);
       setIdPersona(u.id_persona ?? null);
     } catch (e) {
@@ -103,7 +111,11 @@ const MisReservasCliente = () => {
     }
   }, []);
 
-  const fetchReservasResponsable = async (search = "", filtro = "default", page = 1) => {
+  const fetchReservasResponsable = async (
+    search = "",
+    filtro = "default",
+    page = 1
+  ) => {
     if (!idCliente) return;
     setLoading(true);
     setError(null);
@@ -118,8 +130,8 @@ const MisReservasCliente = () => {
             q: search,
             id_cliente: idCliente,
             limit,
-            offset
-          }
+            offset,
+          },
         });
       } else if (filtro !== "default") {
         resp = await api.get("/reserva-cliente/filtro", {
@@ -127,16 +139,16 @@ const MisReservasCliente = () => {
             tipo: filtro,
             id_cliente: idCliente,
             limit,
-            offset
-          }
+            offset,
+          },
         });
       } else {
         resp = await api.get("/reserva-cliente/datos-especificos", {
           params: {
             id_cliente: idCliente,
             limit,
-            offset
-          }
+            offset,
+          },
         });
       }
 
@@ -163,7 +175,11 @@ const MisReservasCliente = () => {
     }
   };
 
-  const fetchReservasDeportista = async (search = "", filtro = "default", page = 1) => {
+  const fetchReservasDeportista = async (
+    search = "",
+    filtro = "default",
+    page = 1
+  ) => {
     if (!idPersona) return;
     setLoading(true);
     setError(null);
@@ -173,7 +189,7 @@ const MisReservasCliente = () => {
       const params = {
         id_persona: idPersona,
         limit,
-        offset
+        offset,
       };
       if (search) {
         params.q = search;
@@ -182,7 +198,9 @@ const MisReservasCliente = () => {
         params.tipo = filtro;
       }
 
-      const resp = await api.get("/reserva-deportista/mis-reservas", { params });
+      const resp = await api.get("/reserva-deportista/mis-reservas", {
+        params,
+      });
 
       if (!resp.data?.exito) {
         const msg = resp.data?.mensaje || "No se pudieron cargar las reservas";
@@ -247,7 +265,7 @@ const MisReservasCliente = () => {
       setSuccess(null);
 
       const resp = await api.delete(`/reserva-cliente/${idReserva}`, {
-        params: { id_cliente: idCliente }
+        params: { id_cliente: idCliente },
       });
 
       if (!resp.data?.exito) {
@@ -274,7 +292,7 @@ const MisReservasCliente = () => {
     setQrData(null);
     try {
       const resp = await api.get("/qr-reserva/buscar", {
-        params: { q: String(idReserva), limit: 1, offset: 0 }
+        params: { q: String(idReserva), limit: 1, offset: 0 },
       });
 
       if (!resp.data?.exito) {
@@ -306,7 +324,9 @@ const MisReservasCliente = () => {
     const url = getImageUrl(qrData.qr_url_imagen);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `qr_reserva_${qrData.id_reserva || qrData.id_qr || "reserva"}.png`;
+    link.download = `qr_reserva_${
+      qrData.id_reserva || qrData.id_qr || "reserva"
+    }.png`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -349,10 +369,13 @@ const MisReservasCliente = () => {
     try {
       setEditSaving(true);
 
-      const resp = await api.patch(`/reserva-cliente/${editReserva.id_reserva}`, {
-        cupo: n,
-        id_cliente: idCliente
-      });
+      const resp = await api.patch(
+        `/reserva-cliente/${editReserva.id_reserva}`,
+        {
+          cupo: n,
+          id_cliente: idCliente,
+        }
+      );
 
       if (!resp.data?.exito) {
         const msg = resp.data?.mensaje || "No se pudo actualizar la reserva";
@@ -362,7 +385,9 @@ const MisReservasCliente = () => {
       }
 
       try {
-        await api.post(`/qr-reserva/regenerar-por-reserva/${editReserva.id_reserva}`);
+        await api.post(
+          `/qr-reserva/regenerar-por-reserva/${editReserva.id_reserva}`
+        );
       } catch (errQr) {}
 
       setEditModalOpen(false);
@@ -413,12 +438,15 @@ const MisReservasCliente = () => {
         id_cliente: idCliente,
         id_reserva: reviewReserva.id_reserva,
         estrellas: reviewRating,
-        comentario: reviewComment
+        comentario: reviewComment,
       };
 
       let resp;
       if (reviewMode === "edit" && reviewReserva.id_resena) {
-        resp = await api.patch(`/resena-cliente/${reviewReserva.id_resena}`, payload);
+        resp = await api.patch(
+          `/resena-cliente/${reviewReserva.id_resena}`,
+          payload
+        );
       } else {
         resp = await api.post("/resena-cliente", payload);
       }
@@ -470,7 +498,8 @@ const MisReservasCliente = () => {
   }
 
   const totalPages = Math.ceil(total / limit) || 1;
-  const qrImageUrl = qrData && qrData.qr_url_imagen ? getImageUrl(qrData.qr_url_imagen) : "";
+  const qrImageUrl =
+    qrData && qrData.qr_url_imagen ? getImageUrl(qrData.qr_url_imagen) : "";
 
   const isResponsableView = viewMode === "RESPONSABLE";
 
@@ -485,7 +514,10 @@ const MisReservasCliente = () => {
                 Mis reservas
               </h1>
               <p className="text-xs md:text-sm text-[#64748B] mt-1">
-                Modo: {isResponsableView ? "reservas donde soy cliente responsable" : "reservas donde soy deportista"}
+                Modo:{" "}
+                {isResponsableView
+                  ? "reservas donde soy cliente responsable"
+                  : "reservas donde soy deportista"}
               </p>
             </div>
 
@@ -615,12 +647,8 @@ const MisReservasCliente = () => {
                             ? String(r.fecha_reserva).substring(0, 10)
                             : "-"}
                         </td>
-                        <td className="px-3 py-2">
-                          {r.cancha_nombre || "-"}
-                        </td>
-                        <td className="px-3 py-2">
-                          Bs. {r.monto_total || 0}
-                        </td>
+                        <td className="px-3 py-2">{r.cancha_nombre || "-"}</td>
+                        <td className="px-3 py-2">Bs. {r.monto_total || 0}</td>
                         <td className="px-3 py-2">
                           <span
                             className={
@@ -662,44 +690,51 @@ const MisReservasCliente = () => {
                                 </button>
                               )}
 
-                              {canLeaveReview(r) && hasReview && !reviewVerified && (
-                                <button
-                                  type="button"
-                                  onClick={() => handleOpenReview("edit", r)}
-                                  className="inline-block px-3 py-1 rounded-md bg-[#22C55E] text-white text-xs font-semibold hover:bg-[#16A34A] transition-all"
-                                >
-                                  Editar resena
-                                </button>
-                              )}
-
-                              {canLeaveReview(r) && hasReview && reviewVerified && (
-                                <button
-                                  type="button"
-                                  disabled
-                                  className="inline-block px-3 py-1 rounded-md bg-gray-200 text-gray-500 text-xs font-semibold cursor-not-allowed"
-                                >
-                                  Resena enviada
-                                </button>
-                              )}
-
-                              {r.estado !== "cancelada" && r.estado !== "pagada" && (
-                                <>
+                              {canLeaveReview(r) &&
+                                hasReview &&
+                                !reviewVerified && (
                                   <button
                                     type="button"
-                                    onClick={() => handleOpenEdit(r)}
-                                    className="inline-block px-3 py-1 rounded-md bg-[#FACC15] text-[#0F2634] text-xs font-semibold hover:bg-[#EAB308] transition-all"
+                                    onClick={() => handleOpenReview("edit", r)}
+                                    className="inline-block px-3 py-1 rounded-md bg-[#22C55E] text-white text-xs font-semibold hover:bg-[#16A34A] transition-all"
                                   >
-                                    Editar
+                                    Editar resena
                                   </button>
+                                )}
+
+                              {canLeaveReview(r) &&
+                                hasReview &&
+                                reviewVerified && (
                                   <button
                                     type="button"
-                                    onClick={() => handleCancel(r.id_reserva, r.estado)}
-                                    className="inline-block px-3 py-1 rounded-md bg-[#F97373] text-white text-xs font-semibold hover:bg-[#EF4444] transition-all"
+                                    disabled
+                                    className="inline-block px-3 py-1 rounded-md bg-gray-200 text-gray-500 text-xs font-semibold cursor-not-allowed"
                                   >
-                                    Cancelar
+                                    Resena enviada
                                   </button>
-                                </>
-                              )}
+                                )}
+
+                              {r.estado !== "cancelada" &&
+                                r.estado !== "pagada" && (
+                                  <>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleOpenEdit(r)}
+                                      className="inline-block px-3 py-1 rounded-md bg-[#FACC15] text-[#0F2634] text-xs font-semibold hover:bg-[#EAB308] transition-all"
+                                    >
+                                      Editar
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        handleCancel(r.id_reserva, r.estado)
+                                      }
+                                      className="inline-block px-3 py-1 rounded-md bg-[#F97373] text-white text-xs font-semibold hover:bg-[#EF4444] transition-all"
+                                    >
+                                      Cancelar
+                                    </button>
+                                  </>
+                                )}
                             </>
                           ) : (
                             <>
@@ -791,16 +826,14 @@ const MisReservasCliente = () => {
               </p>
             )}
             {qrError && (
-              <p className="text-sm text-red-600 text-center mb-4">
-                {qrError}
-              </p>
+              <p className="text-sm text-red-600 text-center mb-4">{qrError}</p>
             )}
             {!qrLoading && !qrError && qrData && (
               <>
                 <div className="flex justify-center mb-4">
                   {qrImageUrl && (
                     <img
-                      src={qrImageUrl}
+                      src={getImageUrl(qrImageUrl)}
                       alt="Codigo QR de la reserva"
                       className="w-48 h-48 object-contain"
                     />
@@ -840,9 +873,7 @@ const MisReservasCliente = () => {
             </h2>
             <form onSubmit={handleUpdateReserva} className="space-y-4">
               <div>
-                <p className="text-sm text-[#64748B] mb-1">
-                  Codigo de reserva
-                </p>
+                <p className="text-sm text-[#64748B] mb-1">Codigo de reserva</p>
                 <p className="font-semibold text-[#0F2634]">
                   #{editReserva.id_reserva}
                 </p>
@@ -871,7 +902,9 @@ const MisReservasCliente = () => {
                   disabled={editSaving}
                   className={
                     "flex-1 px-4 py-2 rounded-md bg-[#01CD6C] text-white text-sm font-semibold transition-all " +
-                    (editSaving ? "opacity-70 cursor-not-allowed" : "hover:bg-[#00b359]")
+                    (editSaving
+                      ? "opacity-70 cursor-not-allowed"
+                      : "hover:bg-[#00b359]")
                   }
                 >
                   {editSaving ? "Guardando..." : "Guardar cambios"}
@@ -889,7 +922,8 @@ const MisReservasCliente = () => {
                 </button>
               </div>
               <p className="mt-2 text-xs text-[#64748B] text-center">
-                Al actualizar el cupo, el codigo QR asociado a la reserva se regenera en el sistema.
+                Al actualizar el cupo, el codigo QR asociado a la reserva se
+                regenera en el sistema.
               </p>
             </form>
           </div>
@@ -914,7 +948,8 @@ const MisReservasCliente = () => {
             </h2>
             <div className="mb-3 text-sm text-[#64748B]">
               <p>
-                Reserva #{reviewReserva.id_reserva} - {reviewReserva.cancha_nombre || "-"}
+                Reserva #{reviewReserva.id_reserva} -{" "}
+                {reviewReserva.cancha_nombre || "-"}
               </p>
               <p>
                 Fecha:{" "}
@@ -963,7 +998,9 @@ const MisReservasCliente = () => {
                   disabled={reviewSaving}
                   className={
                     "flex-1 px-4 py-2 rounded-md bg-[#01CD6C] text-white text-sm font-semibold transition-all " +
-                    (reviewSaving ? "opacity-70 cursor-not-allowed" : "hover:bg-[#00b359]")
+                    (reviewSaving
+                      ? "opacity-70 cursor-not-allowed"
+                      : "hover:bg-[#00b359]")
                   }
                 >
                   {reviewSaving ? "Enviando..." : "Enviar resena"}
@@ -981,7 +1018,8 @@ const MisReservasCliente = () => {
                 </button>
               </div>
               <p className="mt-2 text-xs text-[#64748B] text-center">
-                Tu resena quedara pendiente de revision por el administrador del espacio deportivo.
+                Tu resena quedara pendiente de revision por el administrador del
+                espacio deportivo.
               </p>
             </form>
           </div>
@@ -1020,7 +1058,13 @@ const MisReservasCliente = () => {
                 <p className="text-[#64748B]">Horario reservado</p>
                 <p className="font-medium">
                   {detalleDepReserva.hora_inicio && detalleDepReserva.hora_fin
-                    ? `${String(detalleDepReserva.hora_inicio).substring(0, 5)} - ${String(detalleDepReserva.hora_fin).substring(0, 5)}`
+                    ? `${String(detalleDepReserva.hora_inicio).substring(
+                        0,
+                        5
+                      )} - ${String(detalleDepReserva.hora_fin).substring(
+                        0,
+                        5
+                      )}`
                     : "-"}
                 </p>
               </div>

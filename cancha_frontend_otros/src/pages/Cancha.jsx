@@ -1,38 +1,72 @@
 /* eslint-disable no-empty */
-import React, { useState, useEffect } from 'react';
-import api from '../services/api';
+import React, { useState, useEffect } from "react";
+import api from "../services/api";
+import { getImageUrl } from "../utils";
 
 const permissionsConfig = {
-  ADMINISTRADOR: { canView: true, canCreate: true, canEdit: true, canDelete: true },
-  ADMIN_ESP_DEP: { canView: true, canCreate: true, canEdit: true, canDelete: true },
-  DEFAULT: { canView: false, canCreate: false, canEdit: false, canDelete: false },
+  ADMINISTRADOR: {
+    canView: true,
+    canCreate: true,
+    canEdit: true,
+    canDelete: true,
+  },
+  ADMIN_ESP_DEP: {
+    canView: true,
+    canCreate: true,
+    canEdit: true,
+    canDelete: true,
+  },
+  DEFAULT: {
+    canView: false,
+    canCreate: false,
+    canEdit: false,
+    canDelete: false,
+  },
 };
 
 const getEffectiveRole = () => {
   const keys = Object.keys(permissionsConfig);
   const bag = new Set();
   try {
-    const u = JSON.parse(localStorage.getItem('user') || '{}');
+    const u = JSON.parse(localStorage.getItem("user") || "{}");
     const arr = Array.isArray(u?.roles) ? u.roles : [];
     for (const r of arr) {
-      if (typeof r === 'string') bag.add(r);
-      else if (r && typeof r === 'object') ['rol','role','nombre','name'].forEach(k => { if (r[k]) bag.add(r[k]); });
+      if (typeof r === "string") bag.add(r);
+      else if (r && typeof r === "object")
+        ["rol", "role", "nombre", "name"].forEach((k) => {
+          if (r[k]) bag.add(r[k]);
+        });
     }
     if (bag.size === 0 && u?.role) bag.add(u.role);
   } catch {}
-  const tok = localStorage.getItem('token');
-  if (bag.size === 0 && tok && tok.split('.').length === 3) {
+  const tok = localStorage.getItem("token");
+  if (bag.size === 0 && tok && tok.split(".").length === 3) {
     try {
-      const payload = JSON.parse(atob(tok.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')));
-      const t = Array.isArray(payload?.roles) ? payload.roles : (payload?.rol ? [payload.rol] : []);
-      t.forEach(v => bag.add(v));
+      const payload = JSON.parse(
+        atob(tok.split(".")[1].replace(/-/g, "+").replace(/_/g, "/"))
+      );
+      const t = Array.isArray(payload?.roles)
+        ? payload.roles
+        : payload?.rol
+        ? [payload.rol]
+        : [];
+      t.forEach((v) => bag.add(v));
     } catch {}
   }
-  const norm = Array.from(bag).map(v => String(v || '').trim().toUpperCase().replace(/\s+/g,'_'));
-  const map = v => v === 'ADMIN' ? 'ADMINISTRADOR' : v;
+  const norm = Array.from(bag).map((v) =>
+    String(v || "")
+      .trim()
+      .toUpperCase()
+      .replace(/\s+/g, "_")
+  );
+  const map = (v) => (v === "ADMIN" ? "ADMINISTRADOR" : v);
   const norm2 = norm.map(map);
-  const prio = ['ADMINISTRADOR','ADMIN_ESP_DEP'];
-  return prio.find(r => norm2.includes(r) && keys.includes(r)) || norm2.find(r => keys.includes(r)) || 'DEFAULT';
+  const prio = ["ADMINISTRADOR", "ADMIN_ESP_DEP"];
+  return (
+    prio.find((r) => norm2.includes(r) && keys.includes(r)) ||
+    norm2.find((r) => keys.includes(r)) ||
+    "DEFAULT"
+  );
 };
 
 const Cancha = () => {
@@ -42,20 +76,20 @@ const Cancha = () => {
   const [disciplinasSeleccionadas, setDisciplinasSeleccionadas] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filtro, setFiltro] = useState('');
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filtro, setFiltro] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [viewMode, setViewMode] = useState(false);
   const [currentCancha, setCurrentCancha] = useState(null);
   const [formData, setFormData] = useState({
-    nombre: '',
-    ubicacion: '',
-    capacidad: '',
-    estado: '',
-    monto_por_hora: '',
-    imagen_cancha: '',
-    id_espacio: ''
+    nombre: "",
+    ubicacion: "",
+    capacidad: "",
+    estado: "",
+    monto_por_hora: "",
+    imagen_cancha: "",
+    id_espacio: "",
   });
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
@@ -66,25 +100,31 @@ const Cancha = () => {
 
   useEffect(() => {
     const sync = () => setRole(getEffectiveRole());
-    window.addEventListener('storage', sync);
-    window.addEventListener('auth-changed', sync);
-    window.addEventListener('focus', sync);
+    window.addEventListener("storage", sync);
+    window.addEventListener("auth-changed", sync);
+    window.addEventListener("focus", sync);
     return () => {
-      window.removeEventListener('storage', sync);
-      window.removeEventListener('auth-changed', sync);
-      window.removeEventListener('focus', sync);
+      window.removeEventListener("storage", sync);
+      window.removeEventListener("auth-changed", sync);
+      window.removeEventListener("focus", sync);
     };
   }, []);
 
-  useEffect(() => { setError(null); }, [role]);
+  useEffect(() => {
+    setError(null);
+  }, [role]);
 
-  const permissions = role && permissionsConfig[role] ? permissionsConfig[role] : permissionsConfig.DEFAULT;
+  const permissions =
+    role && permissionsConfig[role]
+      ? permissionsConfig[role]
+      : permissionsConfig.DEFAULT;
 
   useEffect(() => {
     const fetchEsp = async () => {
       try {
-        const response = await api.get('/espacio_deportivo/datos-especificos');
-        if (response.data?.exito) setEspacios(response.data.datos.espacios || []);
+        const response = await api.get("/espacio_deportivo/datos-especificos");
+        if (response.data?.exito)
+          setEspacios(response.data.datos.espacios || []);
       } catch {}
     };
     fetchEsp();
@@ -93,18 +133,19 @@ const Cancha = () => {
   useEffect(() => {
     const fetchDisc = async () => {
       try {
-        const response = await api.get('/cancha/disciplinas');
-        if (response.data?.exito) setDisciplinas(response.data.datos.disciplinas || []);
+        const response = await api.get("/cancha/disciplinas");
+        if (response.data?.exito)
+          setDisciplinas(response.data.datos.disciplinas || []);
       } catch {}
     };
     fetchDisc();
   }, []);
 
   const getImageUrl = (path) => {
-    if (!path) return '';
+    if (!path) return "";
     try {
-      const base = (api.defaults?.baseURL || '').replace(/\/$/, '');
-      const cleanPath = String(path).replace(/^\//, '');
+      const base = (api.defaults?.baseURL || "").replace(/\/$/, "");
+      const cleanPath = String(path).replace(/^\//, "");
       return `${base}/${cleanPath}`;
     } catch {
       return path;
@@ -113,7 +154,7 @@ const Cancha = () => {
 
   const fetchCanchas = async (params = {}) => {
     if (!permissions.canView) {
-      setError('No tienes permisos para ver canchas');
+      setError("No tienes permisos para ver canchas");
       return;
     }
     setLoading(true);
@@ -122,24 +163,32 @@ const Cancha = () => {
     const fullParams = { ...params, limit, offset };
     try {
       let response;
-      if (params.q) response = await api.get('/cancha/buscar', { params: fullParams });
-      else if (params.tipo) response = await api.get('/cancha/filtro', { params: fullParams });
-      else response = await api.get('/cancha/datos-especificos', { params: fullParams });
+      if (params.q)
+        response = await api.get("/cancha/buscar", { params: fullParams });
+      else if (params.tipo)
+        response = await api.get("/cancha/filtro", { params: fullParams });
+      else
+        response = await api.get("/cancha/datos-especificos", {
+          params: fullParams,
+        });
       if (response.data.exito) {
         setCanchas(response.data.datos.canchas);
         setTotal(response.data.datos.paginacion.total);
       } else {
-        setError(response.data.mensaje || 'Error al cargar canchas');
+        setError(response.data.mensaje || "Error al cargar canchas");
       }
     } catch (err) {
-      const errorMessage = err.response?.data?.mensaje || 'Error de conexion al servidor';
+      const errorMessage =
+        err.response?.data?.mensaje || "Error de conexion al servidor";
       setError(errorMessage);
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => { if (role) fetchCanchas(); }, [page, role]);
+  useEffect(() => {
+    if (role) fetchCanchas();
+  }, [page, role]);
 
   const handleSearch = (e) => {
     e.preventDefault();
@@ -160,13 +209,14 @@ const Cancha = () => {
 
   const handleDelete = async (id) => {
     if (!permissions.canDelete) return;
-    if (!window.confirm('Estas seguro de eliminar esta cancha?')) return;
+    if (!window.confirm("Estas seguro de eliminar esta cancha?")) return;
     try {
       const response = await api.delete(`/cancha/${id}`);
       if (response.data.exito) fetchCanchas();
-      else setError(response.data.mensaje || 'No se pudo eliminar');
+      else setError(response.data.mensaje || "No se pudo eliminar");
     } catch (err) {
-      const errorMessage = err.response?.data?.mensaje || 'Error de conexion al servidor';
+      const errorMessage =
+        err.response?.data?.mensaje || "Error de conexion al servidor";
       setError(errorMessage);
     }
   };
@@ -176,13 +226,13 @@ const Cancha = () => {
     setEditMode(false);
     setViewMode(false);
     setFormData({
-      nombre: '',
-      ubicacion: '',
-      capacidad: '',
-      estado: '',
-      monto_por_hora: '',
-      imagen_cancha: '',
-      id_espacio: ''
+      nombre: "",
+      ubicacion: "",
+      capacidad: "",
+      estado: "",
+      monto_por_hora: "",
+      imagen_cancha: "",
+      id_espacio: "",
     });
     setDisciplinasSeleccionadas([]);
     setSelectedFile(null);
@@ -198,22 +248,24 @@ const Cancha = () => {
       if (response.data.exito) {
         const c = response.data.datos.cancha;
         setFormData({
-          nombre: c.nombre || '',
-          ubicacion: c.ubicacion || '',
-          capacidad: c.capacidad || '',
-          estado: c.estado || '',
-          monto_por_hora: c.monto_por_hora || '',
-          imagen_cancha: c.imagen_cancha || '',
-          id_espacio: c.id_espacio || ''
+          nombre: c.nombre || "",
+          ubicacion: c.ubicacion || "",
+          capacidad: c.capacidad || "",
+          estado: c.estado || "",
+          monto_por_hora: c.monto_por_hora || "",
+          imagen_cancha: c.imagen_cancha || "",
+          id_espacio: c.id_espacio || "",
         });
         setImagePreview(c.imagen_cancha ? getImageUrl(c.imagen_cancha) : null);
         setSelectedFile(null);
         if (Array.isArray(c.disciplinas)) {
-          setDisciplinasSeleccionadas(c.disciplinas.map(d => ({
-            id_disciplina: d.id_disciplina,
-            nombre: d.nombre,
-            frecuencia_practica: d.frecuencia_practica || 'Regular'
-          })));
+          setDisciplinasSeleccionadas(
+            c.disciplinas.map((d) => ({
+              id_disciplina: d.id_disciplina,
+              nombre: d.nombre,
+              frecuencia_practica: d.frecuencia_practica || "Regular",
+            }))
+          );
         } else {
           setDisciplinasSeleccionadas([]);
         }
@@ -222,10 +274,11 @@ const Cancha = () => {
         setViewMode(false);
         setModalOpen(true);
       } else {
-        setError(response.data.mensaje || 'No se pudo cargar la cancha');
+        setError(response.data.mensaje || "No se pudo cargar la cancha");
       }
     } catch (err) {
-      const errorMessage = err.response?.data?.mensaje || 'Error de conexion al servidor';
+      const errorMessage =
+        err.response?.data?.mensaje || "Error de conexion al servidor";
       setError(errorMessage);
     }
   };
@@ -237,22 +290,24 @@ const Cancha = () => {
       if (response.data.exito) {
         const c = response.data.datos.cancha;
         setFormData({
-          nombre: c.nombre || '',
-          ubicacion: c.ubicacion || '',
-          capacidad: c.capacidad || '',
-          estado: c.estado || '',
-          monto_por_hora: c.monto_por_hora || '',
-          imagen_cancha: c.imagen_cancha || '',
-          id_espacio: c.id_espacio || ''
+          nombre: c.nombre || "",
+          ubicacion: c.ubicacion || "",
+          capacidad: c.capacidad || "",
+          estado: c.estado || "",
+          monto_por_hora: c.monto_por_hora || "",
+          imagen_cancha: c.imagen_cancha || "",
+          id_espacio: c.id_espacio || "",
         });
         setImagePreview(c.imagen_cancha ? getImageUrl(c.imagen_cancha) : null);
         setSelectedFile(null);
         if (Array.isArray(c.disciplinas)) {
-          setDisciplinasSeleccionadas(c.disciplinas.map(d => ({
-            id_disciplina: d.id_disciplina,
-            nombre: d.nombre,
-            frecuencia_practica: d.frecuencia_practica || 'Regular'
-          })));
+          setDisciplinasSeleccionadas(
+            c.disciplinas.map((d) => ({
+              id_disciplina: d.id_disciplina,
+              nombre: d.nombre,
+              frecuencia_practica: d.frecuencia_practica || "Regular",
+            }))
+          );
         } else {
           setDisciplinasSeleccionadas([]);
         }
@@ -261,10 +316,11 @@ const Cancha = () => {
         setViewMode(true);
         setModalOpen(true);
       } else {
-        setError(response.data.mensaje || 'No se pudo cargar la cancha');
+        setError(response.data.mensaje || "No se pudo cargar la cancha");
       }
     } catch (err) {
-      const errorMessage = err.response?.data?.mensaje || 'Error de conexion al servidor';
+      const errorMessage =
+        err.response?.data?.mensaje || "Error de conexion al servidor";
       setError(errorMessage);
     }
   };
@@ -281,7 +337,7 @@ const Cancha = () => {
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleFileChange = (e) => {
@@ -294,51 +350,102 @@ const Cancha = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (viewMode || (!permissions.canCreate && !editMode) || (!permissions.canEdit && editMode)) return;
+    if (
+      viewMode ||
+      (!permissions.canCreate && !editMode) ||
+      (!permissions.canEdit && editMode)
+    )
+      return;
     try {
       let response;
       const data = new FormData();
       const filteredData = Object.fromEntries(
         Object.entries(formData).filter(([key, value]) => {
-          const required = ['nombre', 'id_espacio'];
+          const required = ["nombre", "id_espacio"];
           if (required.includes(key)) return true;
-          return value !== '' && value !== null && value !== undefined;
+          return value !== "" && value !== null && value !== undefined;
         })
       );
       Object.entries(filteredData).forEach(([key, value]) => {
-        if (key !== 'imagen_cancha') data.append(key, value);
+        if (key !== "imagen_cancha") data.append(key, value);
       });
-      if (selectedFile) data.append('imagen_cancha', selectedFile);
+      if (selectedFile) data.append("imagen_cancha", selectedFile);
 
-      if (filteredData.nombre && filteredData.nombre.length > 100) { setError('El nombre no debe exceder 100 caracteres'); return; }
-      if (filteredData.ubicacion && filteredData.ubicacion.length > 255) { setError('La ubicacion no debe exceder 255 caracteres'); return; }
-      if (filteredData.capacidad && (isNaN(filteredData.capacidad) || Number(filteredData.capacidad) < 0)) { setError('La capacidad debe ser un numero positivo'); return; }
-      const estadosValidos = ['disponible','ocupada','mantenimiento'];
-      if (filteredData.estado && !estadosValidos.includes(String(filteredData.estado))) { setError('Estado invalido'); return; }
-      if (filteredData.monto_por_hora && (isNaN(filteredData.monto_por_hora) || Number(filteredData.monto_por_hora) < 0)) { setError('El monto por hora debe ser un numero positivo'); return; }
-      if (filteredData.id_espacio && !espacios.some(e => e.id_espacio === parseInt(filteredData.id_espacio))) { setError('El espacio deportivo seleccionado no es valido'); return; }
+      if (filteredData.nombre && filteredData.nombre.length > 100) {
+        setError("El nombre no debe exceder 100 caracteres");
+        return;
+      }
+      if (filteredData.ubicacion && filteredData.ubicacion.length > 255) {
+        setError("La ubicacion no debe exceder 255 caracteres");
+        return;
+      }
+      if (
+        filteredData.capacidad &&
+        (isNaN(filteredData.capacidad) || Number(filteredData.capacidad) < 0)
+      ) {
+        setError("La capacidad debe ser un numero positivo");
+        return;
+      }
+      const estadosValidos = ["disponible", "ocupada", "mantenimiento"];
+      if (
+        filteredData.estado &&
+        !estadosValidos.includes(String(filteredData.estado))
+      ) {
+        setError("Estado invalido");
+        return;
+      }
+      if (
+        filteredData.monto_por_hora &&
+        (isNaN(filteredData.monto_por_hora) ||
+          Number(filteredData.monto_por_hora) < 0)
+      ) {
+        setError("El monto por hora debe ser un numero positivo");
+        return;
+      }
+      if (
+        filteredData.id_espacio &&
+        !espacios.some(
+          (e) => e.id_espacio === parseInt(filteredData.id_espacio)
+        )
+      ) {
+        setError("El espacio deportivo seleccionado no es valido");
+        return;
+      }
 
-      const config = { headers: { 'Content-Type': 'multipart/form-data' } };
+      const config = { headers: { "Content-Type": "multipart/form-data" } };
 
       if (editMode) {
-        response = await api.patch(`/cancha/${currentCancha.id_cancha}`, data, config);
+        response = await api.patch(
+          `/cancha/${currentCancha.id_cancha}`,
+          data,
+          config
+        );
         if (response.data.exito) {
-          await api.post(`/cancha/${currentCancha.id_cancha}/disciplinas`, { disciplinas: disciplinasSeleccionadas });
+          await api.post(`/cancha/${currentCancha.id_cancha}/disciplinas`, {
+            disciplinas: disciplinasSeleccionadas,
+          });
         }
       } else {
-        response = await api.post('/cancha/', data, config);
+        response = await api.post("/cancha/", data, config);
         if (response.data.exito) {
           const nuevaId = response.data?.datos?.cancha?.id_cancha;
           if (nuevaId) {
-            await api.post(`/cancha/${nuevaId}/disciplinas`, { disciplinas: disciplinasSeleccionadas });
+            await api.post(`/cancha/${nuevaId}/disciplinas`, {
+              disciplinas: disciplinasSeleccionadas,
+            });
           }
         }
       }
 
-      if (response.data.exito) { closeModal(); fetchCanchas(); }
-      else setError(response.data.mensaje || 'No se pudo guardar');
+      if (response.data.exito) {
+        closeModal();
+        fetchCanchas();
+      } else setError(response.data.mensaje || "No se pudo guardar");
     } catch (err) {
-      const errorMessage = err.response?.data?.mensaje || err.message || 'Error de conexion al servidor';
+      const errorMessage =
+        err.response?.data?.mensaje ||
+        err.message ||
+        "Error de conexion al servidor";
       setError(errorMessage);
     }
   };
@@ -349,26 +456,40 @@ const Cancha = () => {
 
   const handleDisciplinaChange = (e) => {
     const selectedId = parseInt(e.target.value);
-    if (selectedId && !disciplinasSeleccionadas.some(d => d.id_disciplina === selectedId)) {
-      const disciplina = disciplinas.find(d => d.id_disciplina === selectedId);
+    if (
+      selectedId &&
+      !disciplinasSeleccionadas.some((d) => d.id_disciplina === selectedId)
+    ) {
+      const disciplina = disciplinas.find(
+        (d) => d.id_disciplina === selectedId
+      );
       if (disciplina) {
-        setDisciplinasSeleccionadas(prev => [...prev, {
-          id_disciplina: disciplina.id_disciplina,
-          nombre: disciplina.nombre,
-          frecuencia_practica: 'Regular'
-        }]);
+        setDisciplinasSeleccionadas((prev) => [
+          ...prev,
+          {
+            id_disciplina: disciplina.id_disciplina,
+            nombre: disciplina.nombre,
+            frecuencia_practica: "Regular",
+          },
+        ]);
       }
     }
   };
 
   const handleFrecuenciaChange = (id_disciplina, frecuencia) => {
-    setDisciplinasSeleccionadas(prev =>
-      prev.map(d => d.id_disciplina === id_disciplina ? { ...d, frecuencia_practica: frecuencia } : d)
+    setDisciplinasSeleccionadas((prev) =>
+      prev.map((d) =>
+        d.id_disciplina === id_disciplina
+          ? { ...d, frecuencia_practica: frecuencia }
+          : d
+      )
     );
   };
 
   const handleRemoveDisciplina = (id_disciplina) => {
-    setDisciplinasSeleccionadas(prev => prev.filter(d => d.id_disciplina !== id_disciplina));
+    setDisciplinasSeleccionadas((prev) =>
+      prev.filter((d) => d.id_disciplina !== id_disciplina)
+    );
   };
 
   if (!role) return <p>Cargando permisos...</p>;
@@ -444,12 +565,18 @@ const Cancha = () => {
               <tbody>
                 {canchas.map((cancha, index) => (
                   <tr key={cancha.id_cancha} className="border-t">
-                    <td className="px-4 py-2">{(page - 1) * limit + index + 1}</td>
+                    <td className="px-4 py-2">
+                      {(page - 1) * limit + index + 1}
+                    </td>
                     <td className="px-4 py-2">{cancha.nombre}</td>
-                    <td className="px-4 py-2">{cancha.ubicacion || '-'}</td>
-                    <td className="px-4 py-2">{cancha.capacidad || '-'}</td>
-                    <td className="px-4 py-2">{cancha.estado || '-'}</td>
-                    <td className="px-4 py-2">{cancha.monto_por_hora ? `$${cancha.monto_por_hora}` : '-'}</td>
+                    <td className="px-4 py-2">{cancha.ubicacion || "-"}</td>
+                    <td className="px-4 py-2">{cancha.capacidad || "-"}</td>
+                    <td className="px-4 py-2">{cancha.estado || "-"}</td>
+                    <td className="px-4 py-2">
+                      {cancha.monto_por_hora
+                        ? `$${cancha.monto_por_hora}`
+                        : "-"}
+                    </td>
                     <td className="px-4 py-2 flex gap-2">
                       {permissions.canView && (
                         <button
@@ -508,7 +635,11 @@ const Cancha = () => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-8 max-w-2xl w-full max-h-[80vh] overflow-y-auto">
             <h3 className="text-xl font-semibold mb-4">
-              {viewMode ? 'Ver Datos de Cancha' : editMode ? 'Editar Cancha' : 'Crear Cancha'}
+              {viewMode
+                ? "Ver Datos de Cancha"
+                : editMode
+                ? "Editar Cancha"
+                : "Crear Cancha"}
             </h3>
             <form onSubmit={handleSubmit} className="grid grid-cols-2 gap-4">
               <div>
@@ -523,7 +654,9 @@ const Cancha = () => {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Ubicacion</label>
+                <label className="block text-sm font-medium mb-1">
+                  Ubicacion
+                </label>
                 <input
                   name="ubicacion"
                   value={formData.ubicacion}
@@ -533,7 +666,9 @@ const Cancha = () => {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Capacidad</label>
+                <label className="block text-sm font-medium mb-1">
+                  Capacidad
+                </label>
                 <input
                   name="capacidad"
                   value={formData.capacidad}
@@ -560,7 +695,9 @@ const Cancha = () => {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Monto por hora</label>
+                <label className="block text-sm font-medium mb-1">
+                  Monto por hora
+                </label>
                 <input
                   name="monto_por_hora"
                   value={formData.monto_por_hora}
@@ -573,10 +710,12 @@ const Cancha = () => {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Imagen cancha</label>
+                <label className="block text-sm font-medium mb-1">
+                  Imagen cancha
+                </label>
                 {imagePreview ? (
                   <img
-                    src={imagePreview}
+                    src={getImageUrl(imagePreview)}
                     alt="Imagen Cancha"
                     className="w-32 h-32 object-cover rounded mb-2"
                   />
@@ -593,7 +732,9 @@ const Cancha = () => {
                 )}
               </div>
               <div className="col-span-2">
-                <label className="block text-sm font-medium mb-1">Espacio deportivo</label>
+                <label className="block text-sm font-medium mb-1">
+                  Espacio deportivo
+                </label>
                 <select
                   name="id_espacio"
                   value={formData.id_espacio}
@@ -603,7 +744,7 @@ const Cancha = () => {
                   disabled={viewMode}
                 >
                   <option value="">Seleccione un espacio deportivo</option>
-                  {espacios.map(espacio => (
+                  {espacios.map((espacio) => (
                     <option key={espacio.id_espacio} value={espacio.id_espacio}>
                       {espacio.nombre}
                     </option>
@@ -612,17 +753,24 @@ const Cancha = () => {
               </div>
 
               <div className="col-span-2">
-                <label className="block text-sm font-medium mb-1">Disciplinas</label>
+                <label className="block text-sm font-medium mb-1">
+                  Disciplinas
+                </label>
                 {viewMode ? (
                   <div className="space-y-2 max-h-40 overflow-y-auto">
-                    {disciplinasSeleccionadas.map(d => (
-                      <div key={d.id_disciplina} className="flex items-center justify-between p-2 border rounded">
+                    {disciplinasSeleccionadas.map((d) => (
+                      <div
+                        key={d.id_disciplina}
+                        className="flex items-center justify-between p-2 border rounded"
+                      >
                         <span className="flex-1">{d.nombre}</span>
                         <span>{d.frecuencia_practica}</span>
                       </div>
                     ))}
                     {disciplinasSeleccionadas.length === 0 && (
-                      <p className="text-gray-500 text-sm text-center py-2">No hay disciplinas seleccionadas</p>
+                      <p className="text-gray-500 text-sm text-center py-2">
+                        No hay disciplinas seleccionadas
+                      </p>
                     )}
                   </div>
                 ) : (
@@ -633,23 +781,37 @@ const Cancha = () => {
                       value=""
                       disabled={viewMode}
                     >
-                      <option value="">Seleccione una disciplina para agregar</option>
+                      <option value="">
+                        Seleccione una disciplina para agregar
+                      </option>
                       {disciplinas
-                        .filter(d => !disciplinasSeleccionadas.some(s => s.id_disciplina === d.id_disciplina))
-                        .map(d => (
+                        .filter(
+                          (d) =>
+                            !disciplinasSeleccionadas.some(
+                              (s) => s.id_disciplina === d.id_disciplina
+                            )
+                        )
+                        .map((d) => (
                           <option key={d.id_disciplina} value={d.id_disciplina}>
                             {d.nombre}
                           </option>
-                        ))
-                      }
+                        ))}
                     </select>
                     <div className="space-y-2 max-h-40 overflow-y-auto">
-                      {disciplinasSeleccionadas.map(d => (
-                        <div key={d.id_disciplina} className="flex items-center justify-between p-2 border rounded">
+                      {disciplinasSeleccionadas.map((d) => (
+                        <div
+                          key={d.id_disciplina}
+                          className="flex items-center justify-between p-2 border rounded"
+                        >
                           <span className="flex-1">{d.nombre}</span>
                           <select
                             value={d.frecuencia_practica}
-                            onChange={(e) => handleFrecuenciaChange(d.id_disciplina, e.target.value)}
+                            onChange={(e) =>
+                              handleFrecuenciaChange(
+                                d.id_disciplina,
+                                e.target.value
+                              )
+                            }
                             className="border rounded px-2 py-1 mx-2"
                             disabled={viewMode}
                           >
@@ -660,7 +822,9 @@ const Cancha = () => {
                           </select>
                           <button
                             type="button"
-                            onClick={() => handleRemoveDisciplina(d.id_disciplina)}
+                            onClick={() =>
+                              handleRemoveDisciplina(d.id_disciplina)
+                            }
                             className="text-red-500 hover:text-red-700 ml-2"
                             disabled={viewMode}
                           >
@@ -669,7 +833,9 @@ const Cancha = () => {
                         </div>
                       ))}
                       {disciplinasSeleccionadas.length === 0 && (
-                        <p className="text-gray-500 text-sm text-center py-2">No hay disciplinas seleccionadas</p>
+                        <p className="text-gray-500 text-sm text-center py-2">
+                          No hay disciplinas seleccionadas
+                        </p>
                       )}
                     </div>
                   </div>
@@ -689,7 +855,7 @@ const Cancha = () => {
                     type="submit"
                     className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
                   >
-                    {editMode ? 'Actualizar' : 'Crear'}
+                    {editMode ? "Actualizar" : "Crear"}
                   </button>
                 )}
               </div>
