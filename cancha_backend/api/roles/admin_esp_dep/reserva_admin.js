@@ -212,16 +212,42 @@ const buscarReservas = async (id_admin_esp_dep, texto, limite = 10, offset = 0, 
 const obtenerReservaPorId = async (id_reserva, id_admin_esp_dep) => {
   try {
     const query = `
-      SELECT r.*, 
-             c.id_cliente, u.nombre AS cliente_nombre, u.apellido AS cliente_apellido, u.correo AS cliente_correo,
-             ca.id_cancha, ca.nombre AS cancha_nombre,
-             e.id_espacio, e.nombre AS espacio_nombre
+      SELECT
+        r.*,
+        c.id_cliente,
+        u.nombre AS cliente_nombre,
+        u.apellido AS cliente_apellido,
+        u.correo AS cliente_correo,
+        ca.id_cancha,
+        ca.nombre AS cancha_nombre,
+        e.id_espacio,
+        e.nombre AS espacio_nombre,
+        qr.id_qr,
+        qr.codigo_qr,
+        qr.qr_url_imagen,
+        qr.estado AS qr_estado,
+        qr.fecha_generado,
+        qr.fecha_expira
       FROM reserva r
       JOIN cliente c ON r.id_cliente = c.id_cliente
       JOIN usuario u ON c.id_cliente = u.id_persona
       JOIN cancha ca ON r.id_cancha = ca.id_cancha
       JOIN espacio_deportivo e ON ca.id_espacio = e.id_espacio
-      WHERE r.id_reserva = $1 AND e.id_admin_esp_dep = $2
+      LEFT JOIN LATERAL (
+        SELECT
+          id_qr,
+          codigo_qr,
+          qr_url_imagen,
+          estado,
+          fecha_generado,
+          fecha_expira
+        FROM qr_reserva
+        WHERE id_reserva = r.id_reserva
+        ORDER BY fecha_generado DESC
+        LIMIT 1
+      ) qr ON true
+      WHERE r.id_reserva = $1
+        AND e.id_admin_esp_dep = $2
     `;
     const result = await pool.query(query, [id_reserva, id_admin_esp_dep]);
     return result.rows[0] || null;

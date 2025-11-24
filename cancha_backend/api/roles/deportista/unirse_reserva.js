@@ -94,6 +94,100 @@ const obtenerParticipanteEnReserva = async (idReserva, idPersona) => {
   return result.rows[0] || null;
 };
 
+/**
+ * NUEVO: listar deportistas de una reserva con paginacion
+ * GET /unirse-reserva/deportistas?id_reserva=...&limit=...&offset=...
+ */
+const listarDeportistasReservaController = async (req, res) => {
+  try {
+    const idReservaRaw = req.query.id_reserva;
+    const limitRaw = req.query.limit;
+    const offsetRaw = req.query.offset;
+
+    const idReserva = idReservaRaw ? parseInt(idReservaRaw, 10) : NaN;
+    const limit = limitRaw ? parseInt(limitRaw, 10) : 10;
+    const offset = offsetRaw ? parseInt(offsetRaw, 10) : 0;
+
+    if (!idReserva || isNaN(idReserva)) {
+      return res
+        .status(400)
+        .json(respuesta(false, "id_reserva no valido o no proporcionado"));
+    }
+
+    const queryReserva = `
+      SELECT cupo
+      FROM reserva
+      WHERE id_reserva = $1
+      LIMIT 1
+    `;
+    const resultReserva = await pool.query(queryReserva, [idReserva]);
+    const reservaRow = resultReserva.rows[0];
+
+    if (!reservaRow) {
+      return res
+        .status(404)
+        .json(respuesta(false, "No se encontro la reserva"));
+    }
+
+    const cupoTotalRaw = Number(reservaRow.cupo);
+    const cupoTotal = !Number.isNaN(cupoTotalRaw) && cupoTotalRaw > 0 ? cupoTotalRaw : 0;
+    const cupoMaxDeportistas =
+      !Number.isNaN(cupoTotalRaw) && cupoTotalRaw > 1 ? cupoTotalRaw - 1 : 0;
+
+    const queryTotal = `
+      SELECT COUNT(*) AS total
+      FROM reserva_deportista rd
+      WHERE rd.id_reserva = $1
+        AND rd.estado = 'activo'
+    `;
+    const resultTotal = await pool.query(queryTotal, [idReserva]);
+    const total = parseInt(resultTotal.rows[0].total, 10) || 0;
+
+    const queryLista = `
+      SELECT 
+        rd.id_reserva_deportista,
+        rd.id_persona,
+        rd.fecha_union,
+        rd.estado,
+        u.nombre,
+        u.apellido
+      FROM reserva_deportista rd
+      JOIN usuario u ON rd.id_persona = u.id_persona
+      WHERE rd.id_reserva = $1
+        AND rd.estado = 'activo'
+      ORDER BY rd.fecha_union ASC, rd.id_reserva_deportista ASC
+      LIMIT $2 OFFSET $3
+    `;
+    const resultLista = await pool.query(queryLista, [idReserva, limit, offset]);
+    const deportistas = resultLista.rows || [];
+
+    return res.json(
+      respuesta(true, "Deportistas obtenidos", {
+        deportistas,
+        paginacion: {
+          total,
+          limit,
+          offset
+        },
+        cupo_total: cupoTotal,
+        cupo_ocupado: total,
+        cupo_max_deportistas: cupoMaxDeportistas,
+        indice_cupo: cupoTotal > 0 ? `${total}/${cupoTotal}` : `0/0`
+      })
+    );
+  } catch (error) {
+    console.error("Error en listarDeportistasReservaController:", error.message);
+    return res
+      .status(500)
+      .json(
+        respuesta(
+          false,
+          error.message || "Error al obtener los deportistas de la reserva"
+        )
+      );
+  }
+};
+
 const infoUnirseReservaController = async (req, res) => {
   try {
     const { code } = req.query;
@@ -294,6 +388,19 @@ const unirseReservaController = async (req, res) => {
       participante = insertResult.rows[0];
     }
 
+    // NUEVO: llenar participa_en por detras
+    // Se asume que id_deportista coincide con id_persona
+    const insertParticipaQuery = `
+      INSERT INTO participa_en (id_deportista, id_reserva, fecha_reserva)
+      VALUES ($1, $2, CURRENT_DATE)
+      ON CONFLICT (id_deportista, id_reserva) DO NOTHING
+    `;
+    try {
+      await pool.query(insertParticipaQuery, [idPersona, reserva.id_reserva]);
+    } catch (e) {
+      console.error("Error al insertar en participa_en:", e.message);
+    }
+
     const resultCupoFinal = await pool.query(queryCupo, [reserva.id_reserva]);
     const cupoFinal = parseInt(resultCupoFinal.rows[0].total, 10) || 0;
     const reservaFinal = {
@@ -317,6 +424,7 @@ const unirseReservaController = async (req, res) => {
 };
 
 router.get("/info", infoUnirseReservaController);
+router.get("/deportistas", listarDeportistasReservaController); // nuevo
 router.post("/", unirseReservaController);
 
 module.exports = router;

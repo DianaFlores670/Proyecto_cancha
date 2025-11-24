@@ -101,33 +101,32 @@ const buscarPagosAdmin = async (id_admin_esp_dep, texto, limite = 10, offset = 0
           u.nombre ILIKE $2 OR
           u.apellido ILIKE $2 OR
           ca.nombre ILIKE $2 OR
-          p.metodo_pago ILIKE $2
+          p.metodo_pago::text ILIKE $2
         )
       ORDER BY p.fecha_pago DESC
       LIMIT $3 OFFSET $4
     `;
 
+    const queryTotal = `
+      SELECT COUNT(*) 
+      FROM pago p
+      JOIN reserva r ON p.id_reserva = r.id_reserva
+      JOIN cancha ca ON r.id_cancha = ca.id_cancha
+      JOIN espacio_deportivo e ON ca.id_espacio = e.id_espacio
+      JOIN cliente c ON r.id_cliente = c.id_cliente
+      JOIN usuario u ON c.id_cliente = u.id_persona
+      WHERE e.id_admin_esp_dep = $1
+        AND (
+          u.nombre ILIKE $2 OR
+          u.apellido ILIKE $2 OR
+          ca.nombre ILIKE $2 OR
+          p.metodo_pago::text ILIKE $2
+        )
+    `;
+
     const [resultDatos, resultTotal] = await Promise.all([
       pool.query(query, [id_admin_esp_dep, termino, limite, offset]),
-      pool.query(
-        `
-        SELECT COUNT(*) 
-        FROM pago p
-        JOIN reserva r ON p.id_reserva = r.id_reserva
-        JOIN cancha ca ON r.id_cancha = ca.id_cancha
-        JOIN espacio_deportivo e ON ca.id_espacio = e.id_espacio
-        JOIN cliente c ON r.id_cliente = c.id_cliente
-        JOIN usuario u ON c.id_cliente = u.id_persona
-        WHERE e.id_admin_esp_dep = $1
-          AND (
-            u.nombre ILIKE $2 OR
-            u.apellido ILIKE $2 OR
-            ca.nombre ILIKE $2 OR
-            p.metodo_pago ILIKE $2
-          )
-        `,
-        [id_admin_esp_dep, termino]
-      )
+      pool.query(queryTotal, [id_admin_esp_dep, termino])
     ]);
 
     return {
@@ -195,6 +194,113 @@ const obtenerPagosFiltradosAdmin = async (id_admin_esp_dep, tipoFiltro, limite =
   }
 };
 
+const crearPago = async (input) => {
+  const client = await pool.connect();
+  try {
+    const idReserva = parseInt(input.id_reserva);
+    const montoNum = Number(input.monto);
+    const metodoPago = String(input.metodo_pago || '').trim();
+    const fechaPago = input.fecha_pago ? new Date(input.fecha_pago) : new Date();
+
+    if (!Number.isInteger(idReserva)) {
+      throw new Error('id_reserva invalido');
+    }
+    if (!Number.isFinite(montoNum) || montoNum <= 0) {
+      throw new Error('Monto invalido');
+    }
+    if (!metodoPago) {
+      throw new Error('metodo_pago requerido');
+    }
+
+    await client.query('BEGIN');
+
+    const resReserva = await client.query(
+      `
+      select id_reserva, monto_total, saldo_pendiente, estado
+      from reserva
+      where id_reserva = $1
+      for update
+      `,
+      [idReserva]
+    );
+    if (!resReserva.rows[0]) {
+      throw new Error('Reserva no encontrada');
+    }
+
+    const reserva = resReserva.rows[0];
+
+    if (reserva.estado === 'cancelada') {
+      throw new Error('No se puede registrar pago en reserva cancelada');
+    }
+    if (reserva.estado === 'pagada') {
+      throw new Error('La reserva ya esta pagada');
+    }
+
+    if (reserva.monto_total == null) {
+      throw new Error('La reserva no tiene monto_total definido');
+    }
+
+    const montoTotal = Number(reserva.monto_total || 0);
+    let saldoPendiente = reserva.saldo_pendiente != null ? Number(reserva.saldo_pendiente) : null;
+
+    if (saldoPendiente === null) {
+      const resSuma = await client.query(
+        'select coalesce(sum(monto),0) as total_pagado from pago where id_reserva = $1',
+        [idReserva]
+      );
+      const totalPagado = Number(resSuma.rows[0].total_pagado || 0);
+      saldoPendiente = montoTotal - totalPagado;
+      if (saldoPendiente < 0) {
+        saldoPendiente = 0;
+      }
+    }
+
+    if (montoNum > saldoPendiente) {
+      throw new Error('El monto supera el saldo pendiente');
+    }
+
+    const saldoNuevoRaw = saldoPendiente - montoNum;
+    const saldoNuevo = saldoNuevoRaw < 0 ? 0 : saldoNuevoRaw;
+    const estadoNuevo = saldoNuevo <= 0 ? 'pagada' : 'en_cuotas';
+
+    const resPago = await client.query(
+      `
+      insert into pago (id_reserva, monto, metodo_pago, fecha_pago)
+      values ($1, $2, $3, $4)
+      returning *
+      `,
+      [idReserva, montoNum, metodoPago, fechaPago]
+    );
+    const pago = resPago.rows[0];
+
+    await client.query(
+      `
+      update reserva
+      set saldo_pendiente = $2,
+          estado = $3
+      where id_reserva = $1
+      `,
+      [idReserva, saldoNuevo, estadoNuevo]
+    );
+
+    await client.query('COMMIT');
+
+    return {
+      pago,
+      reserva_actualizada: {
+        id_reserva: idReserva,
+        saldo_pendiente: saldoNuevo,
+        estado: estadoNuevo
+      }
+    };
+  } catch (e) {
+    await client.query('ROLLBACK');
+    throw e;
+  } finally {
+    client.release();
+  }
+};
+
 // ===================================================
 // CONTROLADORES
 // ===================================================
@@ -246,9 +352,22 @@ const obtenerPagosFiltradosAdminController = async (req, res) => {
   }
 };
 
+const crearPagoController = async (req, res) => {
+  try {
+    const { id_reserva, monto, metodo_pago, fecha_pago } = req.body;
+    const result = await crearPago({ id_reserva, monto, metodo_pago, fecha_pago });
+    res.status(201).json(
+      respuesta(true, 'Pago registrado correctamente', result)
+    );
+  } catch (e) {
+    res.status(400).json(respuesta(false, e.message));
+  }
+};
+
 // ===================================================
 // RUTAS
 // ===================================================
+router.post('/', crearPagoController);
 router.get('/datos-especificos', obtenerPagosAdminController);
 router.get('/buscar', buscarPagosAdminController);
 router.get('/filtro', obtenerPagosFiltradosAdminController);

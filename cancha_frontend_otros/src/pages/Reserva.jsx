@@ -18,22 +18,22 @@ const getEffectiveRole = () => {
     const arr = Array.isArray(u?.roles) ? u.roles : [];
     for (const r of arr) {
       if (typeof r === 'string') bag.add(r);
-      else if (r && typeof r === 'object') ['rol','role','nombre','name'].forEach(k => { if (r[k]) bag.add(r[k]); });
+      else if (r && typeof r === 'object') ['rol', 'role', 'nombre', 'name'].forEach(k => { if (r[k]) bag.add(r[k]); });
     }
     if (bag.size === 0 && u?.role) bag.add(u.role);
-  } catch {}
+  } catch { }
   const tok = localStorage.getItem('token');
   if (bag.size === 0 && tok && tok.split('.').length === 3) {
     try {
-      const payload = JSON.parse(atob(tok.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')));
+      const payload = JSON.parse(atob(tok.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
       const t = Array.isArray(payload?.roles) ? payload.roles : (payload?.rol ? [payload.rol] : []);
       t.forEach(v => bag.add(v));
-    } catch {}
+    } catch { }
   }
-  const norm = Array.from(bag).map(v => String(v || '').trim().toUpperCase().replace(/\s+/g,'_'));
+  const norm = Array.from(bag).map(v => String(v || '').trim().toUpperCase().replace(/\s+/g, '_'));
   const map = v => v === 'ADMIN' ? 'ADMINISTRADOR' : v;
   const norm2 = norm.map(map);
-  const prio = ['ADMINISTRADOR','ADMIN_ESP_DEP','CONTROL','ENCARGADO'];
+  const prio = ['ADMINISTRADOR', 'ADMIN_ESP_DEP', 'CONTROL', 'ENCARGADO'];
   return prio.find(r => norm2.includes(r) && keys.includes(r)) || norm2.find(r => keys.includes(r)) || 'DEFAULT';
 };
 
@@ -81,28 +81,28 @@ const Reserva = () => {
 
   useEffect(() => {
     const fetchClientes = async () => {
-  try {
-    const response = await api.get('/cliente/datos-especificos', {
-      params: { limit: 1000, offset: 0 }
-    });
-    if (response.data?.exito) setClientes(response.data.datos.clientes || []);
-    else setError(response.data?.mensaje || 'Error al obtener clientes');
-  } catch (err) {
-    setError(err.response?.data?.mensaje || 'Error de conexion al obtener clientes');
-  }
-};
+      try {
+        const response = await api.get('/cliente/datos-especificos', {
+          params: { limit: 1000, offset: 0 }
+        });
+        if (response.data?.exito) setClientes(response.data.datos.clientes || []);
+        else setError(response.data?.mensaje || 'Error al obtener clientes');
+      } catch (err) {
+        setError(err.response?.data?.mensaje || 'Error de conexion al obtener clientes');
+      }
+    };
 
     const fetchCanchas = async () => {
-  try {
-    const response = await api.get('/cancha/datos-especificos', {
-      params: { limit: 1000, offset: 0 }
-    });
-    if (response.data?.exito) setCanchas(response.data.datos.canchas || []);
-    else setError(response.data?.mensaje || 'Error al obtener canchas');
-  } catch (err) {
-    setError(err.response?.data?.mensaje || 'Error de conexion al obtener canchas');
-  }
-};
+      try {
+        const response = await api.get('/cancha/datos-especificos', {
+          params: { limit: 1000, offset: 0 }
+        });
+        if (response.data?.exito) setCanchas(response.data.datos.canchas || []);
+        else setError(response.data?.mensaje || 'Error al obtener canchas');
+      } catch (err) {
+        setError(err.response?.data?.mensaje || 'Error de conexion al obtener canchas');
+      }
+    };
 
     if (permissions.canView) {
       fetchClientes();
@@ -268,7 +268,7 @@ const Reserva = () => {
       if (filtered.monto_total && (isNaN(filtered.monto_total) || filtered.monto_total < 0)) { setError('El monto total debe ser numero no negativo'); return; }
       if (filtered.saldo_pendiente && (isNaN(filtered.saldo_pendiente) || filtered.saldo_pendiente < 0)) { setError('El saldo pendiente debe ser numero no negativo'); return; }
       if (filtered.monto_total && filtered.saldo_pendiente && filtered.saldo_pendiente > filtered.monto_total) { setError('El saldo pendiente no puede ser mayor al monto total'); return; }
-      const estadosValidos = ['pendiente','pagada','en_cuotas','cancelada'];
+      const estadosValidos = ['pendiente', 'pagada', 'en_cuotas', 'cancelada'];
       if (!estadosValidos.includes(filtered.estado)) { setError('Estado invalido'); return; }
       if (!filtered.id_cliente || !clientes.some(c => c.id_cliente === filtered.id_cliente)) { setError('Cliente invalido'); return; }
       if (!filtered.id_cancha || !canchas.some(ca => ca.id_cancha === filtered.id_cancha)) { setError('Cancha invalida'); return; }
@@ -305,8 +305,8 @@ const Reserva = () => {
               className="border rounded-l px-3 py-2 w-full text-sm"
               disabled={!permissions.canView}
             />
-            <button 
-              type="submit" 
+            <button
+              type="submit"
               className="bg-blue-500 text-white px-3 py-2 rounded-r hover:bg-blue-600 whitespace-nowrap text-sm"
               disabled={!permissions.canView}
             >

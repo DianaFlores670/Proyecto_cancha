@@ -8,7 +8,7 @@ const getImageUrl = (path) => {
   return `${base}/${clean}`;
 };
 
-const Espacio_DeportivoEncargado = () => {
+const Espacio_DeportivoControl = () => {
   const [espacios, setEspacios] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -32,15 +32,15 @@ const Espacio_DeportivoEncargado = () => {
       let resp;
 
       if (params.q) {
-        resp = await api.get("/espacio-encargado/buscar", {
+        resp = await api.get("/espacio-control/buscar", {
           params: { limit, offset, q: params.q },
         });
       } else if (params.tipo) {
-        resp = await api.get("/espacio-encargado/filtro", {
+        resp = await api.get("/espacio-control/filtro", {
           params: { limit, offset, tipo: params.tipo },
         });
       } else {
-        resp = await api.get("/espacio-encargado/datos-especificos", {
+        resp = await api.get("/espacio-control/datos-especificos", {
           params: { limit, offset },
         });
       }
@@ -81,7 +81,7 @@ const Espacio_DeportivoEncargado = () => {
 
   const openViewModal = async (id) => {
     try {
-      const r = await api.get(`/espacio-encargado/dato-individual/${id}`);
+      const r = await api.get(`/espacio-control/dato-individual/${id}`);
       if (!r.data?.exito) {
         setError(r.data?.mensaje || "No se pudo cargar");
         return;
@@ -104,9 +104,8 @@ const Espacio_DeportivoEncargado = () => {
 
   return (
     <div className="bg-white rounded-lg shadow p-6">
-      <h2 className="text-xl font-semibold mb-4">Mis Espacios Deportivos</h2>
+      <h2 className="text-xl font-semibold mb-4">Espacios deportivos asignados</h2>
 
-      {/* Busqueda + Filtro */}
       <div className="flex flex-col xl:flex-row gap-4 mb-6 items-stretch">
         <div className="flex-1">
           <form onSubmit={handleSearch} className="flex h-full">
@@ -139,7 +138,6 @@ const Espacio_DeportivoEncargado = () => {
         </div>
       </div>
 
-      {/* Tabla */}
       {loading ? (
         <p>Cargando espacios...</p>
       ) : error ? (
@@ -172,7 +170,6 @@ const Espacio_DeportivoEncargado = () => {
                         ? `${e.admin_nombre || ""} ${e.admin_apellido || ""}`
                         : "Sin admin"}
                     </td>
-
                     <td className="px-4 py-2">
                       <button
                         onClick={() => openViewModal(e.id_espacio)}
@@ -187,7 +184,6 @@ const Espacio_DeportivoEncargado = () => {
             </table>
           </div>
 
-          {/* Paginacion */}
           <div className="flex justify-center mt-4">
             <button
               onClick={() => handlePageChange(page - 1)}
@@ -198,12 +194,12 @@ const Espacio_DeportivoEncargado = () => {
             </button>
 
             <span className="px-4 py-2 bg-gray-100">
-              Pagina {page} de {Math.ceil(total / limit)}
+              Pagina {page} de {Math.ceil(total / limit) || 1}
             </span>
 
             <button
               onClick={() => handlePageChange(page + 1)}
-              disabled={page === Math.ceil(total / limit)}
+              disabled={page === Math.ceil(total / limit) || total === 0}
               className="bg-gray-300 text-gray-800 px-4 py-2 rounded-r hover:bg-gray-400 disabled:opacity-50"
             >
               Siguiente
@@ -212,151 +208,149 @@ const Espacio_DeportivoEncargado = () => {
         </>
       )}
 
-      {/* Modal de Vista */}
       {modalOpen && currentEspacio && (
-  <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-    <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full mx-4 p-6 md:p-8 max-h-[85vh] overflow-y-auto">
-      <div className="flex items-start justify-between gap-4 mb-6">
-        <div>
-          <p className="text-[11px] uppercase tracking-[0.14em] text-gray-400">
-            Espacio deportivo
-          </p>
-          <h3 className="text-xl md:text-2xl font-semibold text-gray-900">
-            Datos del espacio
-          </h3>
-          <p className="text-xs text-gray-500 mt-1">
-            Administrado por {currentEspacio.admin_nombre || ""}{" "}
-            {currentEspacio.admin_apellido || ""}
-          </p>
-        </div>
-
-        <div className="text-right">
-          <p className="text-[11px] text-gray-400">Horario</p>
-          <p className="text-xs font-medium text-gray-700">
-            {currentEspacio.horario_apertura || "--:--"} h -{" "}
-            {currentEspacio.horario_cierre || "--:--"} h
-          </p>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm mb-6">
-        <div className="space-y-1">
-          <p className="text-[11px] text-gray-500">Nombre</p>
-          <p className="font-medium text-gray-900">
-            {currentEspacio.nombre}
-          </p>
-        </div>
-
-        <div className="space-y-1">
-          <p className="text-[11px] text-gray-500">Direccion</p>
-          <p className="font-medium text-gray-900">
-            {currentEspacio.direccion || "-"}
-          </p>
-        </div>
-
-        <div className="space-y-1 md:col-span-2">
-          <p className="text-[11px] text-gray-500">Descripcion</p>
-          <p className="text-sm text-gray-800 leading-snug">
-            {currentEspacio.descripcion || "Sin descripcion registrada."}
-          </p>
-        </div>
-
-        <div className="space-y-1">
-          <p className="text-[11px] text-gray-500">Latitud</p>
-          <p className="font-mono text-gray-900">
-            {currentEspacio.latitud || "-"}
-          </p>
-        </div>
-
-        <div className="space-y-1">
-          <p className="text-[11px] text-gray-500">Longitud</p>
-          <p className="font-mono text-gray-900">
-            {currentEspacio.longitud || "-"}
-          </p>
-        </div>
-
-        <div className="space-y-1 md:col-span-2 mt-2 rounded-xl border border-gray-100 bg-gray-50 px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-          <div>
-            <p className="text-[11px] text-gray-500">Administrador</p>
-            <p className="font-medium text-gray-900">
-              {(currentEspacio.admin_nombre || "") +
-                " " +
-                (currentEspacio.admin_apellido || "")}
-            </p>
-          </div>
-          <div className="sm:text-right">
-            <p className="text-[11px] text-gray-500">Correo admin</p>
-            <p className="text-sm text-gray-800">
-              {currentEspacio.admin_correo || "-"}
-            </p>
-          </div>
-        </div>
-      </div>
-
-      <div className="mt-4">
-        <div className="flex items-center justify-between mb-3">
-          <h4 className="text-sm font-semibold text-gray-900">
-            Imagenes del espacio
-          </h4>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {currentEspacio.imagen_principal && (
-            <div className="relative overflow-hidden rounded-xl border border-gray-200">
-              <img
-                src={getImageUrl(currentEspacio.imagen_principal)}
-                alt="espacio_principal"
-                className="w-full h-48 object-cover"
-              />
-              <span className="absolute top-2 left-2 px-2 py-1 rounded-full bg-black/60 text-[10px] text-white font-medium">
-                Principal
-              </span>
-            </div>
-          )}
-
-          {[1, 2, 3, 4].map((i) => {
-            const key = `imagen_sec_${i}`;
-            if (!currentEspacio[key]) return null;
-            return (
-              <div
-                key={key}
-                className="relative overflow-hidden rounded-xl border border-gray-200"
-              >
-                <img
-                  src={getImageUrl(currentEspacio[key])}
-                  alt={key}
-                  className="w-full h-40 object-cover"
-                />
-                <span className="absolute top-2 left-2 px-2 py-1 rounded-full bg-black/55 text-[10px] text-white font-medium">
-                  Extra {i}
-                </span>
+        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full mx-4 p-6 md:p-8 max-h-[85vh] overflow-y-auto">
+            <div className="flex items-start justify-between gap-4 mb-6">
+              <div>
+                <p className="text-[11px] uppercase tracking-[0.14em] text-gray-400">
+                  Espacio deportivo
+                </p>
+                <h3 className="text-xl md:text-2xl font-semibold text-gray-900">
+                  Datos del espacio
+                </h3>
+                <p className="text-xs text-gray-500 mt-1">
+                  Administrado por {currentEspacio.admin_nombre || ""}{" "}
+                  {currentEspacio.admin_apellido || ""}
+                </p>
               </div>
-            );
-          })}
+
+              <div className="text-right">
+                <p className="text-[11px] text-gray-400">Horario</p>
+                <p className="text-xs font-medium text-gray-700">
+                  {currentEspacio.horario_apertura || "--:--"} h -{" "}
+                  {currentEspacio.horario_cierre || "--:--"} h
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm mb-6">
+              <div className="space-y-1">
+                <p className="text-[11px] text-gray-500">Nombre</p>
+                <p className="font-medium text-gray-900">
+                  {currentEspacio.nombre}
+                </p>
+              </div>
+
+              <div className="space-y-1">
+                <p className="text-[11px] text-gray-500">Direccion</p>
+                <p className="font-medium text-gray-900">
+                  {currentEspacio.direccion || "-"}
+                </p>
+              </div>
+
+              <div className="space-y-1 md:col-span-2">
+                <p className="text-[11px] text-gray-500">Descripcion</p>
+                <p className="text-sm text-gray-800 leading-snug">
+                  {currentEspacio.descripcion || "Sin descripcion registrada."}
+                </p>
+              </div>
+
+              <div className="space-y-1">
+                <p className="text-[11px] text-gray-500">Latitud</p>
+                <p className="font-mono text-gray-900">
+                  {currentEspacio.latitud || "-"}
+                </p>
+              </div>
+
+              <div className="space-y-1">
+                <p className="text-[11px] text-gray-500">Longitud</p>
+                <p className="font-mono text-gray-900">
+                  {currentEspacio.longitud || "-"}
+                </p>
+              </div>
+
+              <div className="space-y-1 md:col-span-2 mt-2 rounded-xl border border-gray-100 bg-gray-50 px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                <div>
+                  <p className="text-[11px] text-gray-500">Administrador</p>
+                  <p className="font-medium text-gray-900">
+                    {(currentEspacio.admin_nombre || "") +
+                      " " +
+                      (currentEspacio.admin_apellido || "")}
+                  </p>
+                </div>
+                <div className="sm:text-right">
+                  <p className="text-[11px] text-gray-500">Correo admin</p>
+                  <p className="text-sm text-gray-800">
+                    {currentEspacio.admin_correo || "-"}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-4">
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="text-sm font-semibold text-gray-900">
+                  Imagenes del espacio
+                </h4>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {currentEspacio.imagen_principal && (
+                  <div className="relative overflow-hidden rounded-xl border border-gray-200">
+                    <img
+                      src={getImageUrl(currentEspacio.imagen_principal)}
+                      alt="espacio_principal"
+                      className="w-full h-48 object-cover"
+                    />
+                    <span className="absolute top-2 left-2 px-2 py-1 rounded-full bg-black/60 text-[10px] text-white font-medium">
+                      Principal
+                    </span>
+                  </div>
+                )}
+
+                {[1, 2, 3, 4].map((i) => {
+                  const key = `imagen_sec_${i}`;
+                  if (!currentEspacio[key]) return null;
+                  return (
+                    <div
+                      key={key}
+                      className="relative overflow-hidden rounded-xl border border-gray-200"
+                    >
+                      <img
+                        src={getImageUrl(currentEspacio[key])}
+                        alt={key}
+                        className="w-full h-40 object-cover"
+                      />
+                      <span className="absolute top-2 left-2 px-2 py-1 rounded-full bg-black/55 text-[10px] text-white font-medium">
+                        Extra {i}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {!currentEspacio.imagen_principal &&
+                ![1, 2, 3, 4].some((i) => currentEspacio[`imagen_sec_${i}`]) && (
+                  <p className="text-xs text-gray-500 mt-2">
+                    Este espacio no tiene imagenes registradas.
+                  </p>
+                )}
+            </div>
+
+            <div className="flex justify-end mt-6">
+              <button
+                onClick={closeModal}
+                className="px-5 py-2.5 rounded-lg bg-gray-800 text-white text-sm font-semibold hover:bg-gray-900 transition-colors"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
         </div>
-
-        {!currentEspacio.imagen_principal &&
-          ![1, 2, 3, 4].some((i) => currentEspacio[`imagen_sec_${i}`]) && (
-            <p className="text-xs text-gray-500 mt-2">
-              Este espacio no tiene imagenes registradas.
-            </p>
-          )}
-      </div>
-
-      <div className="flex justify-end mt-6">
-        <button
-          onClick={closeModal}
-          className="px-5 py-2.5 rounded-lg bg-gray-800 text-white text-sm font-semibold hover:bg-gray-900 transition-colors"
-        >
-          Cerrar
-        </button>
-      </div>
-    </div>
-  </div>
-)}
-
+      )}
     </div>
   );
 };
 
-export default Espacio_DeportivoEncargado;
+export default Espacio_DeportivoControl;

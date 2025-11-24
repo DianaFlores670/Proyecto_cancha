@@ -31,25 +31,26 @@ import Se_Practica from "./pages/Se_Practica";
 import Participa_En from "./pages/Participa_En";
 
 // importa por roles
-import EspacioDeportivoAdmin from "./roles/admin/EspacioDeportivoAdmin";
-import CanchaAdmin from "./roles/admin/CanchaAdmin";
-import ReservaAdmin from "./roles/admin/ReservaAdmin";
-import Reserva_HorarioAdmin from "./roles/admin/Reserva_HorarioAdmin";
-import ResenaAdmin from "./roles/admin/ResenaAdmin";
-import EspaciosView from "./roles/admin/EspaciosView";
-import CalendarioReservasAdmin from "./roles/admin/CalendarioReservasAdmin";
-import PagoAdmin from "./roles/admin/PagoAdmin";
-import SolicitudAdminEspDep from "./pages/SolicitudAdminEspDep";
-import SolicitudEncargado from "./pages/SolicitudEncargado";
-import SolicitudControl from "./pages/SolicitudControl";
-import Reporte_incidenciaAdmin from "./roles/admin/Reporte_IncidenciaAdmin";
-import EncargadoAdmin from "./roles/admin/EncargadoAdmin";
-import ControlAdmin from "./roles/admin/ControlAdmin";
-import Espacio_DeportivoEncargado from "./roles/encargado/Espacio_DeportivoEncargado";
-import CanchaEncargado from "./roles/encargado/CanchaEncargado";
-import ReservaEncargado from "./roles/encargado/ReservaEncargado";
-import Reporte_IncidenciaEncargado from "./roles/encargado/Reporte_IncidenciaEncargado";
-import QR_AccesoEncargado from "./roles/control/QR_AccesoEncargado";
+import EspacioDeportivoAdmin from './roles/admin/EspacioDeportivoAdmin';
+import CanchaAdmin from './roles/admin/CanchaAdmin';
+import ReservaAdmin from './roles/admin/ReservaAdmin';
+import Reserva_HorarioAdmin from './roles/admin/Reserva_HorarioAdmin';
+import ResenaAdmin from './roles/admin/ResenaAdmin';
+import EspaciosView from './roles/admin/EspaciosView';
+import CalendarioReservasAdmin from './roles/admin/CalendarioReservasAdmin';
+import PagoAdmin from './roles/admin/PagoAdmin';
+import SolicitudAdminEspDep from './pages/SolicitudAdminEspDep';
+import SolicitudEncargado from './pages/SolicitudEncargado';
+import SolicitudControl from './pages/SolicitudControl';
+import Reporte_incidenciaAdmin from './roles/admin/Reporte_IncidenciaAdmin';
+import EncargadoAdmin from './roles/admin/EncargadoAdmin';
+import ControlAdmin from './roles/admin/ControlAdmin';
+import Espacio_DeportivoEncargado from './roles/encargado/Espacio_DeportivoEncargado';
+import CanchaEncargado from './roles/encargado/CanchaEncargado';
+import ReservaEncargado from './roles/encargado/ReservaEncargado';
+import Reporte_IncidenciaEncargado from './roles/encargado/Reporte_IncidenciaEncargado';
+import QR_AccesoEncargado from './roles/control/QR_AccesoEncargado';
+import Espacio_DeportivoControl from './roles/control/Espacio_DeportivoControl';
 
 // Configuración de rutas para cada rol
 const roleRoutesConfig = {
@@ -204,99 +205,22 @@ const roleRoutesConfig = {
     },
   ],
   ADMIN_ESP_DEP: [
-    {
-      id: "estadisticas",
-      label: "Estadisticas",
-      icon: "📊",
-      path: "estadisticas",
-      component: EspaciosView,
-    },
-    {
-      id: "calendario",
-      label: "Calendario",
-      icon: "📆",
-      path: "calendario",
-      component: CalendarioReservasAdmin,
-    },
-    {
-      id: "espacio_deportivo",
-      label: "Espacio Deportivo",
-      icon: "🏟️",
-      path: "espacio-deportivo",
-      component: EspacioDeportivoAdmin,
-    },
-    {
-      id: "cancha",
-      label: "Cancha",
-      icon: "🎾",
-      path: "cancha",
-      component: CanchaAdmin,
-    },
-    {
-      id: "reserva",
-      label: "Reserva",
-      icon: "📅",
-      path: "reserva",
-      component: ReservaAdmin,
-    },
-    {
-      id: "reserva_horario",
-      label: "Reserva Horario",
-      icon: "⏰",
-      path: "reserva-horario",
-      component: Reserva_HorarioAdmin,
-    },
-    {
-      id: "pago",
-      label: "Pago",
-      icon: "💳",
-      path: "pago",
-      component: PagoAdmin,
-    },
-    {
-      id: "resena",
-      label: "Reseña",
-      icon: "⭐",
-      path: "resena",
-      component: ResenaAdmin,
-    },
-    {
-      id: "reporte_incidencia",
-      label: "Reporte Incidencia",
-      icon: "⚠️",
-      path: "reporte_incidencia",
-      component: Reporte_incidenciaAdmin,
-    },
-    {
-      id: "encargado",
-      label: "Encargado",
-      icon: "👨‍💼",
-      path: "encargado",
-      component: EncargadoAdmin,
-    },
-    {
-      id: "control",
-      label: "Control",
-      icon: "🎮",
-      path: "control",
-      component: ControlAdmin,
-    },
-    {
-      id: "disciplina",
-      label: "Disciplina",
-      icon: "🥋",
-      path: "disciplina",
-      component: Disciplina,
-    },
+    { id: 'estadisticas', label: 'Estadisticas', icon: '📊', path: 'estadisticas', component: EspaciosView },
+    { id: 'calendario', label: 'Calendario', icon: '📆', path: 'calendario', component: CalendarioReservasAdmin },
+    { id: 'espacio_deportivo', label: 'Espacio Deportivo', icon: '🏟️', path: 'espacio-deportivo', component: EspacioDeportivoAdmin },
+    { id: 'cancha', label: 'Cancha', icon: '🎾', path: 'cancha', component: CanchaAdmin },
+    { id: 'reserva', label: 'Reserva', icon: '📅', path: 'reserva', component: ReservaAdmin },
+    { id: 'reserva_horario', label: 'Reserva Horario', icon: '⏰', path: 'reserva-horario', component: Reserva_HorarioAdmin },
+    { id: 'pago', label: 'Pago', icon: '💳', path: 'pago', component: PagoAdmin },
+    { id: 'resena', label: 'Reseña', icon: '⭐', path: 'resena', component: ResenaAdmin },
+    { id: 'reporte_incidencia', label: 'Reporte Incidencia', icon: '⚠️', path: 'reporte_incidencia', component: Reporte_incidenciaAdmin },
+    { id: 'encargado', label: 'Encargado', icon: '👨‍💼', path: 'encargado', component: EncargadoAdmin },
+    { id: 'control', label: 'Control', icon: '🎮', path: 'control', component: ControlAdmin },
   ],
   CONTROL: [
-    {
-      id: "qr_reserva",
-      label: "QR Reserva",
-      icon: "📱",
-      path: "qr-reserva",
-      component: QR_AccesoEncargado,
-    },
+    { id: 'espacio_deportivo', label: 'Espacio Deportivo', icon: '🏟️', path: 'espacio-deportivo', component: Espacio_DeportivoControl },
+    { id: 'qr_reserva', label: 'QR Reserva', icon: '📱', path: 'qr-reserva', component: QR_AccesoEncargado },
+
   ],
   ENCARGADO: [
     {
@@ -472,26 +396,26 @@ const Sidebar = ({
           {(getMainRole(user) === "ADMIN_ESP_DEP" ||
             getMainRole(user) === "ENCARGADO" ||
             getMainRole(user) === "CONTROL") && (
-            <button
-              onClick={() => (window.location.href = "/")}
-              className="mt-3 w-full text-[#23475F] hover:text-[#01CD6C] text-sm font-medium flex items-center gap-2 transition-all"
-            >
-              <svg
-                className="w-5 h-5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
+              <button
+                onClick={() => (window.location.href = "/")}
+                className="mt-3 w-full text-[#23475F] hover:text-[#01CD6C] text-sm font-medium flex items-center gap-2 transition-all"
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M5.121 17.804A9 9 0 0112 15a9 9 0 016.879 2.804M15 11a3 3 0 11-6 0 3 3 0 016 0z"
-                />
-              </svg>
-              Vista Cliente
-            </button>
-          )}
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M5.121 17.804A9 9 0 0112 15a9 9 0 016.879 2.804M15 11a3 3 0 11-6 0 3 3 0 016 0z"
+                  />
+                </svg>
+                Vista Cliente
+              </button>
+            )}
         </div>
 
         <button
@@ -525,10 +449,9 @@ const Sidebar = ({
               toggleSidebar();
             }}
             className={`flex items-center px-6 py-3 text-left text-sm font-medium transition-all
-              ${
-                currentPage === item.id
-                  ? "bg-[#01CD6C] text-white shadow-inner border-l-4 border-[#0F2634]"
-                  : "text-[#23475F] hover:bg-[#01CD6C]/15 hover:text-[#01CD6C]"
+              ${currentPage === item.id
+                ? "bg-[#01CD6C] text-white shadow-inner border-l-4 border-[#0F2634]"
+                : "text-[#23475F] hover:bg-[#01CD6C]/15 hover:text-[#01CD6C]"
               }`}
           >
             <span className="text-lg mr-3">{item.icon}</span>
@@ -686,9 +609,8 @@ const PaginaPrincipal = () => {
         />
       )}
       <div
-        className={`flex-1 flex flex-col min-w-0 ${
-          isSidebarOpen && routes.length > 0 ? "ml-64" : "ml-0"
-        } transition-all duration-300`}
+        className={`flex-1 flex flex-col min-w-0 ${isSidebarOpen && routes.length > 0 ? "ml-64" : "ml-0"
+          } transition-all duration-300`}
       >
         <Header
           title={pageTitle}

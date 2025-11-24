@@ -175,10 +175,10 @@ const buscarReservas = async (id_cliente, texto, limite = 10, offset = 0) => {
         r.estado ILIKE $2
       )
     `;
-    
+
     const sanitizeInput = (input) => input.replace(/[%_\\]/g, "\\$&");
     const terminoBusqueda = `%${sanitizeInput(texto)}%`;
-    
+
     const [resultDatos, resultTotal] = await Promise.all([
       pool.query(queryDatos, [id_cliente, terminoBusqueda, limite, offset]),
       pool.query(queryTotal, [id_cliente, terminoBusqueda])
@@ -292,12 +292,20 @@ const crearReserva = async (datosReserva) => {
 
     // Verificar si la cancha existe
     const canchaQuery = `
-      SELECT id_cancha FROM cancha WHERE id_cancha = $1
+      SELECT id_cancha, capacidad 
+      FROM cancha 
+      WHERE id_cancha = $1
     `;
     const canchaResult = await pool.query(canchaQuery, [datosReserva.id_cancha]);
-    if (!canchaResult.rows[0]) {
+    const canchaRow = canchaResult.rows[0];
+    if (!canchaRow) {
       throw new Error('La cancha asociada no existe');
     }
+
+    if (datosReserva.cupo && canchaRow.capacidad != null && Number(datosReserva.cupo) > Number(canchaRow.capacidad)) {
+      throw new Error('El cupo no puede superar la capacidad de la cancha');
+    }
+
 
     const query = `
       INSERT INTO reserva (
@@ -335,7 +343,7 @@ const actualizarReserva = async (id, id_cliente, camposActualizar) => {
     console.log('Datos recibidos para actualizar reserva:', { id, camposActualizar });
     const camposPermitidos = ['fecha_reserva', 'cupo', 'monto_total', 'saldo_pendiente', 'estado', 'id_cliente', 'id_cancha'];
 
-    const campos = Object.keys(camposActualizar).filter(key => 
+    const campos = Object.keys(camposActualizar).filter(key =>
       camposPermitidos.includes(key)
     );
 
@@ -353,6 +361,28 @@ const actualizarReserva = async (id, id_cliente, camposActualizar) => {
     if (!reservaResult.rows[0]) {
       throw new Error('Reserva no encontrada o no pertenece al cliente');
     }
+
+    const reservaBase = await obtenerReservaPorId(id, id_cliente);
+    if (!reservaBase) {
+      throw new Error('Reserva no encontrada o no pertenece al cliente');
+    }
+
+    const cupoFinal = camposActualizar.cupo != null ? Number(camposActualizar.cupo) : Number(reservaBase.cupo);
+    const canchaFinal = camposActualizar.id_cancha != null ? Number(camposActualizar.id_cancha) : Number(reservaBase.id_cancha);
+
+    if (cupoFinal && canchaFinal) {
+      const canchaQuery = `
+        SELECT capacidad 
+        FROM cancha 
+        WHERE id_cancha = $1
+      `;
+      const canchaResult = await pool.query(canchaQuery, [canchaFinal]);
+      const canchaRow = canchaResult.rows[0];
+      if (canchaRow && canchaRow.capacidad != null && cupoFinal > Number(canchaRow.capacidad)) {
+        throw new Error('El cupo no puede superar la capacidad de la cancha');
+      }
+    }
+
 
     // Validar fecha_reserva
     if (camposActualizar.fecha_reserva) {
@@ -403,7 +433,9 @@ const actualizarReserva = async (id, id_cliente, camposActualizar) => {
     // Validar cancha si se proporciona
     if (camposActualizar.id_cancha) {
       const canchaQuery = `
-        SELECT id_cancha FROM cancha WHERE id_cancha = $1
+        SELECT id_cancha 
+        FROM cancha 
+        WHERE id_cancha = $1
       `;
       const canchaResult = await pool.query(canchaQuery, [camposActualizar.id_cancha]);
       if (!canchaResult.rows[0]) {
@@ -411,9 +443,10 @@ const actualizarReserva = async (id, id_cliente, camposActualizar) => {
       }
     }
 
+
     const setClause = campos.map((campo, index) => `${campo} = $${index + 2}`).join(', ');
     const values = campos.map(campo => camposActualizar[campo] || null);
-    
+
     const query = `
       UPDATE reserva 
       SET ${setClause}
@@ -515,7 +548,7 @@ const obtenerDatosEspecificosController = async (req, res) => {
     }
 
     const { reservas, total } = await obtenerDatosEspecificos(id_cliente, limite, offset);
-    
+
     res.json(respuesta(true, 'Reservas obtenidas correctamente', {
       reservas,
       paginacion: { limite, offset, total }
@@ -579,7 +612,7 @@ const buscarReservasController = async (req, res) => {
     }
 
     const { reservas, total } = await buscarReservas(id_cliente, q, limite, offset);
-    
+
     res.json(respuesta(true, 'Reservas obtenidas correctamente', {
       reservas,
       paginacion: { limite, offset, total }

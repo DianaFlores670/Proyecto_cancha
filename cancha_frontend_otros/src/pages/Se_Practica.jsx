@@ -242,7 +242,7 @@ const SePractica = () => {
 
   return (
     <div className="bg-white rounded-lg shadow p-6">
-      <h2 className="text-xl font-semibold mb-4">Gestion de Relaciones Se Practica</h2>
+      <h2 className="text-xl font-semibold mb-4">Gestion de Relaciones Cancha-Disciplinas</h2>
 
       <div className="flex flex-col xl:flex-row gap-4 mb-6 items-stretch">
         <div className="flex-1">

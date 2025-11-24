@@ -50,7 +50,150 @@ const ComprobantePagoCliente = () => {
   }, [idPago]);
 
   const handlePrint = () => {
-    window.print();
+    if (!pago) return;
+
+    const printWindow = window.open("", "_blank", "width=800,height=600");
+    if (!printWindow) return;
+
+    const html = `
+<!DOCTYPE html>
+<html>
+<head>
+<meta charSet="utf-8" />
+<title>Comprobante de pago</title>
+<style>
+  body {
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: #F5F7FA;
+    padding: 24px;
+  }
+  .card {
+    max-width: 480px;
+    margin: 0 auto;
+    background: #ffffff;
+    border-radius: 16px;
+    box-shadow: 0 10px 25px rgba(15, 38, 52, 0.12);
+    padding: 24px 28px;
+  }
+  .title {
+    font-size: 24px;
+    font-weight: 700;
+    color: #0F2634;
+    text-align: center;
+    margin-bottom: 16px;
+  }
+  .section {
+    border-radius: 12px;
+    border: 1px solid #E2E8F0;
+    padding: 12px 14px;
+    margin-bottom: 10px;
+  }
+  .section-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: #0F2634;
+    margin-bottom: 8px;
+  }
+  .row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 13px;
+    color: #0F2634;
+    margin-bottom: 4px;
+  }
+  .label {
+    color: #64748B;
+    margin-right: 8px;
+  }
+  .footer-text {
+    font-size: 11px;
+    color: #94A3B8;
+    text-align: center;
+    margin-top: 10px;
+  }
+  .cp-box {
+    border-radius: 12px;
+    border: 1px solid #E2E8F0;
+    padding: 12px 14px;
+    background: #F8FAFC;
+    margin-bottom: 10px;
+  }
+  .cp-label {
+    font-size: 11px;
+    color: #94A3B8;
+    margin-bottom: 4px;
+  }
+  .cp-value {
+    font-size: 18px;
+    font-weight: 600;
+    color: #0F2634;
+  }
+  .amount {
+    font-weight: 600;
+    color: #01CD6C;
+  }
+</style>
+</head>
+<body onload="window.print(); window.close();">
+  <div class="card">
+    <div class="title">Comprobante de pago</div>
+
+    <div class="cp-box">
+      <div class="cp-label">Numero de comprobante</div>
+      <div class="cp-value">CP-${String(pago.id_pago).padStart(6, "0")}</div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Datos del pago</div>
+      <div class="row">
+        <span class="label">Fecha:</span>
+        <span>${pago.fecha_pago ? String(pago.fecha_pago).substring(0, 10) : "-"}</span>
+      </div>
+      <div class="row">
+        <span class="label">Metodo de pago:</span>
+        <span>${pago.metodo_pago}</span>
+      </div>
+      <div class="row">
+        <span class="label">Monto:</span>
+        <span class="amount">Bs. ${pago.monto}</span>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Datos de la reserva</div>
+      <div class="row">
+        <span class="label">Codigo de reserva:</span>
+        <span>#${pago.id_reserva}</span>
+      </div>
+      <div class="row">
+        <span class="label">Cancha:</span>
+        <span>${pago.cancha_nombre || "-"}</span>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Cliente responsable</div>
+      <div class="row">
+        <span class="label">Nombre:</span>
+        <span>${pago.cliente_nombre} ${pago.cliente_apellido}</span>
+      </div>
+      <div class="row">
+        <span class="label">Correo:</span>
+        <span>${pago.cliente_correo || "-"}</span>
+      </div>
+    </div>
+
+    <div class="footer-text">
+      Este comprobante es valido solo si el pago figura como registrado en el sistema del espacio deportivo.
+    </div>
+  </div>
+</body>
+</html>
+    `;
+
+    printWindow.document.open();
+    printWindow.document.write(html);
+    printWindow.document.close();
   };
 
   return (

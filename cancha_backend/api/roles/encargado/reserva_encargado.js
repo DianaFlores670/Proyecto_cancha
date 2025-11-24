@@ -129,7 +129,12 @@ const buscarReservas = async (id_usuario, q, limite, offset) => {
     JOIN cliente cli ON cli.id_cliente = r.id_cliente
     JOIN usuario u ON u.id_persona = cli.id_cliente
     WHERE en.id_encargado = $1
-      AND (c.nombre ILIKE $2 OR u.nombre ILIKE $2 OR u.apellido ILIKE $2 OR r.estado ILIKE $2)
+      AND (
+        c.nombre ILIKE $2
+        OR u.nombre ILIKE $2
+        OR u.apellido ILIKE $2
+        OR r.estado::text ILIKE $2
+      )
     ORDER BY r.fecha_reserva DESC
     LIMIT $3 OFFSET $4
   `;
@@ -142,7 +147,12 @@ const buscarReservas = async (id_usuario, q, limite, offset) => {
     JOIN cliente cli ON cli.id_cliente = r.id_cliente
     JOIN usuario u ON u.id_persona = cli.id_cliente
     WHERE en.id_encargado = $1
-      AND (c.nombre ILIKE $2 OR u.nombre ILIKE $2 OR u.apellido ILIKE $2 OR r.estado ILIKE $2)
+      AND (
+        c.nombre ILIKE $2
+        OR u.nombre ILIKE $2
+        OR u.apellido ILIKE $2
+        OR r.estado::text ILIKE $2
+      )
   `;
 
   const [rows, count] = await Promise.all([
@@ -155,7 +165,6 @@ const buscarReservas = async (id_usuario, q, limite, offset) => {
     total: Number(count.rows[0].count)
   };
 };
-
 
 /**
  * Detalle individual, incluye horarios

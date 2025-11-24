@@ -265,9 +265,7 @@ const Reporte_IncidenciaEncargado = () => {
       </div>
 
       {/* TABLA */}
-      {loading ? (
-        <p>Cargando...</p>
-      ) : error ? (
+      {error ? (
         <p className="text-red-500">{error}</p>
       ) : (
         <div className="overflow-x-auto">
@@ -365,99 +363,203 @@ const Reporte_IncidenciaEncargado = () => {
 
       {/* MODAL */}
       {modalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg shadow max-w-lg w-full">
-            <h3 className="text-xl font-semibold mb-4">
-              {editMode === "ver" && "Detalle del Reporte"}
-              {editMode === "crear" && "Crear Reporte"}
-              {editMode === "editar" && "Editar Reporte"}
+        <div className="fixed inset-0 bg-[#020617]/60 backdrop-blur-sm flex items-center justify-center z-50 px-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-hidden">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-[#E2E8F0] bg-[#F8FAFC]">
+              <div>
+                <h3 className="text-lg md:text-xl font-semibold text-[#0F172A]">
+                  {editMode === "ver" && "Detalle del reporte"}
+                  {editMode === "crear" && "Crear reporte"}
+                  {editMode === "editar" && "Editar reporte"}
+                </h3>
+                <p className="text-xs text-[#64748B] mt-1">
+                  Informacion general de la reserva y el reporte registrado
+                </p>
+              </div>
 
-            </h3>
-            {editMode === "editar" && detalle?.verificado && (
-              <p className="text-red-500 font-semibold mb-3">
-                Este reporte ya está verificado. No puedes editarlo.
-              </p>
-            )}
-
-
-            {/* DATOS */}
-            {editMode === "ver" && detalle && (
-              <>
-                <p><strong>Cancha:</strong> {detalle.nombre_cancha}</p>
-                <p><strong>Fecha reserva:</strong> {detalle.fecha_reserva?.split("T")[0]}</p>
-                <p><strong>Cliente:</strong> {detalle.cliente_nombre} {detalle.cliente_apellido}</p>
-                <p><strong>Reserva:</strong> #{detalle.id_reserva}</p>
-                <p><strong>Estado reserva:</strong> {detalle.estado_reserva}</p>
-                <p><strong>Verificado:</strong> {detalle.verificado ? "Sí" : "No"}</p>
-                <hr className="my-2" />
-                <p><strong>Detalle:</strong> {detalle.detalle}</p>
-                <p><strong>Sugerencia:</strong> {detalle.sugerencia}</p>
-              </>
-            )}
-
-
-            {/* FORMULARIO CREAR / EDITAR */}
-            {(editMode === "crear" || (editMode === "editar" && !detalle?.verificado)) && (
-              <form
-                onSubmit={editMode === "editar" ? enviarEdicion : enviarNuevo}
-                className="space-y-3 mt-2"
-              >
-
-                <div>
-                  <label className="font-semibold">Detalle</label>
-                  <textarea
-                    className="border w-full rounded p-2"
-                    value={formDetalle}
-                    onChange={(e) => setFormDetalle(e.target.value)}
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="font-semibold">Sugerencia</label>
-                  <textarea
-                    className="border w-full rounded p-2"
-                    value={formSugerencia}
-                    onChange={(e) => setFormSugerencia(e.target.value)}
-                  />
-                </div>
-
-                <div>
-                  <label className="font-semibold">Reserva</label>
-                  <select
-                    className="border w-full rounded p-2"
-                    value={formReserva}
-                    onChange={(e) => setFormReserva(e.target.value)}
-                    required
-                  >
-                    <option value="">Seleccione una reserva</option>
-                    {reservasDisponibles.map((r) => (
-                      <option key={r.id_reserva} value={r.id_reserva}>
-                        #{r.id_reserva} {r.cliente_completo}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-
-                <button className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">
-                  {detalle ? "Actualizar" : "Crear"}
-                </button>
-              </form>
-            )}
-
-            <div className="flex justify-end mt-4">
-              <button
-                onClick={closeModal}
-                className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600"
-              >
-                Cerrar
-              </button>
+              {detalle && typeof detalle.verificado === "boolean" && (
+                <span
+                  className={
+                    "inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold " +
+                    (detalle.verificado
+                      ? "bg-[#DCFCE7] text-[#15803D]"
+                      : "bg-[#FEF9C3] text-[#92400E]")
+                  }
+                >
+                  {detalle.verificado ? "Verificado" : "Pendiente"}
+                </span>
+              )}
             </div>
 
+            {editMode === "editar" && detalle?.verificado && (
+              <div className="px-6 pt-3">
+                <p className="text-[13px] text-[#B91C1C] bg-[#FEE2E2] border border-[#FCA5A5] rounded-lg px-3 py-2">
+                  Este reporte ya esta verificado. No puedes editarlo.
+                </p>
+              </div>
+            )}
+
+            <div className="px-6 py-5 space-y-5 overflow-y-auto max-h-[60vh] text-sm">
+              {editMode === "ver" && detalle && (
+                <div className="space-y-5">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-[#94A3B8]">
+                        Cancha
+                      </p>
+                      <p className="text-[#0F172A]">{detalle.nombre_cancha}</p>
+                    </div>
+
+                    <div className="space-y-1">
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-[#94A3B8]">
+                        Fecha reserva
+                      </p>
+                      <p className="text-[#0F172A]">
+                        {detalle.fecha_reserva?.split("T")[0] || "-"}
+                      </p>
+                    </div>
+
+                    <div className="space-y-1">
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-[#94A3B8]">
+                        Cliente
+                      </p>
+                      <p className="text-[#0F172A]">
+                        {detalle.cliente_nombre} {detalle.cliente_apellido}
+                      </p>
+                    </div>
+
+                    <div className="space-y-1">
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-[#94A3B8]">
+                        Reserva
+                      </p>
+                      <p className="text-[#0F172A]">
+                        {detalle.id_reserva ? `#${detalle.id_reserva}` : "-"}
+                      </p>
+                    </div>
+
+                    <div className="space-y-1">
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-[#94A3B8]">
+                        Estado reserva
+                      </p>
+                      <p className="text-[#0F172A]">
+                        {detalle.estado_reserva || "-"}
+                      </p>
+                    </div>
+
+                    <div className="space-y-1">
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-[#94A3B8]">
+                        Verificado
+                      </p>
+                      <p className="text-[#0F172A]">
+                        {detalle.verificado ? "Si" : "No"}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="border-t border-[#E2E8F0] pt-4 space-y-3">
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-[#94A3B8] mb-1">
+                        Detalle del reporte
+                      </p>
+                      <p className="text-[#0F172A] text-sm leading-relaxed bg-[#F8FAFC] rounded-lg px-3 py-2">
+                        {detalle.detalle || "-"}
+                      </p>
+                    </div>
+
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-[#94A3B8] mb-1">
+                        Sugerencia
+                      </p>
+                      <p className="text-[#0F172A] text-sm leading-relaxed bg-[#F8FAFC] rounded-lg px-3 py-2">
+                        {detalle.sugerencia || "-"}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {(editMode === "crear" || (editMode === "editar" && !detalle?.verificado)) && (
+                <form
+                  onSubmit={editMode === "editar" ? enviarEdicion : enviarNuevo}
+                  className="space-y-4 mt-1"
+                >
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-[#0F172A]">
+                      Detalle
+                    </label>
+                    <textarea
+                      className="border border-[#CBD5E1] w-full rounded-lg px-3 py-2 text-sm bg-[#F8FAFC] focus:outline-none focus:ring-2 focus:ring-[#0F172A]/70 focus:border-[#0F172A]"
+                      value={formDetalle}
+                      onChange={(e) => setFormDetalle(e.target.value)}
+                      rows={3}
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-[#0F172A]">
+                      Sugerencia
+                    </label>
+                    <textarea
+                      className="border border-[#CBD5E1] w-full rounded-lg px-3 py-2 text-sm bg-[#F8FAFC] focus:outline-none focus:ring-2 focus:ring-[#0F172A]/70 focus:border-[#0F172A]"
+                      value={formSugerencia}
+                      onChange={(e) => setFormSugerencia(e.target.value)}
+                      rows={2}
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-[#0F172A]">
+                      Reserva relacionada
+                    </label>
+                    <select
+                      className="border border-[#CBD5E1] w-full rounded-lg px-3 py-2 text-sm bg-[#F8FAFC] focus:outline-none focus:ring-2 focus:ring-[#0F172A]/70 focus:border-[#0F172A]"
+                      value={formReserva}
+                      onChange={(e) => setFormReserva(e.target.value)}
+                      required
+                    >
+                      <option value="">Seleccione una reserva</option>
+                      {reservasDisponibles.map((r) => (
+                        <option key={r.id_reserva} value={r.id_reserva}>
+                          #{r.id_reserva} {r.cliente_completo}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="flex justify-end gap-2 pt-2">
+                    <button
+                      type="button"
+                      onClick={closeModal}
+                      className="px-4 py-2 text-sm font-semibold rounded-lg border border-[#CBD5E1] text-[#0F172A] bg-white hover:bg-[#F1F5F9] transition-colors"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      className="px-4 py-2 text-sm font-semibold rounded-lg bg-[#0F172A] text-white hover:bg-[#020617] transition-colors"
+                    >
+                      {detalle && editMode === "editar" ? "Actualizar" : "Crear"}
+                    </button>
+                  </div>
+                </form>
+              )}
+            </div>
+
+            {editMode === "ver" && (
+              <div className="px-6 py-4 border-t border-[#E2E8F0] bg-[#F9FAFB] flex justify-end">
+                <button
+                  type="button"
+                  onClick={closeModal}
+                  className="px-4 py-2 text-sm font-semibold rounded-lg bg-[#0F172A] text-white hover:bg-[#020617] transition-colors"
+                >
+                  Cerrar
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
+
     </div>
   );
 };

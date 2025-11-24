@@ -1,6 +1,6 @@
 /* eslint-disable no-unused-vars */
 import React, { useState, useEffect } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import api from "../../services/api";
 import Header from "../../Header";
 
@@ -21,12 +21,11 @@ const BASE_SLOTS = [
   { id: "19-20", start: "19:00:00", end: "20:00:00", label: "19:00 - 20:00" },
   { id: "20-21", start: "20:00:00", end: "21:00:00", label: "20:00 - 21:00" },
   { id: "21-22", start: "21:00:00", end: "22:00:00", label: "21:00 - 22:00" },
-  { id: "22-23", start: "22:00:00", end: "23:00:00", label: "22:00 - 23:00" },
+  { id: "22-23", start: "22:00:00", end: "23:00:00", label: "22:00 - 23:00" }
 ];
 
 const getUserRoles = (u) => {
-  if (Array.isArray(u?.roles))
-    return u.roles.map((r) => String(r?.rol ?? r).toUpperCase());
+  if (Array.isArray(u?.roles)) return u.roles.map((r) => String(r?.rol ?? r).toUpperCase());
   if (u?.role) return [String(u.role).toUpperCase()];
   return [];
 };
@@ -37,19 +36,9 @@ const pickRoleForThisPage = (u) => {
   return "DEFAULT";
 };
 
-const getImageUrl = (path) => {
-  if (!path) return "";
-  try {
-    const base = api.defaults.baseURL?.replace(/\/$/, "") || "";
-    const cleanPath = String(path).replace(/^\//, "");
-    return `${base}/${cleanPath}`;
-  } catch (e) {
-    return String(path);
-  }
-};
-
 const ReservarCliente = () => {
   const { idCancha } = useParams();
+  const navigate = useNavigate();
 
   const [cancha, setCancha] = useState(null);
   const [idCliente, setIdCliente] = useState(null);
@@ -70,6 +59,7 @@ const ReservarCliente = () => {
 
   const [qrInfo, setQrInfo] = useState(null);
   const [showQrModal, setShowQrModal] = useState(false);
+  const [linkUnirse, setLinkUnirse] = useState("");
 
   useEffect(() => {
     const userData = localStorage.getItem("user");
@@ -84,13 +74,10 @@ const ReservarCliente = () => {
 
       let idFromRoles = null;
       if (Array.isArray(u?.roles)) {
-        const cl = u.roles.find(
-          (rr) => String(rr?.rol ?? rr).toUpperCase() === "CLIENTE"
-        );
+        const cl = u.roles.find((rr) => String(rr?.rol ?? rr).toUpperCase() === "CLIENTE");
         idFromRoles = cl?.datos?.id_cliente ?? null;
       }
-      const finalId =
-        r === "CLIENTE" ? idFromRoles ?? u.id_persona ?? null : null;
+      const finalId = r === "CLIENTE" ? idFromRoles ?? u.id_persona ?? null : null;
       setIdCliente(finalId);
     } catch (e) {
       setError("Error al leer datos de usuario");
@@ -103,17 +90,14 @@ const ReservarCliente = () => {
       try {
         setLoadingCancha(true);
         setError(null);
-        const resp = await api.get(
-          `/cancha-casual/dato-individual/${idCancha}`
-        );
+        const resp = await api.get(`/cancha-casual/dato-individual/${idCancha}`);
         if (resp.data?.exito) {
           setCancha(resp.data.datos?.cancha || null);
         } else {
           setError(resp.data?.mensaje || "No se pudo cargar la cancha");
         }
       } catch (err) {
-        const m =
-          err.response?.data?.mensaje || "Error de conexion al cargar cancha";
+        const m = err.response?.data?.mensaje || "Error de conexion al cargar cancha";
         setError(m);
       } finally {
         setLoadingCancha(false);
@@ -148,8 +132,9 @@ const ReservarCliente = () => {
     if (!cancha) return;
     try {
       setLoadingSlots(true);
+      setError(null);
       const resp = await api.get("/reserva-horario/disponibles", {
-        params: { id_cancha: cancha.id_cancha, fecha },
+        params: { id_cancha: cancha.id_cancha, fecha }
       });
 
       if (!resp.data?.exito) {
@@ -158,21 +143,23 @@ const ReservarCliente = () => {
       }
 
       const ocupados = resp.data?.datos?.ocupados || [];
-      const ids = [];
+      const idsSet = new Set();
 
       ocupados.forEach((h) => {
-        const slot = BASE_SLOTS.find(
-          (s) =>
-            s.start === String(h.hora_inicio) && s.end === String(h.hora_fin)
-        );
-        if (slot) ids.push(slot.id);
+        const start = String(h.hora_inicio);
+        const end = String(h.hora_fin);
+        BASE_SLOTS.forEach((s) => {
+          if (s.start >= start && s.start < end) {
+            idsSet.add(s.id);
+          }
+        });
       });
 
+      const ids = Array.from(idsSet);
       setBusySlots(ids);
       setSelectedSlots((prev) => prev.filter((id) => !ids.includes(id)));
     } catch (err) {
-      const m =
-        err.response?.data?.mensaje || "No se pudo cargar disponibilidad";
+      const m = err.response?.data?.mensaje || "No se pudo cargar disponibilidad";
       setError(m);
       setBusySlots([]);
     } finally {
@@ -194,9 +181,9 @@ const ReservarCliente = () => {
   };
 
   const handleCopyLink = async () => {
-    if (!qrInfo?.codigo_qr) return;
+    if (!linkUnirse) return;
     try {
-      const text = String(qrInfo.codigo_qr);
+      const text = String(linkUnirse);
       if (navigator.clipboard && navigator.clipboard.writeText) {
         await navigator.clipboard.writeText(text);
       } else {
@@ -219,6 +206,7 @@ const ReservarCliente = () => {
     setSuccess(null);
     setQrInfo(null);
     setShowQrModal(false);
+    setLinkUnirse("");
 
     if (!cancha) {
       setError("No se cargo la cancha");
@@ -242,6 +230,11 @@ const ReservarCliente = () => {
       setError("El cupo debe ser un numero positivo");
       return;
     }
+    const capacidadCancha = cancha.capacidad != null ? Number(cancha.capacidad) : null;
+    if (capacidadCancha != null && cupoNum > capacidadCancha) {
+      setError(`El cupo no puede ser mayor a la capacidad de la cancha (${capacidadCancha})`);
+      return;
+    }
     if (selectedSlots.length === 0) {
       setError("Debe seleccionar al menos un horario");
       return;
@@ -256,7 +249,7 @@ const ReservarCliente = () => {
       saldo_pendiente: montoTotal,
       estado: "pendiente",
       id_cliente: idCliente,
-      id_cancha: cancha.id_cancha,
+      id_cancha: cancha.id_cancha
     };
 
     try {
@@ -284,7 +277,7 @@ const ReservarCliente = () => {
             fecha: fechaReserva,
             hora_inicio: slot.start,
             hora_fin: slot.end,
-            monto: precio,
+            monto: precio
           };
           return api.post("/reserva-horario", bodyHorario);
         })
@@ -295,41 +288,53 @@ const ReservarCliente = () => {
       setSuccess("Reserva creada correctamente");
 
       try {
-        const reservaDate = new Date(fechaReserva); // Fecha de la reserva
-        const expira = new Date(reservaDate.getTime() + 24 * 60 * 60 * 1000); // Expira 24 horas después de la fecha de reserva
+        const reservaDate = new Date(fechaReserva);
+        const expira = new Date(reservaDate.getTime() + 24 * 60 * 60 * 1000);
         const bodyQr = {
           id_reserva: idReserva,
           fecha_generado: new Date().toISOString(),
           fecha_expira: expira.toISOString(),
-          estado: "activo",
+          estado: "activo"
         };
         const resQr = await api.post("/qr-reserva", bodyQr);
         if (resQr.data?.exito && resQr.data?.datos?.qr) {
-          setQrInfo(resQr.data.datos.qr);
+          const qr = resQr.data.datos.qr;
+          setQrInfo(qr);
+          const origin =
+            typeof window !== "undefined" &&
+            window.location &&
+            window.location.origin
+              ? window.location.origin
+              : "";
+          if (origin && qr.codigo_qr) {
+            const link = `${origin}/unirse-reserva?code=${encodeURIComponent(qr.codigo_qr)}`;
+            setLinkUnirse(link);
+          }
           setShowQrModal(true);
         } else {
-          const msgQr =
-            resQr.data?.mensaje || "No se pudo generar el codigo QR";
+          const msgQr = resQr.data?.mensaje || "No se pudo generar el codigo QR";
           setError(msgQr);
         }
       } catch (errQr) {
-        const msgQr =
-          errQr.response?.data?.mensaje || "No se pudo generar el codigo QR";
+        const msgQr = errQr.response?.data?.mensaje || "No se pudo generar el codigo QR";
         setError(msgQr);
       }
 
       setSelectedSlots([]);
       setCupo("1");
     } catch (err) {
-      const m =
-        err.response?.data?.mensaje ||
-        err.message ||
-        "Error al crear la reserva";
+      const m = err.response?.data?.mensaje || err.message || "Error al crear la reserva";
       setError(m);
     } finally {
       setSaving(false);
     }
   };
+
+    const handleCloseModal = () => {
+    setShowQrModal(false);
+      navigate(`/mis-reservas`);
+  };
+
 
   if (role !== "CLIENTE") {
     return (
@@ -348,9 +353,7 @@ const ReservarCliente = () => {
 
   const allowedSlots = getAllowedSlots();
 
-  const baseUrl = api.defaults.baseURL
-    ? api.defaults.baseURL.replace(/\/$/, "")
-    : "";
+  const baseUrl = api.defaults.baseURL ? api.defaults.baseURL.replace(/\/$/, "") : "";
 
   const qrImageUrl = qrInfo ? `${baseUrl}${qrInfo.qr_url_imagen}` : "";
 
@@ -433,11 +436,7 @@ const ReservarCliente = () => {
                     </label>
                     <input
                       type="text"
-                      value={
-                        cancha.monto_por_hora
-                          ? `Bs. ${cancha.monto_por_hora}`
-                          : ""
-                      }
+                      value={cancha.monto_por_hora ? `Bs. ${cancha.monto_por_hora}` : ""}
                       disabled
                       className="w-full border border-[#CBD5E1] rounded-md px-3 py-2 bg-gray-100 text-[#23475F] font-semibold"
                     />
@@ -490,7 +489,7 @@ const ReservarCliente = () => {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-[#23475F] mb-1">
-                      Cupo aproximado
+                      Cupo
                     </label>
                     <input
                       type="number"
@@ -509,8 +508,7 @@ const ReservarCliente = () => {
                     Seleccionar horarios
                   </h2>
                   <span className="text-sm text-[#64748B]">
-                    Solo se muestran horarios dentro del rango de apertura y
-                    cierre
+                    Solo se muestran horarios dentro del rango de apertura y cierre
                   </span>
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
@@ -587,7 +585,7 @@ const ReservarCliente = () => {
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg mx-4 p-6 relative">
             <button
-              onClick={() => setShowQrModal(false)}
+              onClick={handleCloseModal}
               className="absolute top-3 right-3 w-8 h-8 rounded-full flex items-center justify-center bg-black text-white text-xl leading-none"
             >
               ×
@@ -596,14 +594,13 @@ const ReservarCliente = () => {
               Reserva creada con exito
             </h2>
             <p className="text-sm text-[#475569] mb-4 text-center">
-              Comparte este codigo con los deportistas para que puedan ingresar
-              al espacio deportivo
+              Comparte este codigo con los deportistas para que puedan ingresar al espacio deportivo
             </p>
 
             <div className="flex justify-center mb-4">
               {qrInfo && (
                 <img
-                  src={getImageUrl(qrImageUrl)}
+                  src={qrImageUrl}
                   alt="Codigo QR de la reserva"
                   className="mx-auto mb-6 w-48 h-48 object-contain"
                 />
@@ -618,7 +615,7 @@ const ReservarCliente = () => {
                 <input
                   type="text"
                   readOnly
-                  value={qrInfo.codigo_qr || ""}
+                  value={linkUnirse || ""}
                   className="flex-1 border border-[#CBD5E1] rounded-md px-3 py-2 text-sm text-[#23475F] bg-gray-50"
                 />
                 <button
@@ -632,9 +629,8 @@ const ReservarCliente = () => {
             </div>
 
             <div className="mt-2 bg-[#FEF3C7] text-[#92400E] text-sm px-4 py-3 rounded-lg">
-              Recuerde que debe realizar el pago de la reserva al menos 24 horas
-              antes del inicio del horario reservado. Si no se registra el pago,
-              la reserva puede ser cancelada.
+              Recuerde que debe realizar el pago de la reserva al menos 24 horas antes del inicio del horario reservado.
+              Si no se registra el pago, la reserva puede ser cancelada.
             </div>
           </div>
         </div>

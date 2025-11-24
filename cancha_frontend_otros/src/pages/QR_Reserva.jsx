@@ -1,7 +1,6 @@
 /* eslint-disable no-empty */
 import React, { useState, useEffect } from "react";
 import api from "../services/api";
-import { getImageUrl } from "../utils";
 
 const permissionsConfig = {
   ADMINISTRADOR: {
@@ -181,14 +180,9 @@ const QRReserva = () => {
     const fullParams = { ...params, limit, offset };
     try {
       let r;
-      if (params.q)
-        r = await api.get("/qr_reserva/buscar", { params: fullParams });
-      else if (params.tipo)
-        r = await api.get("/qr_reserva/filtro", { params: fullParams });
-      else
-        r = await api.get("/qr_reserva/datos-especificos", {
-          params: fullParams,
-        });
+      if (params.q) r = await api.get('/qr-reserva/buscar', { params: fullParams });
+      else if (params.tipo) r = await api.get('/qr-reserva/filtro', { params: fullParams });
+      else r = await api.get('/qr-reserva/datos-especificos', { params: fullParams });
       if (r.data?.exito) {
         setQRs(r.data.datos?.qrs || []);
         setTotal(r.data.datos?.paginacion?.total || 0);
@@ -227,7 +221,7 @@ const QRReserva = () => {
     if (!permissions.canDelete) return;
     if (!window.confirm("Estas seguro de eliminar este QR de reserva?")) return;
     try {
-      const r = await api.delete(`/qr_reserva/${id}`);
+      const r = await api.delete(`/qr-reserva/${id}`);
       if (r.data?.exito) fetchQRs();
       else setError(r.data?.mensaje || "No se pudo eliminar");
     } catch (e) {
@@ -256,7 +250,7 @@ const QRReserva = () => {
   const openEditModal = async (id) => {
     if (!permissions.canEdit) return;
     try {
-      const r = await api.get(`/qr_reserva/dato-individual/${id}`);
+      const r = await api.get(`/qr-reserva/dato-individual/${id}`);
       if (r.data?.exito) {
         const qr = r.data.datos?.qr || {};
         setFormData({
@@ -348,9 +342,8 @@ const QRReserva = () => {
         verificado: !!base.verificado,
       };
       let r;
-      if (editMode)
-        r = await api.patch(`/qr_reserva/${currentQR.id_qr}`, payload);
-      else r = await api.post("/qr_reserva/", payload);
+      if (editMode) r = await api.patch(`/qr-reserva/${currentQR.id_qr}`, payload);
+      else r = await api.post('/qr-reserva/', payload);
       if (r.data?.exito) {
         if (r.data.datos?.qr?.qr_url_imagen)
           setPreviewQR(getImageUrl(r.data.datos.qr.qr_url_imagen));
@@ -799,9 +792,7 @@ const QRReserva = () => {
               </div>
               {selectedQR.id_control && (
                 <div>
-                  <label className="font-medium text-gray-700">
-                    Control asociado
-                  </label>
+                  <label className="font-medium text-gray-700">Control asociado:</label>
                   <p className="mt-1 p-2 bg-gray-50 rounded">
                     #{selectedQR.id_control}{" "}
                     {selectedQR.control_nombre

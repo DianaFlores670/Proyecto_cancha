@@ -225,40 +225,129 @@ const ReservaEncargado = () => {
 
             {/* MODAL DETALLE */}
             {modalOpen && detalle && detalle.info && (
-                <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-                    <div className="bg-white p-6 rounded-lg shadow max-w-lg w-full">
-                        <h3 className="text-xl font-semibold mb-4">Detalle de Reserva</h3>
+  <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+    <div className="bg-white rounded-2xl shadow-2xl max-w-xl w-full mx-4 p-6 md:p-8">
+      <div className="flex items-start justify-between gap-4 mb-6">
+        <div>
+          <p className="text-[11px] uppercase tracking-[0.12em] text-gray-400">
+            Reserva
+          </p>
+          <h3 className="text-xl md:text-2xl font-semibold text-gray-900">
+            Detalle de reserva
+          </h3>
+          <p className="text-xs text-gray-500 mt-1">
+            Cliente {detalle.info.cliente_nombre} {detalle.info.cliente_apellido}
+          </p>
+        </div>
 
-                        <p><strong>Cliente:</strong> {detalle.info.cliente_nombre} {detalle.info.cliente_apellido}</p>
-                        <p><strong>Cancha:</strong> {detalle.info.nombre_cancha}</p>
-                        <p><strong>Fecha:</strong> {detalle.info.fecha_reserva?.split("T")[0]}</p>
-                        <p><strong>Fecha:</strong> {detalle.info.fecha_reserva?.split("T")[0]}</p>
-                        <p><strong>Cupo:</strong> {detalle.info.cupo}</p>
-                        <p><strong>Monto total:</strong> {detalle.info.monto_total}</p>
-                        <p><strong>Saldo pendiente:</strong> {detalle.info.saldo_pendiente}</p>
-                        <p><strong>Estado:</strong> {detalle.info.estado}</p>
+        <span
+          className={
+            "inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold " +
+            (detalle.info.estado === "pagada"
+              ? "bg-green-100 text-green-700"
+              : detalle.info.estado === "cancelada"
+              ? "bg-red-100 text-red-700"
+              : detalle.info.estado === "en_cuotas"
+              ? "bg-blue-100 text-blue-700"
+              : "bg-yellow-100 text-yellow-700")
+          }
+        >
+          {detalle.info.estado}
+        </span>
+      </div>
 
-                        <h4 className="text-lg font-semibold mt-4 mb-2">Horarios</h4>
-                        <ul className="border p-3 rounded space-y-2 max-h-48 overflow-y-auto">
-                            {detalle.horarios.map((h, idx) => (
-                                <li key={idx} className="border-b pb-2">
-                                    <p><strong>Inicio:</strong> {h.hora_inicio}</p>
-                                    <p><strong>Fin:</strong> {h.hora_fin}</p>
-                                </li>
-                            ))}
-                        </ul>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+        <div className="space-y-1">
+          <p className="text-xs text-gray-500">Cliente</p>
+          <p className="font-medium text-gray-900">
+            {detalle.info.cliente_nombre} {detalle.info.cliente_apellido}
+          </p>
+        </div>
 
-                        <div className="flex justify-end mt-4">
-                            <button
-                                onClick={closeModal}
-                                className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600"
-                            >
-                                Cerrar
-                            </button>
-                        </div>
-                    </div>
+        <div className="space-y-1">
+          <p className="text-xs text-gray-500">Cancha</p>
+          <p className="font-medium text-gray-900">
+            {detalle.info.nombre_cancha}
+          </p>
+        </div>
+
+        <div className="space-y-1">
+          <p className="text-xs text-gray-500">Fecha</p>
+          <p className="font-medium text-gray-900">
+            {detalle.info.fecha_reserva
+              ? String(detalle.info.fecha_reserva).split("T")[0]
+              : "-"}
+          </p>
+        </div>
+
+        <div className="space-y-1">
+          <p className="text-xs text-gray-500">Cupo</p>
+          <p className="font-medium text-gray-900">
+            {detalle.info.cupo ?? "-"}
+          </p>
+        </div>
+
+        <div className="space-y-1">
+          <p className="text-xs text-gray-500">Monto total</p>
+          <p className="font-semibold text-emerald-600">
+            {detalle.info.monto_total != null ? `Bs ${detalle.info.monto_total}` : "-"}
+          </p>
+        </div>
+
+        <div className="space-y-1">
+          <p className="text-xs text-gray-500">Saldo pendiente</p>
+          <p className="font-semibold text-gray-900">
+            {detalle.info.saldo_pendiente != null ? `Bs ${detalle.info.saldo_pendiente}` : "-"}
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-6">
+        <h4 className="text-sm font-semibold text-gray-900 mb-2">
+          Horarios reservados
+        </h4>
+
+        {detalle.horarios && detalle.horarios.length > 0 ? (
+          <div className="border border-gray-200 rounded-xl max-h-52 overflow-y-auto divide-y">
+            {detalle.horarios.map((h, idx) => (
+              <div
+                key={idx}
+                className="flex items-center justify-between px-3 py-2 bg-gray-50/60"
+              >
+                <div>
+                  <p className="text-[11px] text-gray-500">Inicio</p>
+                  <p className="text-sm font-medium text-gray-900">
+                    {h.hora_inicio}
+                  </p>
                 </div>
-            )}
+                <div>
+                  <p className="text-[11px] text-gray-500">Fin</p>
+                  <p className="text-sm font-medium text-gray-900">
+                    {h.hora_fin}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-xs text-gray-500">
+            No hay horarios registrados para esta reserva.
+          </p>
+        )}
+      </div>
+
+      <div className="flex justify-end mt-6">
+        <button
+          onClick={closeModal}
+          className="px-5 py-2.5 rounded-lg bg-gray-800 text-white text-sm font-semibold hover:bg-gray-900 transition-colors"
+        >
+          Cerrar
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+
 
         </div>
     );

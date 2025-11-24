@@ -526,7 +526,7 @@ const MisReservasCliente = () => {
                   setCurrentPage(1);
                 }}
                 className={
-                  "px-3 py-2 rounded-md text-xs md:text-sm font-semibold " +
+                  "px-3 py-2 rounded-full text-xs md:text-sm font-semibold " +
                   (isResponsableView
                     ? "bg-[#01CD6C] text-white"
                     : "bg-[#E2E8F0] text-[#0F2634] hover:bg-[#CBD5E1]")
@@ -541,7 +541,7 @@ const MisReservasCliente = () => {
                   setCurrentPage(1);
                 }}
                 className={
-                  "px-3 py-2 rounded-md text-xs md:text-sm font-semibold " +
+                  "px-3 py-2 rounded-full text-xs md:text-sm font-semibold " +
                   (!isResponsableView
                     ? "bg-[#01CD6C] text-white"
                     : "bg-[#E2E8F0] text-[#0F2634] hover:bg-[#CBD5E1]")
@@ -566,12 +566,12 @@ const MisReservasCliente = () => {
                     ? "Buscar por cancha, espacio o estado"
                     : "Buscar por cancha o estado"
                 }
-                className="flex-1 border border-[#CBD5E1] rounded-md px-3 py-2 text-sm text-[#23475F]"
+                className="flex-1 border border-[#CBD5E1] rounded-full px-3 py-2 text-sm text-[#23475F]"
               />
               <select
                 value={filter}
                 onChange={handleFilterChange}
-                className="border border-[#CBD5E1] rounded-md px-3 py-2 text-sm text-[#23475F]"
+                className="border border-[#CBD5E1] rounded-full px-3 py-2 text-sm text-[#23475F]"
               >
                 <option value="default">Sin filtro</option>
                 <option value="fecha">Ordenar por fecha</option>
@@ -580,7 +580,7 @@ const MisReservasCliente = () => {
               </select>
               <button
                 type="submit"
-                className="px-4 py-2 rounded-md bg-[#01CD6C] text-white text-sm font-semibold hover:bg-[#00b359] transition-all"
+                className="px-4 py-2 rounded-full bg-[#01CD6C] text-white text-sm font-semibold hover:bg-[#00b359] transition-all"
               >
                 Buscar
               </button>
@@ -665,14 +665,14 @@ const MisReservasCliente = () => {
                             <>
                               <Link
                                 to={`/reserva-detalle/${r.id_reserva}`}
-                                className="inline-block px-3 py-1 rounded-md bg-[#0F2634] text-white text-xs font-semibold hover:bg-[#01CD6C] transition-all"
+                                className="inline-block px-3 py-1 rounded-full bg-[#0F2634] text-white text-xs font-semibold hover:bg-[#01CD6C] transition-all"
                               >
                                 Ver detalle
                               </Link>
                               <button
                                 type="button"
                                 onClick={() => handleOpenQr(r.id_reserva)}
-                                className="inline-block px-3 py-1 rounded-md bg-[#38BDF8] text-white text-xs font-semibold hover:bg-[#0EA5E9] transition-all"
+                                className="inline-block px-3 py-1 rounded-full bg-[#38BDF8] text-white text-xs font-semibold hover:bg-[#0EA5E9] transition-all"
                               >
                                 Ver QR
                               </button>
@@ -681,22 +681,42 @@ const MisReservasCliente = () => {
                                 <button
                                   type="button"
                                   onClick={() => handleOpenReview("create", r)}
-                                  className="inline-block px-3 py-1 rounded-md bg-[#4ADE80] text-white text-xs font-semibold hover:bg-[#22C55E] transition-all"
+                                  className="inline-block px-3 py-1 rounded-full bg-[#4ADE80] text-white text-xs font-semibold hover:bg-[#22C55E] transition-all"
                                 >
-                                  Dejar resena
+                                  Dejar reseña
                                 </button>
                               )}
 
-                              {canLeaveReview(r) &&
-                                hasReview &&
-                                !reviewVerified && (
+                              {canLeaveReview(r) && hasReview && !reviewVerified && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenReview("edit", r)}
+                                  className="inline-block px-3 py-1 rounded-full bg-[#22C55E] text-white text-xs font-semibold hover:bg-[#16A34A] transition-all"
+                                >
+                                  Editar reseña
+                                </button>
+                              )}
+
+                              {canLeaveReview(r) && hasReview && reviewVerified && (
+                                <button
+                                  type="button"
+                                  disabled
+                                  className="inline-block px-3 py-1 rounded-full bg-gray-200 text-gray-500 text-xs font-semibold cursor-not-allowed"
+                                >
+                                  Reseña enviada
+                                </button>
+                              )}
+
+                              {r.estado !== "cancelada" && (
+                                <>
                                   <button
                                     type="button"
-                                    onClick={() => handleOpenReview("edit", r)}
-                                    className="inline-block px-3 py-1 rounded-md bg-[#22C55E] text-white text-xs font-semibold hover:bg-[#16A34A] transition-all"
+                                    onClick={() => handleOpenEdit(r)}
+                                    className="inline-block px-3 py-1 rounded-full bg-[#FACC15] text-[#0F2634] text-xs font-semibold hover:bg-[#EAB308] transition-all"
                                   >
-                                    Editar resena
+                                    Editar reseña
                                   </button>
+                                  </>
                                 )}
 
                               {canLeaveReview(r) &&
@@ -704,8 +724,8 @@ const MisReservasCliente = () => {
                                 reviewVerified && (
                                   <button
                                     type="button"
-                                    disabled
-                                    className="inline-block px-3 py-1 rounded-md bg-gray-200 text-gray-500 text-xs font-semibold cursor-not-allowed"
+                                    onClick={() => handleCancel(r.id_reserva, r.estado)}
+                                    className="inline-block px-3 py-1 rounded-full bg-[#F97373] text-white text-xs font-semibold hover:bg-[#EF4444] transition-all"
                                   >
                                     Resena enviada
                                   </button>
@@ -738,16 +758,16 @@ const MisReservasCliente = () => {
                               <button
                                 type="button"
                                 onClick={() => handleOpenDetalleDeportista(r)}
-                                className="inline-block px-3 py-1 rounded-md bg-[#0F2634] text-white text-xs font-semibold hover:bg-[#01CD6C] transition-all"
+                                className="inline-block px-3 py-1 rounded-full bg-[#0F2634] text-white text-xs font-semibold hover:bg-[#01CD6C] transition-all"
                               >
                                 Ver detalle
                               </button>
                               <button
                                 type="button"
                                 onClick={() => handleOpenQr(r.id_reserva)}
-                                className="inline-block px-3 py-1 rounded-md bg-[#38BDF8] text-white text-xs font-semibold hover:bg-[#0EA5E9] transition-all"
+                                className="inline-block px-3 py-1 rounded-full bg-[#38BDF8] text-white text-xs font-semibold hover:bg-[#0EA5E9] transition-all"
                               >
-                                Ver QR deportista
+                                Ver QR
                               </button>
                             </>
                           )}
@@ -964,7 +984,7 @@ const MisReservasCliente = () => {
                 <select
                   value={reviewRating}
                   onChange={(e) => setReviewRating(Number(e.target.value))}
-                  className="w-full border border-[#CBD5E1] rounded-md px-3 py-2 text-sm text-[#0F2634]"
+                  className="w-full border border-[#CBD5E1] rounded-full px-3 py-2 text-sm text-[#0F2634]"
                 >
                   <option value={5}>5</option>
                   <option value={4}>4</option>
@@ -995,10 +1015,8 @@ const MisReservasCliente = () => {
                   type="submit"
                   disabled={reviewSaving}
                   className={
-                    "flex-1 px-4 py-2 rounded-md bg-[#01CD6C] text-white text-sm font-semibold transition-all " +
-                    (reviewSaving
-                      ? "opacity-70 cursor-not-allowed"
-                      : "hover:bg-[#00b359]")
+                    "flex-1 px-4 py-2 rounded-full bg-[#01CD6C] text-white text-sm font-semibold transition-all " +
+                    (reviewSaving ? "opacity-70 cursor-not-allowed" : "hover:bg-[#00b359]")
                   }
                 >
                   {reviewSaving ? "Enviando..." : "Enviar resena"}
@@ -1010,7 +1028,7 @@ const MisReservasCliente = () => {
                     setReviewReserva(null);
                     setReviewError(null);
                   }}
-                  className="flex-1 px-4 py-2 rounded-md bg-[#E2E8F0] text-[#0F2634] text-sm font-semibold hover:bg-[#CBD5E1] transition-all"
+                  className="flex-1 px-4 py-2 rounded-full bg-[#E2E8F0] text-[#0F2634] text-sm font-semibold hover:bg-[#CBD5E1] transition-all"
                 >
                   Cancelar
                 </button>
@@ -1088,7 +1106,7 @@ const MisReservasCliente = () => {
                 setDetalleDepModalOpen(false);
                 setDetalleDepReserva(null);
               }}
-              className="w-full mt-5 px-4 py-2 rounded-md bg-[#E2E8F0] text-[#0F2634] text-sm font-semibold hover:bg-[#CBD5E1] transition-all"
+              className="w-full mt-5 px-4 py-2 rounded-full bg-[#E2E8F0] text-[#0F2634] text-sm font-semibold hover:bg-[#CBD5E1] transition-all"
             >
               Cerrar
             </button>

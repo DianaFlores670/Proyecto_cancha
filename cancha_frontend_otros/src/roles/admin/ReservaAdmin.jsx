@@ -83,7 +83,7 @@ const ReservaAdmin = () => {
 
   const location = useLocation();
   const params = new URLSearchParams(location.search);
-  const canchaId = params.get('cancha'); // 👈 Obtiene el id_cancha desde la URL si existe
+  const canchaId = params.get('cancha');
   const idReserva = params.get('id_reserva');
 
   useEffect(() => {
@@ -100,9 +100,14 @@ const ReservaAdmin = () => {
   useEffect(() => {
     const fetchClientes = async () => {
       try {
-        const res = await api.get('/cliente/datos-especificos');
-        if (res.data?.exito) setClientes(res.data.datos.clientes || []);
-      } catch (e) { setError('Error al cargar clientes'); }
+        const response = await api.get('/cliente/datos-especificos', {
+          params: { limit: 1000, offset: 0 }
+        });
+        if (response.data?.exito) setClientes(response.data.datos.clientes || []);
+        else setError(response.data?.mensaje || 'Error al obtener clientes');
+      } catch (err) {
+        setError(err.response?.data?.mensaje || 'Error de conexion al obtener clientes');
+      }
     };
 
     const fetchCanchas = async () => {
@@ -120,94 +125,85 @@ const ReservaAdmin = () => {
   }, [role, idAdminEspDep]);
 
   const fetchReservas = async (params = {}) => {
-  if (!permissions.canView) { setError('No tienes permisos para ver'); return; }
-  setLoading(true);
-  setError(null);
-  const offset = (page - 1) * limit;
-  const fullParams = { ...params, limit, offset };
+    if (!permissions.canView) { setError('No tienes permisos para ver'); return; }
+    setLoading(true);
+    setError(null);
+    const offset = (page - 1) * limit;
+    const fullParams = { ...params, limit, offset };
 
-  try {
-    if (!idAdminEspDep) {
-      setError('No se detectó id_admin_esp_dep del usuario actual');
+    try {
+      if (!idAdminEspDep) {
+        setError('No se detecto id_admin_esp_dep del usuario actual');
+        setLoading(false);
+        return;
+      }
+
+      let resp;
+      if (params.q) {
+        resp = await api.get('/reserva-admin/buscar', {
+          params: { ...fullParams, id_admin_esp_dep: idAdminEspDep }
+        });
+      } else if (params.tipo) {
+        resp = await api.get('/reserva-admin/filtro', {
+          params: { ...fullParams, id_admin_esp_dep: idAdminEspDep }
+        });
+      } else {
+        resp = await api.get('/reserva-admin/datos-especificos', {
+          params: { ...fullParams, id_admin_esp_dep: idAdminEspDep, id_cancha: canchaId || undefined }
+        });
+      }
+
+      if (resp.data?.exito) {
+        setReservas(resp.data.datos.reservas || []);
+        setTotal(resp.data.datos.paginacion?.total || 0);
+      } else {
+        setError(resp.data?.mensaje || 'Error al cargar reservas');
+      }
+    } catch (e) {
+      setError(e.response?.data?.mensaje || 'Error de conexion');
+    } finally {
       setLoading(false);
-      return;
     }
-
-    let resp;
-    // 🔹 Buscar
-    if (params.q) {
-      resp = await api.get('/reserva-admin/buscar', { 
-        params: { ...fullParams, id_admin_esp_dep: idAdminEspDep } 
-      });
-    }
-    // 🔹 Filtrar
-    else if (params.tipo) {
-      resp = await api.get('/reserva-admin/filtro', { 
-        params: { ...fullParams, id_admin_esp_dep: idAdminEspDep } 
-      });
-    }
-    // 🔹 Datos normales
-    else {
-      resp = await api.get('/reserva-admin/datos-especificos', { 
-        params: { ...fullParams, id_admin_esp_dep: idAdminEspDep, id_cancha: canchaId || undefined }
-      });
-    }
-
-    if (resp.data?.exito) {
-      setReservas(resp.data.datos.reservas || []);
-      setTotal(resp.data.datos.paginacion?.total || 0);
-    } else {
-      setError(resp.data?.mensaje || 'Error al cargar reservas');
-    }
-  } catch (e) {
-    setError(e.response?.data?.mensaje || 'Error de conexion');
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
   useEffect(() => {
-  if (!role || !idAdminEspDep) return;
+    if (!role || !idAdminEspDep) return;
 
-  if (idReserva) {
-    // Si hay id_reserva en la URL, cargar solo esa
-    api.get(`/reserva-admin/dato-individual/${idReserva}`, {
-      params: { id_admin_esp_dep: idAdminEspDep }
-    })
-    .then(r => {
-      if (r.data?.exito) {
-        setReservas([r.data.datos.reserva]);
-        setTotal(1);
-      } else {
-        setReservas([]);
-        setError('No se encontró la reserva');
-      }
-    })
-    .catch(() => setError('Error de conexión al servidor'));
-  } else {
-    // Si no hay id_reserva, carga normalmente (por cancha o todas)
-    fetchReservas({ id_cancha: canchaId });
-  }
-}, [role, idAdminEspDep, page, canchaId, idReserva]);
+    if (idReserva) {
+      api.get(`/reserva-admin/dato-individual/${idReserva}`, {
+        params: { id_admin_esp_dep: idAdminEspDep }
+      })
+        .then(r => {
+          if (r.data?.exito) {
+            setReservas([r.data.datos.reserva]);
+            setTotal(1);
+          } else {
+            setReservas([]);
+            setError('No se encontro la reserva');
+          }
+        })
+        .catch(() => setError('Error de conexion al servidor'));
+    } else {
+      fetchReservas({ id_cancha: canchaId });
+    }
+  }, [role, idAdminEspDep, page, canchaId, idReserva]);
 
-const handleSearch = (e) => {
-  e.preventDefault();
-  setPage(1);
-  const baseParams = canchaId ? { id_cancha: canchaId } : {};
-  if (searchTerm.trim()) fetchReservas({ q: searchTerm, ...baseParams });
-  else fetchReservas(baseParams);
-};
+  const handleSearch = (e) => {
+    e.preventDefault();
+    setPage(1);
+    const baseParams = canchaId ? { id_cancha: canchaId } : {};
+    if (searchTerm.trim()) fetchReservas({ q: searchTerm, ...baseParams });
+    else fetchReservas(baseParams);
+  };
 
-
-const handleFiltroChange = (e) => {
-  const tipo = e.target.value;
-  setFiltro(tipo);
-  setPage(1);
-  const baseParams = canchaId ? { id_cancha: canchaId } : {};
-  if (tipo) fetchReservas({ tipo, ...baseParams });
-  else fetchReservas(baseParams);
-};
-
+  const handleFiltroChange = (e) => {
+    const tipo = e.target.value;
+    setFiltro(tipo);
+    setPage(1);
+    const baseParams = canchaId ? { id_cancha: canchaId } : {};
+    if (tipo) fetchReservas({ tipo, ...baseParams });
+    else fetchReservas(baseParams);
+  };
 
   const openCreateModal = () => {
     setEditMode(false);
@@ -229,7 +225,7 @@ const handleFiltroChange = (e) => {
     if (!permissions.canEdit) return;
     try {
       const response = await api.get(`/reserva-admin/dato-individual/${id}`, {
-        params: { id_admin_esp_dep: idAdminEspDep }, // 👈 importante
+        params: { id_admin_esp_dep: idAdminEspDep },
       });
 
       if (response.data?.exito) {
@@ -256,7 +252,6 @@ const handleFiltroChange = (e) => {
       setError(err.response?.data?.mensaje || 'Error de conexion al servidor');
     }
   };
-
 
   const openViewModal = async (id) => {
     if (!permissions.canView) return;
@@ -287,7 +282,6 @@ const handleFiltroChange = (e) => {
     }
   };
 
-
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
@@ -307,20 +301,18 @@ const handleFiltroChange = (e) => {
       };
 
       if (!data.fecha_reserva || isNaN(data.id_cliente) || isNaN(data.id_cancha)) {
-        setError('Faltan campos obligatorios o inválidos');
+        setError('Faltan campos obligatorios o invalidos');
         return;
       }
 
       let resp;
       if (editMode) {
-        // ✅ enviar id_admin_esp_dep en la query, no en el body
         resp = await api.patch(
           `/reserva-admin/${currentReserva.id_reserva}`,
           data,
-          { params: { id_admin_esp_dep: idAdminEspDep } } // 👈 clave
+          { params: { id_admin_esp_dep: idAdminEspDep } }
         );
       } else {
-        // ✅ Enviar id_admin_esp_dep dentro del body
         resp = await api.post('/reserva-admin/', { ...data, id_admin_esp_dep: idAdminEspDep });
       }
 
@@ -331,12 +323,12 @@ const handleFiltroChange = (e) => {
         setError(resp.data?.mensaje || 'Error al guardar');
       }
     } catch (e) {
-      setError(e.response?.data?.mensaje || 'Error de conexión con el servidor');
+      setError(e.response?.data?.mensaje || 'Error de conexion con el servidor');
     }
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm('¿Eliminar reserva?')) return;
+    if (!window.confirm('Eliminar reserva?')) return;
     try {
       const r = await api.delete(`/reserva-admin/${id}`);
       if (r.data?.exito) fetchReservas();
@@ -346,11 +338,19 @@ const handleFiltroChange = (e) => {
 
   if (!role || (role === 'ADMIN_ESP_DEP' && !idAdminEspDep)) return <p>Cargando permisos...</p>;
 
+  const baseUrl = api.defaults.baseURL
+    ? api.defaults.baseURL.replace(/\/$/, '')
+    : '';
+
+  const qrImageUrl = currentReserva && currentReserva.qr_url_imagen
+    ? `${baseUrl}${currentReserva.qr_url_imagen}`
+    : '';
+
   return (
     <div className="bg-white rounded-lg shadow p-6">
       <h2 className="text-xl font-semibold mb-4">
-  {idReserva ? `Detalle de la Reserva #${idReserva}` : 'Gestión de Reservas'}
-</h2>
+        {idReserva ? `Detalle de la Reserva #${idReserva}` : 'Gestion de Reservas'}
+      </h2>
 
       <div className="flex flex-col xl:flex-row gap-4 mb-6 items-stretch">
         <div className="flex-1">
@@ -416,8 +416,8 @@ const handleFiltroChange = (e) => {
                     <td className="px-4 py-2">{`${r.cliente_nombre} ${r.cliente_apellido}`}</td>
                     <td className="px-4 py-2">{r.cancha_nombre}</td>
                     <td className="px-4 py-2">{new Date(r.fecha_reserva).toLocaleDateString()}</td>
-                    <td className="px-4 py-2">{r.monto_total ? `$${r.monto_total}` : '-'}</td>
-                    <td className="px-4 py-2">{r.saldo_pendiente ? `$${r.saldo_pendiente}` : '-'}</td>
+                    <td className="px-4 py-2">{r.monto_total ? `Bs. ${r.monto_total}` : '-'}</td>
+                    <td className="px-4 py-2">{r.saldo_pendiente ? `Bs. ${r.saldo_pendiente}` : '-'}</td>
                     <td className="px-4 py-2 flex gap-2">
                       <button onClick={() => openViewModal(r.id_reserva)} className="text-green-500 hover:text-green-700">Ver</button>
                       <button onClick={() => openEditModal(r.id_reserva)} className="text-blue-500 hover:text-blue-700">Editar</button>
@@ -542,6 +542,30 @@ const handleFiltroChange = (e) => {
                   <option value="cancelada">Cancelada</option>
                 </select>
               </div>
+
+              {viewMode && currentReserva && (
+                <div className="col-span-2 mt-4 border rounded-lg p-4 bg-gray-50">
+                  <p className="text-sm font-medium mb-2">Codigo QR de la reserva</p>
+                  {qrImageUrl ? (
+                    <div className="flex flex-col items-center gap-2">
+                      <img
+                        src={qrImageUrl}
+                        alt="Codigo QR"
+                        className="w-40 h-40 object-contain"
+                      />
+                      {currentReserva.codigo_qr && (
+                        <p className="text-xs text-gray-700 break-all">
+                          {currentReserva.codigo_qr}
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-500">
+                      Esta reserva no tiene codigo QR registrado
+                    </p>
+                  )}
+                </div>
+              )}
 
               <div className="col-span-2 flex justify-end mt-4">
                 <button

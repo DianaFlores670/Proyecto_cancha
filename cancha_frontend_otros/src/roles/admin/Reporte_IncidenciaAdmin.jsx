@@ -369,65 +369,127 @@ console.log('📦 DATOS RECIBIDOS:', r.data?.datos);
       )}
 
       {modalOpen && viewData && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-8 max-w-xl w-full max-h-[80vh] overflow-y-auto">
-            <h3 className="text-xl font-semibold mb-4">Detalle de incidencia</h3>
+  <div className="fixed inset-0 bg-[#020617]/60 backdrop-blur-sm flex items-center justify-center z-50 px-4">
+    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-hidden">
+      <div className="flex items-center justify-between px-6 py-4 border-b border-[#E2E8F0] bg-[#F8FAFC]">
+        <div>
+          <h3 className="text-lg md:text-xl font-semibold text-[#0F172A]">
+            Detalle de incidencia
+          </h3>
+          <p className="text-xs text-[#64748B] mt-1">
+            Revisa la informacion registrada del incidente
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          {viewData.id_reporte && (
+            <span className="inline-flex items-center rounded-full bg-[#E0F2FE] px-3 py-1 text-xs font-semibold text-[#0369A1]">
+              ID {viewData.id_reporte}
+            </span>
+          )}
+        </div>
+      </div>
 
-            <div className="space-y-2 text-sm">
-              <p>
-                <strong>ID reporte:</strong> {viewData.id_reporte}
-              </p>
-              <p>
-                <strong>Encargado:</strong>{' '}
-                {viewData.encargado_nombre || viewData.encargado_apellido
-                  ? `${viewData.encargado_nombre || ''} ${viewData.encargado_apellido || ''}`.trim()
-                  : '-'}
-              </p>
-              <p>
-                <strong>Cliente:</strong>{' '}
-                {viewData.cliente_nombre || viewData.cliente_apellido
-                  ? `${viewData.cliente_nombre || ''} ${viewData.cliente_apellido || ''}`.trim()
-                  : '-'}
-              </p>
-              <p>
-                <strong>Reserva:</strong> {viewData.id_reserva ? `#${viewData.id_reserva}` : '-'}
-              </p>
-              <p>
-                <strong>Cancha:</strong> {viewData.cancha_nombre || '-'}
-              </p>
-              <p>
-                <strong>Detalle:</strong> {viewData.detalle || '-'}
-              </p>
-              <p>
-                <strong>Sugerencia:</strong> {viewData.sugerencia || '-'}
-              </p>
-              <div className="mt-3 flex items-center gap-3">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                  disabled
-                    type="checkbox"
-                    checked={verificadoLocal}
-                    onChange={(e) => setVerificadoLocal(e.target.checked)}
-                  />
-                  <span>Verificado</span>
-                </label>
-              </div>
-            </div>
+      <div className="px-6 py-5 space-y-5 overflow-y-auto max-h-[60vh]">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+          <div className="space-y-1">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-[#94A3B8]">
+              Encargado
+            </p>
+            <p className="text-[#0F172A]">
+              {viewData.encargado_nombre || viewData.encargado_apellido
+                ? `${viewData.encargado_nombre || ''} ${viewData.encargado_apellido || ''}`.trim()
+                : '-'}
+            </p>
+          </div>
 
-            <div className="flex justify-end mt-6 gap-2">
-              <button
-                type="button"
-                onClick={closeModal}
-                className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600"
-              >
-                Cerrar
-              </button>
-            </div>
+          <div className="space-y-1">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-[#94A3B8]">
+              Cliente
+            </p>
+            <p className="text-[#0F172A]">
+              {viewData.cliente_nombre || viewData.cliente_apellido
+                ? `${viewData.cliente_nombre || ''} ${viewData.cliente_apellido || ''}`.trim()
+                : '-'}
+            </p>
+          </div>
 
-            {error && <p className="text-red-500 mt-4">{error}</p>}
+          <div className="space-y-1">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-[#94A3B8]">
+              Reserva
+            </p>
+            <p className="text-[#0F172A]">
+              {viewData.id_reserva ? `#${viewData.id_reserva}` : '-'}
+            </p>
+          </div>
+
+          <div className="space-y-1">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-[#94A3B8]">
+              Cancha
+            </p>
+            <p className="text-[#0F172A]">
+              {viewData.cancha_nombre || '-'}
+            </p>
           </div>
         </div>
-      )}
+
+        <div className="space-y-3 text-sm">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-[#94A3B8] mb-1">
+              Detalle
+            </p>
+            <div className="rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] px-3 py-2 text-[#0F172A] text-sm">
+              {viewData.detalle || '-'}
+            </div>
+          </div>
+
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-[#94A3B8] mb-1">
+              Sugerencia
+            </p>
+            <div className="rounded-xl border border-[#E2E8F0] bg-[#F9FAFB] px-3 py-2 text-[#0F172A] text-sm">
+              {viewData.sugerencia || '-'}
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-3 flex items-center justify-between border-t border-[#E2E8F0] pt-4">
+          <div className="flex items-center gap-2">
+            <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#DCFCE7] text-[#16A34A] text-xs font-semibold">
+              {verificadoLocal ? 'OK' : 'NO'}
+            </span>
+            <label className="flex items-center gap-2 cursor-default text-sm text-[#0F172A]">
+              <input
+                disabled
+                type="checkbox"
+                checked={verificadoLocal}
+                onChange={(e) => setVerificadoLocal(e.target.checked)}
+                className="h-4 w-4 rounded border-[#CBD5E1] text-[#16A34A] focus:ring-[#16A34A]"
+              />
+              <span>Verificado</span>
+            </label>
+          </div>
+        </div>
+
+        {error && (
+          <p className="text-xs text-red-500 mt-1">
+            {error}
+          </p>
+        )}
+      </div>
+
+      <div className="px-6 py-4 border-t border-[#E2E8F0] bg-[#F9FAFB] flex justify-end">
+        <button
+          type="button"
+          onClick={closeModal}
+          className="px-4 py-2 text-sm font-semibold rounded-lg bg-[#0F172A] text-white hover:bg-[#020617] transition-colors"
+        >
+          Cerrar
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+
     </div>
   );
 };

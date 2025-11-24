@@ -25,11 +25,15 @@ const obtenerQRParaControl = async (codigo_qr, id_control) => {
         SELECT COUNT(*) 
         FROM control_acceso ca 
         WHERE ca.id_qr = qr.id_qr
-      ) AS accesos_usados
+      ) AS accesos_usados,
+      u.nombre AS cliente_nombre,
+      u.apellido AS cliente_apellido
     FROM qr_reserva qr
     JOIN reserva r ON r.id_reserva = qr.id_reserva
     JOIN cancha c ON c.id_cancha = r.id_cancha
     JOIN control ctrl ON ctrl.id_espacio = c.id_espacio
+    JOIN cliente cli ON cli.id_cliente = r.id_cliente
+    JOIN usuario u ON u.id_persona = cli.id_cliente
     WHERE qr.codigo_qr = $1 AND ctrl.id_control = $2
     LIMIT 1
   `;
@@ -38,7 +42,6 @@ const obtenerQRParaControl = async (codigo_qr, id_control) => {
   const qr = result.rows[0];
 
   if (qr) {
-    // Actualiza el campo id_control en qr_reserva
     const updateControl = `
       UPDATE qr_reserva
       SET id_control = $1
@@ -47,10 +50,9 @@ const obtenerQRParaControl = async (codigo_qr, id_control) => {
     `;
     await pool.query(updateControl, [id_control, qr.id_qr]);
   }
-  
+
   return qr;
 };
-
 
 /**
  * Registrar un acceso
@@ -61,7 +63,7 @@ const registrarAcceso = async (id_qr, id_control) => {
     VALUES ($1, $2)
     RETURNING *
   `;
-  
+
   const r = await pool.query(q, [id_qr, id_control]);
   return r.rows[0];
 };
@@ -102,7 +104,7 @@ const scanQRController = async (req, res) => {
         .json(respuesta(false, "La reserva no está pagada o activa"));
 
     // verificar cupo disponible
-        if (qr.accesos_usados >= qr.cupo)
+    if (qr.accesos_usados >= qr.cupo)
       return res.json(
         respuesta(false, "Cupo agotado, no se permiten mas accesos")
       );
@@ -113,8 +115,11 @@ const scanQRController = async (req, res) => {
         id_reserva: qr.id_reserva,
         accesos_usados: qr.accesos_usados,
         cupo_total: qr.cupo,
+        cliente_nombre: qr.cliente_nombre,
+        cliente_apellido: qr.cliente_apellido
       })
     );
+
   } catch (e) {
     console.error(e);
     res.status(500).json(respuesta(false, e.message));
@@ -155,25 +160,30 @@ const permitirAccesoController = async (req, res) => {
     }
 
     const qInfo = `
-      SELECT 
-        qr.id_qr,
-        qr.codigo_qr,
-        qr.estado AS estado_qr,
-        qr.id_reserva,
-        r.cupo,
-        r.estado AS estado_reserva,
-        (
-          SELECT COUNT(*)
-          FROM control_acceso ca
-          WHERE ca.id_qr = qr.id_qr
-        ) AS accesos_usados
-      FROM qr_reserva qr
-      JOIN reserva r ON r.id_reserva = qr.id_reserva
-      JOIN cancha c ON c.id_cancha = r.id_cancha
-      JOIN control ctrl ON ctrl.id_espacio = c.id_espacio
-      WHERE qr.id_qr = $1 AND ctrl.id_control = $2
-      LIMIT 1
-    `;
+  SELECT 
+    qr.id_qr,
+    qr.codigo_qr,
+    qr.estado AS estado_qr,
+    qr.id_reserva,
+    r.cupo,
+    r.estado AS estado_reserva,
+    (
+      SELECT COUNT(*)
+      FROM control_acceso ca
+      WHERE ca.id_qr = qr.id_qr
+    ) AS accesos_usados,
+    u.nombre AS cliente_nombre,
+    u.apellido AS cliente_apellido
+  FROM qr_reserva qr
+  JOIN reserva r ON r.id_reserva = qr.id_reserva
+  JOIN cancha c ON c.id_cancha = r.id_cancha
+  JOIN control ctrl ON ctrl.id_espacio = c.id_espacio
+  JOIN cliente cli ON cli.id_cliente = r.id_cliente
+  JOIN usuario u ON u.id_persona = cli.id_cliente
+  WHERE qr.id_qr = $1 AND ctrl.id_control = $2
+  LIMIT 1
+`;
+
 
     const info = await pool.query(qInfo, [id_qr, id_control]);
     const qr = info.rows[0];
@@ -201,8 +211,11 @@ const permitirAccesoController = async (req, res) => {
         id_reserva: qr2.id_reserva,
         accesos_usados: qr2.accesos_usados,
         cupo_total: qr2.cupo,
+        cliente_nombre: qr2.cliente_nombre,
+        cliente_apellido: qr2.cliente_apellido
       })
     );
+
   } catch (e) {
     res.status(500).json(respuesta(false, e.message));
   }

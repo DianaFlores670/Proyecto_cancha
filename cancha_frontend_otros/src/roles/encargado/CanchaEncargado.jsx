@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from "react";
 import api from "../../services/api";
-import { getImageUrl } from "../../utils";
 
 const CanchaEncargado = () => {
   const [canchas, setCanchas] = useState([]);
@@ -99,7 +98,6 @@ const CanchaEncargado = () => {
     <div className="bg-white rounded-lg shadow p-6">
       <h2 className="text-xl font-semibold mb-4">Mis Canchas</h2>
 
-      {/* BUSCADOR Y FILTRO */}
       <div className="flex flex-col xl:flex-row gap-4 mb-6 items-stretch">
         <div className="flex-1">
           <form onSubmit={handleSearch} className="flex h-full">
@@ -134,7 +132,6 @@ const CanchaEncargado = () => {
         </div>
       </div>
 
-      {/* TABLA */}
       {loading ? (
         <p>Cargando canchas...</p>
       ) : error ? (
@@ -157,9 +154,7 @@ const CanchaEncargado = () => {
               <tbody>
                 {canchas.map((c, index) => (
                   <tr key={c.id_cancha} className="border-t">
-                    <td className="px-4 py-2">
-                      {(page - 1) * limit + index + 1}
-                    </td>
+                    <td className="px-4 py-2">{(page - 1) * limit + index + 1}</td>
                     <td className="px-4 py-2">{c.nombre}</td>
                     <td className="px-4 py-2">{c.ubicacion || "-"}</td>
                     <td className="px-4 py-2">{c.capacidad || "-"}</td>
@@ -181,7 +176,6 @@ const CanchaEncargado = () => {
             </table>
           </div>
 
-          {/* PAGINACION */}
           <div className="flex justify-center mt-4">
             <button
               onClick={() => handlePageChange(page - 1)}
@@ -192,7 +186,7 @@ const CanchaEncargado = () => {
             </button>
 
             <span className="px-4 py-2 bg-gray-100">
-              Página {page} de {Math.ceil(total / limit)}
+              Pagina {page} de {Math.ceil(total / limit)}
             </span>
 
             <button
@@ -206,80 +200,160 @@ const CanchaEncargado = () => {
         </>
       )}
 
-      {/* MODAL */}
       {modalOpen && currentCancha && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-8 max-w-xl w-full max-h-[80vh] overflow-y-auto">
-            <h3 className="text-xl font-semibold mb-4">Datos de la Cancha</h3>
+        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full mx-4 p-6 md:p-8 max-h-[85vh] overflow-y-auto">
 
-            {/* Imagen */}
-            {currentCancha.imagen_cancha ? (
-              <img
-                src={
-                  currentCancha.imagen_cancha.startsWith("http")
-                    ? currentCancha.imagen_cancha
-                    : `${api.defaults.baseURL}/${currentCancha.imagen_cancha}`
-                }
-                alt="Foto de cancha"
-                className="w-full h-64 object-cover rounded mb-4"
-              />
-            ) : (
-              <p className="text-gray-500 mb-4">Sin imagen</p>
-            )}
+            <div className="flex items-start justify-between gap-4 mb-6">
+              <div>
+                <p className="text-[11px] uppercase tracking-[0.14em] text-gray-400">
+                  Cancha
+                </p>
+                <h3 className="text-xl md:text-2xl font-semibold text-gray-900">
+                  Datos de la cancha
+                </h3>
+                <p className="text-xs text-gray-500 mt-1">
+                  Espacio: {currentCancha.espacio_nombre || "-"}
+                </p>
+              </div>
 
-            {/* Tabla de valores */}
-            <div className="grid grid-cols-2 gap-4 mb-6">
-              <p>
-                <strong>Nombre:</strong> {currentCancha.nombre}
-              </p>
-              <p>
-                <strong>Ubicacion:</strong> {currentCancha.ubicacion || "-"}
-              </p>
-              <p>
-                <strong>Capacidad:</strong> {currentCancha.capacidad || "-"}
-              </p>
-              <p>
-                <strong>Estado:</strong> {currentCancha.estado || "-"}
-              </p>
-              <p>
-                <strong>Monto/hora:</strong>{" "}
-                {currentCancha.monto_por_hora || "-"}
-              </p>
-              <p>
-                <strong>Espacio:</strong> {currentCancha.espacio_nombre}
-              </p>
+              <div className="flex flex-col items-end gap-2">
+                {currentCancha.estado && (
+                  <span
+                    className={
+                      "inline-flex items-center px-3 py-1 rounded-full text-[11px] font-medium " +
+                      (currentCancha.estado === "disponible"
+                        ? "bg-green-100 text-green-700"
+                        : currentCancha.estado === "ocupada"
+                        ? "bg-blue-100 text-blue-700"
+                        : currentCancha.estado === "mantenimiento"
+                        ? "bg-yellow-100 text-yellow-700"
+                        : "bg-gray-100 text-gray-700")
+                    }
+                  >
+                    {currentCancha.estado}
+                  </span>
+                )}
+                {currentCancha.monto_por_hora && (
+                  <p className="text-xs text-gray-700">
+                    Monto por hora:{" "}
+                    <span className="font-semibold">
+                      Bs {currentCancha.monto_por_hora}
+                    </span>
+                  </p>
+                )}
+              </div>
             </div>
 
-            {/* Disciplinas */}
-            <h4 className="text-lg font-semibold mb-2">Disciplinas</h4>
+            <div className="mb-6">
+              {currentCancha.imagen_cancha ? (
+                <div className="relative overflow-hidden rounded-2xl border border-gray-200">
+                  <img
+                    src={
+                      currentCancha.imagen_cancha.startsWith("http")
+                        ? currentCancha.imagen_cancha
+                        : `${api.defaults.baseURL}/${currentCancha.imagen_cancha}`
+                    }
+                    alt="foto_cancha"
+                    className="w-full h-64 object-cover"
+                  />
+                  <span className="absolute top-2 left-2 px-2 py-1 rounded-full bg-black/60 text-[10px] text-white font-medium">
+                    Imagen principal
+                  </span>
+                </div>
+              ) : (
+                <div className="flex items-center justify-center h-32 rounded-2xl border border-dashed border-gray-300 bg-gray-50">
+                  <p className="text-xs text-gray-500">Sin imagen registrada</p>
+                </div>
+              )}
+            </div>
 
-            {currentCancha.disciplinas &&
-            currentCancha.disciplinas.length > 0 ? (
-              <ul className="space-y-2 mb-4">
-                {currentCancha.disciplinas.map((d) => (
-                  <li
-                    key={d.id_disciplina}
-                    className="p-2 border rounded flex justify-between"
-                  >
-                    <span>{d.nombre}</span>
-                    <span className="text-sm text-gray-600">
-                      {d.frecuencia_practica}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm mb-6">
+              <div className="space-y-1">
+                <p className="text-[11px] text-gray-500">Nombre</p>
+                <p className="font-medium text-gray-900">
+                  {currentCancha.nombre || "-"}
+                </p>
+              </div>
+
+              <div className="space-y-1">
+                <p className="text-[11px] text-gray-500">Ubicacion</p>
+                <p className="font-medium text-gray-900">
+                  {currentCancha.ubicacion || "-"}
+                </p>
+              </div>
+
+              <div className="space-y-1">
+                <p className="text-[11px] text-gray-500">Capacidad</p>
+                <p className="font-medium text-gray-900">
+                  {currentCancha.capacidad || "-"} personas
+                </p>
+              </div>
+
+              <div className="space-y-1">
+                <p className="text-[11px] text-gray-500">Monto por hora</p>
+                <p className="font-medium text-gray-900">
+                  {currentCancha.monto_por_hora
+                    ? `Bs ${currentCancha.monto_por_hora}`
+                    : "-"}
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-4">
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="text-sm font-semibold text-gray-900">
+                  Disciplinas asociadas
+                </h4>
+                {currentCancha.disciplinas &&
+                  currentCancha.disciplinas.length > 0 && (
+                    <span className="text-[11px] text-gray-500">
+                      {currentCancha.disciplinas.length} disciplina
+                      {currentCancha.disciplinas.length > 1 ? "s" : ""}
                     </span>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="text-gray-500">Sin disciplinas asignadas</p>
-            )}
+                  )}
+              </div>
+
+              {currentCancha.disciplinas &&
+              currentCancha.disciplinas.length > 0 ? (
+                <ul className="space-y-2 mb-2">
+                  {currentCancha.disciplinas.map((d) => (
+                    <li
+                      key={d.id_disciplina}
+                      className="flex items-center justify-between px-3 py-2 rounded-lg border border-gray-200 bg-gray-50"
+                    >
+                      <div className="flex flex-col">
+                        <span className="text-sm font-medium text-gray-900">
+                          {d.nombre}
+                        </span>
+                        {d.frecuencia_practica && (
+                          <span className="text-[11px] text-gray-500">
+                            Frecuencia: {d.frecuencia_practica}
+                          </span>
+                        )}
+                      </div>
+                      <span className="inline-flex items-center px-2 py-1 rounded-full bg-gray-900 text-white text-[10px] font-medium">
+                        Activa
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-xs text-gray-500">
+                  Sin disciplinas asignadas a esta cancha.
+                </p>
+              )}
+            </div>
 
             <div className="flex justify-end mt-6">
               <button
                 onClick={closeModal}
-                className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600"
+                className="px-5 py-2.5 rounded-lg bg-gray-800 text-white text-sm font-semibold hover:bg-gray-900 transition-colors"
               >
                 Cerrar
               </button>
             </div>
+
           </div>
         </div>
       )}

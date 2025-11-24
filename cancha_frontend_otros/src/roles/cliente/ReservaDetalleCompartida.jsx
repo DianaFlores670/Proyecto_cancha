@@ -21,6 +21,14 @@ const ReservaDetalleCompartida = () => {
 
   const [linkUnirse, setLinkUnirse] = useState("");
 
+  const [deportistas, setDeportistas] = useState([]);
+  const [loadingDeportistas, setLoadingDeportistas] = useState(false);
+  const [errorDeportistas, setErrorDeportistas] = useState(null);
+  const [cupoInfo, setCupoInfo] = useState(null);
+  const [depLimit, setDepLimit] = useState(10);
+  const [depOffset, setDepOffset] = useState(0);
+  const [depTotal, setDepTotal] = useState(0);
+
   useEffect(() => {
     const fetchReserva = async () => {
       try {
@@ -134,12 +142,83 @@ const ReservaDetalleCompartida = () => {
     fetchLinkUnirse();
   }, [idReserva]);
 
+  useEffect(() => {
+    const fetchDeportistas = async () => {
+      if (!idReserva) return;
+      try {
+        setLoadingDeportistas(true);
+        setErrorDeportistas(null);
+
+        const resp = await api.get("/unirse-reserva/deportistas", {
+          params: {
+            id_reserva: idReserva,
+            limit: depLimit,
+            offset: depOffset
+          }
+        });
+
+        if (!resp.data?.exito) {
+          const msg =
+            resp.data?.mensaje ||
+            "No se pudieron cargar los deportistas de la reserva";
+          setErrorDeportistas(msg);
+          setDeportistas([]);
+          setCupoInfo(null);
+          setDepTotal(0);
+          return;
+        }
+
+        const datos = resp.data?.datos || {};
+        const lista = datos.deportistas || [];
+        const pag = datos.paginacion || {};
+        const cupoTotal = datos.cupo_total;
+        const cupoOcupado = datos.cupo_ocupado;
+        const indiceCupo = datos.indice_cupo;
+
+        setDeportistas(Array.isArray(lista) ? lista : []);
+        setDepTotal(pag.total || 0);
+        setCupoInfo({
+          cupo_total: cupoTotal,
+          cupo_ocupado: cupoOcupado,
+          indice_cupo: indiceCupo
+        });
+      } catch (err) {
+        const msg =
+          err.response?.data?.mensaje ||
+          err.message ||
+          "Error al cargar los deportistas de la reserva";
+        setErrorDeportistas(msg);
+        setDeportistas([]);
+        setCupoInfo(null);
+        setDepTotal(0);
+      } finally {
+        setLoadingDeportistas(false);
+      }
+    };
+
+    fetchDeportistas();
+  }, [idReserva, depLimit, depOffset]);
+
   const handleCopyLinkUnirse = () => {
     if (!linkUnirse) return;
     if (navigator && navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(linkUnirse).catch(() => {});
     }
   };
+
+  const handleDepPrev = () => {
+    if (depOffset === 0) return;
+    setDepOffset((prev) => (prev - depLimit < 0 ? 0 : prev - depLimit));
+  };
+
+  const handleDepNext = () => {
+    const nextOffset = depOffset + depLimit;
+    if (nextOffset >= depTotal) return;
+    setDepOffset(nextOffset);
+  };
+
+  const depDesde = depOffset + 1;
+  const depHasta = depOffset + deportistas.length;
 
   return (
     <>
@@ -199,7 +278,7 @@ const ReservaDetalleCompartida = () => {
                     </p>
                   </div>
                   <div>
-                    <p className="text-sm text-[#64748B]">Cupo aproximado</p>
+                    <p className="text-sm text-[#64748B]">Cupo</p>
                     <p className="font-medium text-[#0F2634]">
                       {reserva.cupo || "-"}
                     </p>
@@ -211,7 +290,7 @@ const ReservaDetalleCompartida = () => {
                 <h2 className="text-lg font-semibold text-[#0F2634] mb-3">
                   Cancha y espacio deportivo
                 </h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
                     <p className="text-sm text-[#64748B]">Cancha</p>
                     <p className="font-semibold text-[#0F2634]">
@@ -309,6 +388,121 @@ const ReservaDetalleCompartida = () => {
                   </div>
                 </section>
               )}
+
+              <section className="border border-[#E2E8F0] rounded-xl p-4 md:p-5 bg-[#F8FAFC]">
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 mb-3">
+                  <h2 className="text-lg font-semibold text-[#0F2634]">
+                    Deportistas inscritos
+                  </h2>
+                  <div className="flex items-center gap-3">
+                    <div className="text-sm text-[#64748B]">
+                      Cupo usado
+                    </div>
+                    <div className="px-3 py-1 rounded-full bg-[#E0F2FE] text-[#0F2634] text-sm font-semibold">
+                      {cupoInfo && cupoInfo.indice_cupo
+                        ? cupoInfo.indice_cupo
+                        : "0/0"}
+                    </div>
+                  </div>
+                </div>
+
+                {loadingDeportistas && (
+                  <p className="text-sm text-[#23475F]">
+                    Cargando lista de deportistas...
+                  </p>
+                )}
+
+                {!loadingDeportistas && errorDeportistas && (
+                  <p className="text-sm text-red-600">
+                    {errorDeportistas}
+                  </p>
+                )}
+
+                {!loadingDeportistas &&
+                  !errorDeportistas &&
+                  deportistas.length === 0 && (
+                    <p className="text-sm text-[#64748B]">
+                      No hay deportistas inscritos en esta reserva aun
+                    </p>
+                  )}
+
+                {!loadingDeportistas &&
+                  !errorDeportistas &&
+                  deportistas.length > 0 && (
+                    <>
+                      <div className="space-y-2 mb-3">
+                        {deportistas.map((d, index) => (
+                          <div
+                            key={d.id_reserva_deportista}
+                            className="flex items-center justify-between border border-[#E2E8F0] rounded-lg px-3 py-2 bg-white"
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 rounded-full bg-[#0F2634] text-white flex items-center justify-center text-sm font-semibold">
+                                {depOffset + index + 1}
+                              </div>
+                              <div>
+                                <p className="text-sm font-medium text-[#0F2634]">
+                                  {d.nombre} {d.apellido}
+                                </p>
+                                <p className="text-xs text-[#64748B]">
+                                  Fecha union:{" "}
+                                  {d.fecha_union
+                                    ? String(d.fecha_union).substring(0, 10)
+                                    : "-"}
+                                </p>
+                              </div>
+                            </div>
+                            <span className="px-2 py-1 rounded-full text-xs font-semibold bg-[#ECFEF3] text-[#16A34A]">
+                              Activo
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+
+                      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 text-sm text-[#64748B]">
+                        <div>
+                          Mostrando{" "}
+                          <span className="font-semibold text-[#0F2634]">
+                            {depDesde}-{depHasta}
+                          </span>{" "}
+                          de{" "}
+                          <span className="font-semibold text-[#0F2634]">
+                            {depTotal}
+                          </span>{" "}
+                          deportistas
+                        </div>
+                        <div className="flex gap-2 justify-end">
+                          <button
+                            type="button"
+                            onClick={handleDepPrev}
+                            disabled={depOffset === 0}
+                            className={
+                              "px-3 py-1 rounded-md border text-sm " +
+                              (depOffset === 0
+                                ? "border-[#CBD5E1] text-[#94A3B8] cursor-not-allowed"
+                                : "border-[#CBD5E1] text-[#0F2634] hover:border-[#0F2634]")
+                            }
+                          >
+                            Anterior
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleDepNext}
+                            disabled={depOffset + depLimit >= depTotal}
+                            className={
+                              "px-3 py-1 rounded-md border text-sm " +
+                              (depOffset + depLimit >= depTotal
+                                ? "border-[#CBD5E1] text-[#94A3B8] cursor-not-allowed"
+                                : "border-[#CBD5E1] text-[#0F2634] hover:border-[#0F2634]")
+                            }
+                          >
+                            Siguiente
+                          </button>
+                        </div>
+                      </div>
+                    </>
+                  )}
+              </section>
 
               <section className="border border-[#E2E8F0] rounded-xl p-4 md:p-5 bg-[#F8FAFC]">
                 <h2 className="text-lg font-semibold text-[#0F2634] mb-3">

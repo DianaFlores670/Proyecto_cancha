@@ -315,11 +315,13 @@ const PagoAdmin = () => {
                                     required
                                 >
                                     <option value="">Seleccione reserva</option>
-                                    {reservas.map((r) => (
-                                        <option key={r.id_reserva} value={r.id_reserva}>
-                                            #{r.id_reserva} - {r.cliente_nombre} {r.cliente_apellido} ({r.cancha_nombre})
-                                        </option>
-                                    ))}
+                                    {reservas
+                                        .filter(r => r.estado === 'pendiente' || r.estado === 'en_cuotas')
+                                        .map(r => (
+                                            <option key={r.id_reserva} value={r.id_reserva}>
+                                                #{r.id_reserva} - {r.cliente_nombre} {r.cliente_apellido} ({r.cancha_nombre}) - saldo Bs {r.saldo_pendiente ?? 0}
+                                            </option>
+                                        ))}
                                 </select>
                             </div>
 
