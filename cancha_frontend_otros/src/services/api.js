@@ -3,8 +3,8 @@ import axios from 'axios'
 const api = axios.create({
   //aca modificar la red del wifi conectado 
   //baseURL: 'http://192.168.26.3:3000',
-  baseURL: 'http://localhost:3000',
-  //baseURL:'https://proyecto-cancha.onrender.com',   
+  //baseURL: 'http://localhost:3000',
+  baseURL:'https://proyecto-cancha.onrender.com',   
   timeout: 10000
 })
 
