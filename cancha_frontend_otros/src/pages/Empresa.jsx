@@ -1,7 +1,6 @@
 /* eslint-disable no-empty */
 import React, { useState, useEffect } from "react";
 import api from "../services/api";
-import { getImageUrl } from "../utils";
 
 const permissionsConfig = {
   ADMINISTRADOR: {
@@ -154,15 +153,17 @@ const Empresa = () => {
     fetchAdministradores();
   }, []);
 
+  // Función local, sin import
   const getImageUrl = (path) => {
     if (!path) return "";
-    try {
-      const base = (api.defaults?.baseURL || "").replace(/\/$/, "");
-      const cleanPath = String(path).replace(/^\//, "");
-      return `${base}/${cleanPath}`;
-    } catch {
+
+    // Si ya viene una URL completa, NO agregar dominio
+    if (path.startsWith("http://") || path.startsWith("https://")) {
       return path;
     }
+
+    // Si solo viene la ruta, agregar tu dominio
+    return `https://proyecto-cancha.onrender.com${path}`;
   };
 
   const fetchEmpresas = async (params = {}) => {
@@ -553,7 +554,7 @@ const Empresa = () => {
 
   return (
     <div className="bg-white rounded-lg shadow p-6">
-      <h2 className="text-xl font-semibold mb-4">Gestion de Empresas</h2>
+      <h2 className="text-xl font-semibold mb-4">Gestion de Empresas 123</h2>
 
       <div className="flex flex-col xl:flex-row gap-4 mb-6 items-stretch">
         <div className="flex-1">
