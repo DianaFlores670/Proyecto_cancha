@@ -762,7 +762,7 @@ const EspacioDeportivoAdmin = () => {
 
               <div className="col-span-2">
                 <label className="block text-sm font-medium mb-1">
-                  Imagen principal
+                  Imagen principal 123
                 </label>
                 {imagePreviews.imagen_principal ? (
                   <img

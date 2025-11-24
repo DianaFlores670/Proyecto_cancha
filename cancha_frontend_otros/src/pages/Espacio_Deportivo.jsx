@@ -778,7 +778,7 @@ const EspacioDeportivo = () => {
 
               <div className="col-span-2">
                 <label className="block text-sm font-medium mb-1">
-                  Imagen Principal 123
+                  Imagen Principal
                 </label>
                 {imagePreviews.imagen_principal && (
                   <img
