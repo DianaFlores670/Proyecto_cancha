@@ -266,6 +266,28 @@ const obtenerReservasEncargado = async (id_encargado) => {
   return resp.rows;
 };
 
+const obtenerReservasPasadasEncargado = async (id_encargado) => {
+  const q = `
+    SELECT 
+      r.id_reserva,
+      r.fecha_reserva,
+      c.nombre AS nombre_cancha,
+      u.nombre AS cliente_nombre,
+      u.apellido AS cliente_apellido,
+      (u.nombre || ' ' || u.apellido) AS cliente_completo
+    FROM encargado en
+    JOIN cancha c ON c.id_espacio = en.id_espacio
+    JOIN reserva r ON r.id_cancha = c.id_cancha
+    JOIN cliente cli ON cli.id_cliente = r.id_cliente
+    JOIN usuario u ON u.id_persona = cli.id_cliente
+    WHERE en.id_encargado = $1
+      AND r.fecha_reserva < NOW()
+    ORDER BY r.fecha_reserva DESC
+  `;
+  const resp = await pool.query(q, [id_encargado]);
+  return resp.rows;
+};
+
 
 /* ===================================================================
    ======================= CONTROLADORES =============================
@@ -372,6 +394,16 @@ const reservasDisponiblesController = async (req, res) => {
   }
 };
 
+const reservasPasadasController = async (req, res) => {
+  try {
+    const id = req.user.id_persona;
+    const rows = await obtenerReservasPasadasEncargado(id);
+    res.json(respuesta(true, "Reservas pasadas", { reservas: rows }));
+  } catch (e) {
+    res.status(500).json(respuesta(false, e.message));
+  }
+};
+
 
 /* ===================================================================
    ============================ RUTAS ================================
@@ -385,6 +417,7 @@ router.get('/dato-individual/:id', verifyToken, checkRole(['ENCARGADO']), detall
 router.post('/', verifyToken, checkRole(['ENCARGADO']), crearController);
 router.put('/:id', verifyToken, checkRole(['ENCARGADO']), editarController);
 router.get('/reservas-disponibles', verifyToken, checkRole(['ENCARGADO']), reservasDisponiblesController);
+router.get('/reservas-pasadas', verifyToken, checkRole(['ENCARGADO']), reservasPasadasController);
 
 
 module.exports = router;

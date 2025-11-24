@@ -771,8 +771,7 @@ const Header = () => {
 
         const res = await api.post("/solicitud-admin-esp-dep/", payload);
         const ok = res.data?.exito === true;
-        if (!ok)
-          throw new Error(res.data?.mensaje || "No se pudo crear la solicitud");
+        if (!ok) throw new Error(res.data?.mensaje || "No se pudo crear la solicitud");
 
         setRoleRequestSuccess("Solicitud enviada correctamente");
       } else if (roleRequest.rol === "encargado") {
@@ -783,22 +782,41 @@ const Header = () => {
         }
 
         const payload = {
+          id_usuario: user.id_persona,
           id_espacio: Number(roleRequest.id_espacio),
+          rol: roleRequest.rol,
           motivo: roleRequest.motivo || null,
         };
 
         const res = await api.post("/solicitud-encargado/", payload);
         const ok = res.data?.exito === true;
-        if (!ok)
-          throw new Error(res.data?.mensaje || "No se pudo crear la solicitud");
+        if (!ok) throw new Error(res.data?.mensaje || "No se pudo crear la solicitud");
+
+        setRoleRequestSuccess("Solicitud enviada correctamente");
+      } else if (roleRequest.rol === "control") {
+        if (!roleRequest.id_espacio) {
+          setRoleRequestError("Debes seleccionar un espacio");
+          setRoleRequestLoading(false);
+          return;
+        }
+
+        const payload = {
+          id_usuario: user.id_persona,
+          id_espacio: Number(roleRequest.id_espacio),
+          rol: roleRequest.rol,
+          motivo: roleRequest.motivo || null,
+        };
+
+        const res = await api.post("/solicitud-control/", payload);
+        const ok = res.data?.exito === true;
+        if (!ok) throw new Error(res.data?.mensaje || "No se pudo crear la solicitud");
 
         setRoleRequestSuccess("Solicitud enviada correctamente");
       } else {
         setRoleRequestError("Rol no soportado");
       }
     } catch (err) {
-      const backendMsg =
-        err?.response?.data?.mensaje || err?.response?.data?.error;
+      const backendMsg = err?.response?.data?.mensaje || err?.response?.data?.error;
       if (backendMsg) {
         setRoleRequestError(backendMsg);
       } else {
@@ -808,6 +826,7 @@ const Header = () => {
       setRoleRequestLoading(false);
     }
   };
+
 
   // Handle file change for profile image
   const handleFileChange = (e) => {
