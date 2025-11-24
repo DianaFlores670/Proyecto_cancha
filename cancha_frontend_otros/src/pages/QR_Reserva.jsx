@@ -122,11 +122,19 @@ const QRReserva = () => {
 
   const getImageUrl = (path) => {
     if (!path) return "";
-    // Si path ya empieza con http o https, usarlo tal cual
+
+    // Si ya es una URL absoluta, usar tal cual
     if (/^https?:\/\//i.test(path)) return path;
 
+    // Asegurarse que baseURL termina sin slash
     const base = (api.defaults?.baseURL || "").replace(/\/$/, "");
-    const cleanPath = String(path).replace(/^\//, "");
+
+    // Normalizar path: quitar slashes al inicio, reemplazar backslashes, y forzar lowercase si quieres
+    const cleanPath = String(path)
+      .replace(/^\/+/, "") // quitar slashes al inicio
+      .replace(/\\/g, "/"); // reemplazar backslashes por slash
+
+    // Combinar base y path
     return `${base}/${cleanPath}`;
   };
 
