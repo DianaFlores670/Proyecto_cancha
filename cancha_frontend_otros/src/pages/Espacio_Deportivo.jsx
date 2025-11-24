@@ -2,8 +2,6 @@
 import React, { useState, useEffect } from "react";
 import api from "../services/api";
 
-import { getImageUrl } from "../utils";
-
 const permissionsConfig = {
   ADMINISTRADOR: {
     canView: true,
@@ -148,16 +146,15 @@ const EspacioDeportivo = () => {
     fetchAdministradores();
   }, []);
 
-  // const getImageUrl = (path) => {
-  //   if (!path) return "";
-  //   try {
-  //     const base = (api.defaults?.baseURL || "").replace(/\/$/, "");
-  //     const cleanPath = String(path).replace(/^\//, "");
-  //     return `${base}/${cleanPath}`;
-  //   } catch {
-  //     return path;
-  //   }
-  // };
+  const getImageUrlSafe = (path) => {
+    if (!path) return null;
+    // Si es URL completa
+    if (path.startsWith("http://") || path.startsWith("https://")) return path;
+    // Si es ruta relativa
+    return `https://proyecto-cancha.onrender.com${
+      path.startsWith("/") ? "" : "/"
+    }${path}`;
+  };
 
   const fetchEspacios = async (params = {}) => {
     if (!permissions.canView) {
@@ -295,13 +292,14 @@ const EspacioDeportivo = () => {
         });
         setImagePreviews({
           imagen_principal: e.imagen_principal
-            ? getImageUrl(e.imagen_principal)
+            ? getImageUrlSafe(e.imagen_principal)
             : null,
-          imagen_sec_1: e.imagen_sec_1 ? getImageUrl(e.imagen_sec_1) : null,
-          imagen_sec_2: e.imagen_sec_2 ? getImageUrl(e.imagen_sec_2) : null,
-          imagen_sec_3: e.imagen_sec_3 ? getImageUrl(e.imagen_sec_3) : null,
-          imagen_sec_4: e.imagen_sec_4 ? getImageUrl(e.imagen_sec_4) : null,
+          imagen_sec_1: e.imagen_sec_1 ? getImageUrlSafe(e.imagen_sec_1) : null,
+          imagen_sec_2: e.imagen_sec_2 ? getImageUrlSafe(e.imagen_sec_2) : null,
+          imagen_sec_3: e.imagen_sec_3 ? getImageUrlSafe(e.imagen_sec_3) : null,
+          imagen_sec_4: e.imagen_sec_4 ? getImageUrlSafe(e.imagen_sec_4) : null,
         });
+
         setSelectedFiles({
           imagen_principal: null,
           imagen_sec_1: null,
@@ -785,7 +783,7 @@ const EspacioDeportivo = () => {
                     src={
                       selectedFiles.imagen_principal
                         ? URL.createObjectURL(selectedFiles.imagen_principal)
-                        : getImageUrl(imagePreviews.imagen_principal)
+                        : imagePreviews.imagen_principal
                     }
                     alt="Imagen Principal"
                     className="w-32 h-32 object-cover rounded mb-2"
@@ -811,7 +809,7 @@ const EspacioDeportivo = () => {
                     src={
                       selectedFiles.imagen_sec_1
                         ? URL.createObjectURL(selectedFiles.imagen_sec_1)
-                        : getImageUrl(imagePreviews.imagen_sec_1)
+                        : imagePreviews.imagen_sec_1
                     }
                     alt="Imagen Secundaria 1"
                     className="w-32 h-32 object-cover rounded mb-2"
@@ -840,7 +838,7 @@ const EspacioDeportivo = () => {
                     src={
                       selectedFiles.imagen_sec_2
                         ? URL.createObjectURL(selectedFiles.imagen_sec_2)
-                        : getImageUrl(imagePreviews.imagen_sec_2)
+                        : imagePreviews.imagen_sec_2
                     }
                     alt="Imagen Secundaria 2"
                     className="w-32 h-32 object-cover rounded mb-2"
@@ -869,7 +867,7 @@ const EspacioDeportivo = () => {
                     src={
                       selectedFiles.imagen_sec_3
                         ? URL.createObjectURL(selectedFiles.imagen_sec_3)
-                        : getImageUrl(imagePreviews.imagen_sec_3)
+                        : imagePreviews.imagen_sec_3
                     }
                     alt="Imagen Secundaria 3"
                     className="w-32 h-32 object-cover rounded mb-2"
@@ -893,12 +891,13 @@ const EspacioDeportivo = () => {
                 <label className="block text-sm font-medium mb-1">
                   Imagen Secundaria 4
                 </label>
+                {/* Imagen Secundaria 4 */}
                 {imagePreviews.imagen_sec_4 && (
                   <img
                     src={
                       selectedFiles.imagen_sec_4
                         ? URL.createObjectURL(selectedFiles.imagen_sec_4)
-                        : getImageUrl(imagePreviews.imagen_sec_4)
+                        : imagePreviews.imagen_sec_4
                     }
                     alt="Imagen Secundaria 4"
                     className="w-32 h-32 object-cover rounded mb-2"
