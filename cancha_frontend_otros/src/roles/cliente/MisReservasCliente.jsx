@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import api from "../../services/api";
 import Header from "../../Header";
+import { getImageUrl } from "../../utils";
 
 const canLeaveReview = (reserva) => {
   if (!reserva) return false;
@@ -28,18 +29,18 @@ const pickRoleForThisPage = (u) => {
   return "DEFAULT";
 };
 
-const getImageUrl = (path) => {
-  if (!path) return "";
-  try {
-    const base = api.defaults.baseURL
-      ? api.defaults.baseURL.replace(/\/$/, "")
-      : "";
-    const clean = String(path).replace(/^\//, "");
-    return `${base}/${clean}`;
-  } catch (e) {
-    return String(path);
-  }
-};
+// const getImageUrl = (path) => {
+//   if (!path) return "";
+//   try {
+//     const base = api.defaults.baseURL
+//       ? api.defaults.baseURL.replace(/\/$/, "")
+//       : "";
+//     const clean = String(path).replace(/^\//, "");
+//     return `${base}/${clean}`;
+//   } catch (e) {
+//     return String(path);
+//   }
+// };
 
 const MisReservasCliente = () => {
   const [role, setRole] = useState("DEFAULT");
@@ -832,7 +833,8 @@ const MisReservasCliente = () => {
                   {qrImageUrl && (
                     <img
                       src={getImageUrl(qrImageUrl)}
-                      alt="Codigo QR de la reserva"
+                      onError={(e) => (e.target.src = "/placeholder.png")}
+                      alt="Código QR"
                       className="w-48 h-48 object-contain"
                     />
                   )}
