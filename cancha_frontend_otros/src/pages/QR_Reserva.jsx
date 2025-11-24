@@ -122,13 +122,11 @@ const QRReserva = () => {
 
   // Función para obtener la URL correcta de la imagen
   const getImageUrl = (path) => {
-    if (!path) return "";
-    // Si la ruta ya es una URL completa, devuélvela tal cual
+    if (!path) return null; // <--- antes estaba ""
     if (/^https?:\/\//i.test(path)) return path;
 
-    // Si es ruta relativa, usa la base de la API
     const base = (api.defaults?.baseURL || "").replace(/\/$/, "");
-    const cleanPath = String(path).replace(/^\//, "");
+    const cleanPath = String(path).replace(/^\/+/, ""); // elimina todos los / iniciales
     return `${base}/${cleanPath}`;
   };
 
@@ -676,12 +674,15 @@ const QRReserva = () => {
                     Vista previa del QR
                   </label>
                   <img
-                    src={getImageUrl(previewQR)}
+                    src={
+                      getImageUrl(previewQR) ||
+                      "https://via.placeholder.com/150"
+                    }
                     alt="Vista previa del QR"
                     className="max-w-xs h-auto rounded"
                     onError={(e) => {
                       console.error("Error cargando QR:", e.target.src);
-                      e.target.src = ""; // opcional: puedes poner una imagen por defecto
+                      e.target.src = "https://via.placeholder.com/150"; // fallback
                     }}
                   />
                 </div>
@@ -825,12 +826,15 @@ const QRReserva = () => {
                       {selectedQR.qr_url_imagen}
                     </p>
                     <img
-                      src={getImageUrl(selectedQR.qr_url_imagen)}
+                      src={
+                        getImageUrl(selectedQR.qr_url_imagen) ||
+                        "https://via.placeholder.com/150"
+                      }
                       alt="QR"
                       className="mt-2 max-w-xs h-auto rounded"
                       onError={(e) => {
                         console.error("Error cargando QR:", e.target.src);
-                        e.target.src = ""; // opcional: puedes poner una imagen por defecto aquí
+                        e.target.src = "https://via.placeholder.com/150"; // placeholder si falla
                       }}
                     />
                   </div>
