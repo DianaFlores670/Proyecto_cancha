@@ -120,8 +120,13 @@ const QRReserva = () => {
       ? permissionsConfig[role]
       : permissionsConfig.DEFAULT;
 
+  // Función para obtener la URL correcta de la imagen
   const getImageUrl = (path) => {
     if (!path) return "";
+    // Si la ruta ya es una URL completa, devuélvela tal cual
+    if (/^https?:\/\//i.test(path)) return path;
+
+    // Si es ruta relativa, usa la base de la API
     const base = (api.defaults?.baseURL || "").replace(/\/$/, "");
     const cleanPath = String(path).replace(/^\//, "");
     return `${base}/${cleanPath}`;
@@ -180,9 +185,14 @@ const QRReserva = () => {
     const fullParams = { ...params, limit, offset };
     try {
       let r;
-      if (params.q) r = await api.get('/qr-reserva/buscar', { params: fullParams });
-      else if (params.tipo) r = await api.get('/qr-reserva/filtro', { params: fullParams });
-      else r = await api.get('/qr-reserva/datos-especificos', { params: fullParams });
+      if (params.q)
+        r = await api.get("/qr-reserva/buscar", { params: fullParams });
+      else if (params.tipo)
+        r = await api.get("/qr-reserva/filtro", { params: fullParams });
+      else
+        r = await api.get("/qr-reserva/datos-especificos", {
+          params: fullParams,
+        });
       if (r.data?.exito) {
         setQRs(r.data.datos?.qrs || []);
         setTotal(r.data.datos?.paginacion?.total || 0);
@@ -342,8 +352,9 @@ const QRReserva = () => {
         verificado: !!base.verificado,
       };
       let r;
-      if (editMode) r = await api.patch(`/qr-reserva/${currentQR.id_qr}`, payload);
-      else r = await api.post('/qr-reserva/', payload);
+      if (editMode)
+        r = await api.patch(`/qr-reserva/${currentQR.id_qr}`, payload);
+      else r = await api.post("/qr-reserva/", payload);
       if (r.data?.exito) {
         if (r.data.datos?.qr?.qr_url_imagen)
           setPreviewQR(getImageUrl(r.data.datos.qr.qr_url_imagen));
@@ -668,9 +679,10 @@ const QRReserva = () => {
                     src={getImageUrl(previewQR)}
                     alt="Vista previa del QR"
                     className="max-w-xs h-auto rounded"
-                    onError={(e) =>
-                      console.error("Error loading QR image:", e.target.src)
-                    }
+                    onError={(e) => {
+                      console.error("Error cargando QR:", e.target.src);
+                      e.target.src = ""; // opcional: puedes poner una imagen por defecto
+                    }}
                   />
                 </div>
               )}
@@ -792,7 +804,9 @@ const QRReserva = () => {
               </div>
               {selectedQR.id_control && (
                 <div>
-                  <label className="font-medium text-gray-700">Control asociado:</label>
+                  <label className="font-medium text-gray-700">
+                    Control asociado:
+                  </label>
                   <p className="mt-1 p-2 bg-gray-50 rounded">
                     #{selectedQR.id_control}{" "}
                     {selectedQR.control_nombre
@@ -814,9 +828,10 @@ const QRReserva = () => {
                       src={getImageUrl(selectedQR.qr_url_imagen)}
                       alt="QR"
                       className="mt-2 max-w-xs h-auto rounded"
-                      onError={(e) =>
-                        console.error("Error loading QR image:", e.target.src)
-                      }
+                      onError={(e) => {
+                        console.error("Error cargando QR:", e.target.src);
+                        e.target.src = ""; // opcional: puedes poner una imagen por defecto aquí
+                      }}
                     />
                   </div>
                 )}
