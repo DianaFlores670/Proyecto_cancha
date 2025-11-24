@@ -11,13 +11,16 @@ import api from "../../services/api";
 const getImageUrl = (path) => {
   if (!path) return "";
 
-  // Asegurarse de que la ruta comience con /
-  const clean = path.startsWith("/") ? path : `/${path}`;
+  // Si ya es URL completa, devolver tal cual
+  if (path.startsWith("http")) return path;
 
-  // Dominio de tu backend en producción
-  const base = "https://proyecto-cancha.onrender.com";
+  const base =
+    process.env.NODE_ENV === "development"
+      ? "http://localhost:3000" // tu backend local
+      : "https://proyecto-cancha.onrender.com"; // tu backend en Render
 
-  return `${base}${clean}`;
+  const clean = String(path).replace(/^\/+/, ""); // quitar / inicial
+  return `${base}/${clean}`;
 };
 
 const Espacio_DeportivoEncargado = () => {
@@ -322,6 +325,7 @@ const Espacio_DeportivoEncargado = () => {
                       alt="espacio_principal"
                       className="w-full h-48 object-cover"
                     />
+
                     <span className="absolute top-2 left-2 px-2 py-1 rounded-full bg-black/60 text-[10px] text-white font-medium">
                       Principal
                     </span>
@@ -330,14 +334,16 @@ const Espacio_DeportivoEncargado = () => {
 
                 {[1, 2, 3, 4].map((i) => {
                   const key = `imagen_sec_${i}`;
-                  if (!currentEspacio[key]) return null;
+                  const imgPath = currentEspacio[key];
+                  if (!imgPath) return null;
+
                   return (
                     <div
                       key={key}
                       className="relative overflow-hidden rounded-xl border border-gray-200"
                     >
                       <img
-                        src={getImageUrl(currentEspacio[key])}
+                        src={getImageUrl(imgPath)}
                         alt={key}
                         className="w-full h-40 object-cover"
                       />
