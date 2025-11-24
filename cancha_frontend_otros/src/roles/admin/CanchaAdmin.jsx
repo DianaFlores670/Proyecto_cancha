@@ -735,7 +735,7 @@ const CanchaAdmin = () => {
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">
-                  Imagen cancha
+                  Imagen cancha 12222222222
                 </label>
                 {imagePreview ? (
                   <img
