@@ -11,7 +11,7 @@ import api from "../../services/api";
 const getImageUrl = (path) => {
   if (!path) return "";
 
-  // Si ya es una URL completa, devolver tal cual
+  // Si ya es URL completa, devolver tal cual
   if (path.startsWith("http://") || path.startsWith("https://")) return path;
 
   const base =
@@ -19,7 +19,11 @@ const getImageUrl = (path) => {
       ? "http://localhost:3000"
       : "https://proyecto-cancha.onrender.com";
 
-  const clean = String(path).replace(/^\/+/, ""); // quitar / inicial
+  // Eliminar cualquier barra inicial y también "https://proyecto-cancha.onrender.com/" repetido
+  const clean = String(path)
+    .replace(/^\/+/, "")
+    .replace(/^https?:\/\/proyecto-cancha\.onrender\.com\//, "");
+
   return `${base}/${clean}`;
 };
 
