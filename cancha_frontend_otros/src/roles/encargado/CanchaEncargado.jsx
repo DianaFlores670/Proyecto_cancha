@@ -1,6 +1,25 @@
 import React, { useState, useEffect } from "react";
 import api from "../../services/api";
 
+const getImageUrl = (path) => {
+  if (!path) return "";
+
+  path = path.trim();
+
+  // Si ya es URL completa, devolver tal cual
+  if (path.startsWith("http://") || path.startsWith("https://")) return path;
+
+  const base =
+    process.env.NODE_ENV === "development"
+      ? "http://localhost:3000"
+      : "https://proyecto-cancha.onrender.com";
+
+  // Quitar cualquier barra inicial sobrante
+  path = path.replace(/^\/+/, "");
+
+  return `${base}/${path}`;
+};
+
 const CanchaEncargado = () => {
   const [canchas, setCanchas] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -250,18 +269,10 @@ const CanchaEncargado = () => {
               {currentCancha.imagen_cancha ? (
                 <div className="relative overflow-hidden rounded-2xl border border-gray-200">
                   <img
-                    src={
-                      currentCancha.imagen_cancha.startsWith("http")
-                        ? currentCancha.imagen_cancha
-                        : `https://proyecto-cancha.onrender.com/${currentCancha.imagen_cancha.replace(
-                            /^\/+/,
-                            ""
-                          )}`
-                    }
+                    src={getImageUrl(currentCancha.imagen_cancha)}
                     alt="foto_cancha"
                     className="w-full h-64 object-cover"
                   />
-
                   <span className="absolute top-2 left-2 px-2 py-1 rounded-full bg-black/60 text-[10px] text-white font-medium">
                     Imagen principal
                   </span>
