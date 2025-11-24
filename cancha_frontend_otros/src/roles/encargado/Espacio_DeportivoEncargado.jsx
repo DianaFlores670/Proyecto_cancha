@@ -1,23 +1,14 @@
 import React, { useState, useEffect } from "react";
 import api from "../../services/api";
 
-// const getImageUrl = (path) => {
-//   if (!path) return "";
-//   const base = (api.defaults?.baseURL || "").replace(/\/$/, "");
-//   const clean = String(path).replace(/^\//, "");
-//   return `${base}/${clean}`;
-// };
-
 const getImageUrl = (path) => {
   if (!path) return "";
 
-  // Limpiar espacios
   path = path.trim();
 
-  // Si ya es una URL completa, devolver tal cual
+  // Si ya es URL completa, devolver tal cual
   if (path.startsWith("http://") || path.startsWith("https://")) return path;
 
-  // Base según entorno
   const base =
     process.env.NODE_ENV === "development"
       ? "http://localhost:3000"
@@ -319,7 +310,7 @@ const Espacio_DeportivoEncargado = () => {
             <div className="mt-4">
               <div className="flex items-center justify-between mb-3">
                 <h4 className="text-sm font-semibold text-gray-900">
-                  Imagenes del espacio
+                  Imagenes del espacio......
                 </h4>
               </div>
 
@@ -331,7 +322,6 @@ const Espacio_DeportivoEncargado = () => {
                       alt="espacio_principal"
                       className="w-full h-48 object-cover"
                     />
-
                     <span className="absolute top-2 left-2 px-2 py-1 rounded-full bg-black/60 text-[10px] text-white font-medium">
                       Principal
                     </span>
@@ -343,12 +333,18 @@ const Espacio_DeportivoEncargado = () => {
                   const imgPath = currentEspacio[key];
                   if (!imgPath) return null;
                   return (
-                    <div key={key}>
+                    <div
+                      key={key}
+                      className="relative overflow-hidden rounded-xl border border-gray-200"
+                    >
                       <img
                         src={getImageUrl(imgPath)}
                         alt={key}
                         className="w-full h-40 object-cover"
                       />
+                      <span className="absolute top-2 left-2 px-2 py-1 rounded-full bg-black/55 text-[10px] text-white font-medium">
+                        Extra {i}
+                      </span>
                     </div>
                   );
                 })}
