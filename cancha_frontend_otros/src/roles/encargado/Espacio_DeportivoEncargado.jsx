@@ -11,13 +11,13 @@ import api from "../../services/api";
 const getImageUrl = (path) => {
   if (!path) return "";
 
-  // Si ya es URL completa, devolver tal cual
-  if (path.startsWith("http")) return path;
+  // Si ya es una URL completa, devolver tal cual
+  if (path.startsWith("http://") || path.startsWith("https://")) return path;
 
   const base =
     process.env.NODE_ENV === "development"
-      ? "http://localhost:3000" // tu backend local
-      : "https://proyecto-cancha.onrender.com"; // tu backend en Render
+      ? "http://localhost:3000"
+      : "https://proyecto-cancha.onrender.com";
 
   const clean = String(path).replace(/^\/+/, ""); // quitar / inicial
   return `${base}/${clean}`;
