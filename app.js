@@ -50,6 +50,7 @@ const reserva_encargadoRoutes = require('./cancha_backend/api/roles/encargado/re
 const reporte_incidencia_encargadoRoutes = require('./cancha_backend/api/roles/encargado/reporte_incidencia_encargado');
 
 const qr_acceso_controlRoutes = require('./cancha_backend/api/roles/control/qr_acceso_control');
+const espacio_controlRoutes = require('./cancha_backend/api/roles/control/espacio_control');
 
 const unirse_reservaRoutes = require('./cancha_backend/api/roles/deportista/unirse_reserva');
 const reserva_deportistaRoutes = require('./cancha_backend/api/roles/deportista/reserva_deportista');
@@ -122,6 +123,7 @@ try {
   app.use('/reporte-incidencia-encargado', reporte_incidencia_encargadoRoutes);
 
   app.use('/qr-acceso-control', qr_acceso_controlRoutes);
+  app.use('/espacio-control', espacio_controlRoutes);
 
   app.use('/reserva-encargado', reserva_encargadoRoutes);
 

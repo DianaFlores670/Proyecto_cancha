@@ -1,13 +1,9 @@
-const express = require('express');
-const pool = require('../../../config/database');
-const { verifyToken, checkRole } = require('../../../middleware/auth');
+const express = require("express");
+const pool = require("../../../config/database");
+const { verifyToken, checkRole } = require("../../../middleware/auth");
 
 const router = express.Router();
 const respuesta = (exito, mensaje, datos = null) => ({ exito, mensaje, datos });
-
-/* ===============================================================
-   ======================= MODELOS ================================
-   =============================================================== */
 
 const obtenerEspacios = async (id_control, limite, offset) => {
   const q = `
@@ -30,7 +26,7 @@ const obtenerEspacios = async (id_control, limite, offset) => {
       u.apellido AS admin_apellido,
       u.correo AS admin_correo
     FROM control c
-    JOIN espacio_deportivo e ON e.id_espacio = c.id_control
+    JOIN espacio_deportivo e ON e.id_espacio = c.id_espacio
     JOIN admin_esp_dep a ON a.id_admin_esp_dep = e.id_admin_esp_dep
     JOIN usuario u ON u.id_persona = a.id_admin_esp_dep
     WHERE c.id_control = $1
@@ -40,8 +36,9 @@ const obtenerEspacios = async (id_control, limite, offset) => {
 
   const qt = `
     SELECT COUNT(*)
-    FROM control
-    WHERE id_control = $1
+    FROM control c
+    JOIN espacio_deportivo e ON e.id_espacio = c.id_espacio
+    WHERE c.id_control = $1
   `;
 
   const [r1, r2] = await Promise.all([
@@ -55,11 +52,10 @@ const obtenerEspacios = async (id_control, limite, offset) => {
   };
 };
 
-
 const obtenerEspaciosFiltrados = async (id_control, tipo, limite, offset) => {
   const tiposValidos = {
-    nombre: 'e.nombre ASC',
-    direccion: 'e.direccion ASC'
+    nombre: "e.nombre ASC",
+    direccion: "e.direccion ASC"
   };
 
   const orderBy = tiposValidos[tipo] || tiposValidos.nombre;
@@ -84,7 +80,7 @@ const obtenerEspaciosFiltrados = async (id_control, tipo, limite, offset) => {
       u.apellido AS admin_apellido,
       u.correo AS admin_correo
     FROM control c
-    JOIN espacio_deportivo e ON e.id_espacio = c.id_control
+    JOIN espacio_deportivo e ON e.id_espacio = c.id_espacio
     JOIN admin_esp_dep a ON a.id_admin_esp_dep = e.id_admin_esp_dep
     JOIN usuario u ON u.id_persona = a.id_admin_esp_dep
     WHERE c.id_control = $1
@@ -94,8 +90,9 @@ const obtenerEspaciosFiltrados = async (id_control, tipo, limite, offset) => {
 
   const qt = `
     SELECT COUNT(*)
-    FROM control
-    WHERE id_control = $1
+    FROM control c
+    JOIN espacio_deportivo e ON e.id_espacio = c.id_espacio
+    WHERE c.id_control = $1
   `;
 
   const [rows, total] = await Promise.all([
@@ -109,9 +106,8 @@ const obtenerEspaciosFiltrados = async (id_control, tipo, limite, offset) => {
   };
 };
 
-
 const buscarEspacios = async (id_control, q, limite, offset) => {
-  const sanitize = (str) => str.replace(/[%_\\]/g, '\\$&');
+  const sanitize = (str) => String(str).replace(/[%_\\]/g, "\\$&");
   const like = `%${sanitize(q)}%`;
 
   const sql = `
@@ -134,7 +130,7 @@ const buscarEspacios = async (id_control, q, limite, offset) => {
       u.apellido AS admin_apellido,
       u.correo AS admin_correo
     FROM control c
-    JOIN espacio_deportivo e ON e.id_espacio = c.id_control
+    JOIN espacio_deportivo e ON e.id_espacio = c.id_espacio
     JOIN admin_esp_dep a ON a.id_admin_esp_dep = e.id_admin_esp_dep
     JOIN usuario u ON u.id_persona = a.id_admin_esp_dep
     WHERE c.id_control = $1
@@ -152,7 +148,7 @@ const buscarEspacios = async (id_control, q, limite, offset) => {
   const totalSql = `
     SELECT COUNT(*)
     FROM control c
-    JOIN espacio_deportivo e ON e.id_espacio = c.id_control
+    JOIN espacio_deportivo e ON e.id_espacio = c.id_espacio
     JOIN admin_esp_dep a ON a.id_admin_esp_dep = e.id_admin_esp_dep
     JOIN usuario u ON u.id_persona = a.id_admin_esp_dep
     WHERE c.id_control = $1
@@ -176,7 +172,6 @@ const buscarEspacios = async (id_control, q, limite, offset) => {
   };
 };
 
-
 const obtenerEspacioPorId = async (id_control, id_espacio) => {
   const q = `
     SELECT 
@@ -198,7 +193,7 @@ const obtenerEspacioPorId = async (id_control, id_espacio) => {
       u.apellido AS admin_apellido,
       u.correo AS admin_correo
     FROM control c
-    JOIN espacio_deportivo e ON e.id_espacio = c.id_control
+    JOIN espacio_deportivo e ON e.id_espacio = c.id_espacio
     JOIN admin_esp_dep a ON a.id_admin_esp_dep = e.id_admin_esp_dep
     JOIN usuario u ON u.id_persona = a.id_admin_esp_dep
     WHERE c.id_control = $1 AND e.id_espacio = $2
@@ -207,11 +202,6 @@ const obtenerEspacioPorId = async (id_control, id_espacio) => {
   const r = await pool.query(q, [id_control, id_espacio]);
   return r.rows[0] || null;
 };
-
-
-/* ===============================================================
-   ===================== CONTROLADORES ============================
-   =============================================================== */
 
 const datosEspecificosController = async (req, res) => {
   try {
@@ -231,7 +221,6 @@ const datosEspecificosController = async (req, res) => {
     res.status(500).json(respuesta(false, e.message));
   }
 };
-
 
 const filtroController = async (req, res) => {
   try {
@@ -253,11 +242,10 @@ const filtroController = async (req, res) => {
   }
 };
 
-
 const buscarController = async (req, res) => {
   try {
     const id_control = req.user.id_persona;
-    const q = req.query.q || '';
+    const q = req.query.q || "";
     const limite = Number(req.query.limit || 10);
     const offset = Number(req.query.offset || 0);
 
@@ -274,7 +262,6 @@ const buscarController = async (req, res) => {
   }
 };
 
-
 const detalleController = async (req, res) => {
   try {
     const id_control = req.user.id_persona;
@@ -282,8 +269,9 @@ const detalleController = async (req, res) => {
 
     const espacio = await obtenerEspacioPorId(id_control, id_espacio);
 
-    if (!espacio)
+    if (!espacio) {
       return res.status(404).json(respuesta(false, "No encontrado"));
+    }
 
     res.json(respuesta(true, "OK", { espacio }));
   } catch (e) {
@@ -291,14 +279,9 @@ const detalleController = async (req, res) => {
   }
 };
 
-
-/* ===============================================================
-   ========================= RUTAS ================================
-   =============================================================== */
-
-router.get('/datos-especificos', verifyToken, checkRole(['CONTROL']), datosEspecificosController);
-router.get('/filtro', verifyToken, checkRole(['CONTROL']), filtroController);
-router.get('/buscar', verifyToken, checkRole(['CONTROL']), buscarController);
-router.get('/dato-individual/:id', verifyToken, checkRole(['CONTROL']), detalleController);
+router.get("/datos-especificos", verifyToken, checkRole(["CONTROL"]), datosEspecificosController);
+router.get("/filtro", verifyToken, checkRole(["CONTROL"]), filtroController);
+router.get("/buscar", verifyToken, checkRole(["CONTROL"]), buscarController);
+router.get("/dato-individual/:id", verifyToken, checkRole(["CONTROL"]), detalleController);
 
 module.exports = router;

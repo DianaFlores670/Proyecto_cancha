@@ -51,6 +51,7 @@ const Espacio_DeportivoControl = () => {
         setEspacios(rows);
         setTotal(typeof t === "number" ? t : 0);
       } else {
+        console.log("espacio-control error:", resp.data);
         setError(resp.data?.mensaje || "Error al cargar");
       }
     } catch (err) {

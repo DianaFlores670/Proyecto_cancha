@@ -1,7 +1,7 @@
 /* eslint-disable no-undef */
 import React, { useState, useEffect } from "react";
 import api from "./services/api";
-import { getImageUrl } from "./utils"; // importa la función
+import { getImageUrl } from "./utils";
 import {
   Routes,
   Route,
@@ -30,29 +30,27 @@ import Resena from "./pages/Resena";
 import Se_Practica from "./pages/Se_Practica";
 import Participa_En from "./pages/Participa_En";
 
-// importa por roles
-import EspacioDeportivoAdmin from './roles/admin/EspacioDeportivoAdmin';
-import CanchaAdmin from './roles/admin/CanchaAdmin';
-import ReservaAdmin from './roles/admin/ReservaAdmin';
-import Reserva_HorarioAdmin from './roles/admin/Reserva_HorarioAdmin';
-import ResenaAdmin from './roles/admin/ResenaAdmin';
-import EspaciosView from './roles/admin/EspaciosView';
-import CalendarioReservasAdmin from './roles/admin/CalendarioReservasAdmin';
-import PagoAdmin from './roles/admin/PagoAdmin';
-import SolicitudAdminEspDep from './pages/SolicitudAdminEspDep';
-import SolicitudEncargado from './pages/SolicitudEncargado';
-import SolicitudControl from './pages/SolicitudControl';
-import Reporte_incidenciaAdmin from './roles/admin/Reporte_IncidenciaAdmin';
-import EncargadoAdmin from './roles/admin/EncargadoAdmin';
-import ControlAdmin from './roles/admin/ControlAdmin';
-import Espacio_DeportivoEncargado from './roles/encargado/Espacio_DeportivoEncargado';
-import CanchaEncargado from './roles/encargado/CanchaEncargado';
-import ReservaEncargado from './roles/encargado/ReservaEncargado';
-import Reporte_IncidenciaEncargado from './roles/encargado/Reporte_IncidenciaEncargado';
-import QR_AccesoEncargado from './roles/control/QR_AccesoEncargado';
-import Espacio_DeportivoControl from './roles/control/Espacio_DeportivoControl';
+import EspacioDeportivoAdmin from "./roles/admin/EspacioDeportivoAdmin";
+import CanchaAdmin from "./roles/admin/CanchaAdmin";
+import ReservaAdmin from "./roles/admin/ReservaAdmin";
+import Reserva_HorarioAdmin from "./roles/admin/Reserva_HorarioAdmin";
+import ResenaAdmin from "./roles/admin/ResenaAdmin";
+import EspaciosView from "./roles/admin/EspaciosView";
+import CalendarioReservasAdmin from "./roles/admin/CalendarioReservasAdmin";
+import PagoAdmin from "./roles/admin/PagoAdmin";
+import SolicitudAdminEspDep from "./pages/SolicitudAdminEspDep";
+import SolicitudEncargado from "./pages/SolicitudEncargado";
+import SolicitudControl from "./pages/SolicitudControl";
+import Reporte_incidenciaAdmin from "./roles/admin/Reporte_IncidenciaAdmin";
+import EncargadoAdmin from "./roles/admin/EncargadoAdmin";
+import ControlAdmin from "./roles/admin/ControlAdmin";
+import Espacio_DeportivoEncargado from "./roles/encargado/Espacio_DeportivoEncargado";
+import CanchaEncargado from "./roles/encargado/CanchaEncargado";
+import ReservaEncargado from "./roles/encargado/ReservaEncargado";
+import Reporte_IncidenciaEncargado from "./roles/encargado/Reporte_IncidenciaEncargado";
+import QR_AccesoEncargado from "./roles/control/QR_AccesoEncargado";
+import Espacio_DeportivoControl from "./roles/control/Espacio_DeportivoControl";
 
-// Configuración de rutas para cada rol
 const roleRoutesConfig = {
   ADMINISTRADOR: [
     {
@@ -184,7 +182,7 @@ const roleRoutesConfig = {
     },
     {
       id: "resena",
-      label: "Reseña",
+      label: "Resena",
       icon: "⭐",
       path: "resena",
       component: Resena,
@@ -205,22 +203,99 @@ const roleRoutesConfig = {
     },
   ],
   ADMIN_ESP_DEP: [
-    { id: 'estadisticas', label: 'Estadisticas', icon: '📊', path: 'estadisticas', component: EspaciosView },
-    { id: 'calendario', label: 'Calendario', icon: '📆', path: 'calendario', component: CalendarioReservasAdmin },
-    { id: 'espacio_deportivo', label: 'Espacio Deportivo', icon: '🏟️', path: 'espacio-deportivo', component: EspacioDeportivoAdmin },
-    { id: 'cancha', label: 'Cancha', icon: '🎾', path: 'cancha', component: CanchaAdmin },
-    { id: 'reserva', label: 'Reserva', icon: '📅', path: 'reserva', component: ReservaAdmin },
-    { id: 'reserva_horario', label: 'Reserva Horario', icon: '⏰', path: 'reserva-horario', component: Reserva_HorarioAdmin },
-    { id: 'pago', label: 'Pago', icon: '💳', path: 'pago', component: PagoAdmin },
-    { id: 'resena', label: 'Reseña', icon: '⭐', path: 'resena', component: ResenaAdmin },
-    { id: 'reporte_incidencia', label: 'Reporte Incidencia', icon: '⚠️', path: 'reporte_incidencia', component: Reporte_incidenciaAdmin },
-    { id: 'encargado', label: 'Encargado', icon: '👨‍💼', path: 'encargado', component: EncargadoAdmin },
-    { id: 'control', label: 'Control', icon: '🎮', path: 'control', component: ControlAdmin },
+    {
+      id: "estadisticas",
+      label: "Estadisticas",
+      icon: "📊",
+      path: "estadisticas",
+      component: EspaciosView,
+    },
+    {
+      id: "calendario",
+      label: "Calendario",
+      icon: "📆",
+      path: "calendario",
+      component: CalendarioReservasAdmin,
+    },
+    {
+      id: "espacio_deportivo",
+      label: "Espacio Deportivo",
+      icon: "🏟️",
+      path: "espacio-deportivo",
+      component: EspacioDeportivoAdmin,
+    },
+    {
+      id: "cancha",
+      label: "Cancha",
+      icon: "🎾",
+      path: "cancha",
+      component: CanchaAdmin,
+    },
+    {
+      id: "reserva",
+      label: "Reserva",
+      icon: "📅",
+      path: "reserva",
+      component: ReservaAdmin,
+    },
+    {
+      id: "reserva_horario",
+      label: "Reserva Horario",
+      icon: "⏰",
+      path: "reserva-horario",
+      component: Reserva_HorarioAdmin,
+    },
+    {
+      id: "pago",
+      label: "Pago",
+      icon: "💳",
+      path: "pago",
+      component: PagoAdmin,
+    },
+    {
+      id: "resena",
+      label: "Resena",
+      icon: "⭐",
+      path: "resena",
+      component: ResenaAdmin,
+    },
+    {
+      id: "reporte_incidencia",
+      label: "Reporte Incidencia",
+      icon: "⚠️",
+      path: "reporte_incidencia",
+      component: Reporte_incidenciaAdmin,
+    },
+    {
+      id: "encargado",
+      label: "Encargado",
+      icon: "👨‍💼",
+      path: "encargado",
+      component: EncargadoAdmin,
+    },
+    {
+      id: "control",
+      label: "Control",
+      icon: "🎮",
+      path: "control",
+      component: ControlAdmin,
+    },
   ],
   CONTROL: [
-    { id: 'espacio_deportivo', label: 'Espacio Deportivo', icon: '🏟️', path: 'espacio-deportivo', component: Espacio_DeportivoControl },
-    { id: 'qr_reserva', label: 'QR Reserva', icon: '📱', path: 'qr-reserva', component: QR_AccesoEncargado },
-
+    {
+      id: "espacio_deportivo",
+      label: "Espacio Deportivo",
+      icon: "🏟️",
+      path: "espacio-deportivo",
+      component: Espacio_DeportivoControl,
+    },
+    {
+      id: "qr_reserva",
+      label: "QR Reserva",
+      icon: "📱",
+      path: "qr-reserva",
+      component: QR_AccesoEncargado,
+    },
   ],
   ENCARGADO: [
     {
@@ -254,10 +329,8 @@ const roleRoutesConfig = {
   ],
 };
 
-// Roles que tienen rutas en tu config (panel)
 const PANEL_ROLES = Object.keys(roleRoutesConfig);
 
-// Prioridad para elegir el rol efectivo cuando hay varios
 const ROLE_PRIORITY = [
   "ADMINISTRADOR",
   "ADMIN_ESP_DEP",
@@ -265,7 +338,8 @@ const ROLE_PRIORITY = [
   "CONTROL",
 ];
 
-// Soporta {role:'X'} (viejo) o {roles:['X','Y']} (nuevo)
+const PANEL_ROLE_KEY = "panelRole";
+
 const getUserRoles = (u) => {
   if (Array.isArray(u?.roles))
     return u.roles.map((r) => String(r?.rol ?? r).toUpperCase());
@@ -273,12 +347,23 @@ const getUserRoles = (u) => {
   return [];
 };
 
-// Toma solo roles que existen en roleRoutesConfig y elige 1 por prioridad
-const pickEffectiveRole = (u) => {
+const pickEffectiveRole = (u, preferredRole) => {
   const roles = getUserRoles(u).filter((r) => PANEL_ROLES.includes(r));
   if (roles.length === 0) return null;
-  for (const r of ROLE_PRIORITY) if (roles.includes(r)) return r;
-  return roles[0]; // fallback: el primero válido
+
+  const normalizedPreferred = preferredRole
+    ? String(preferredRole).toUpperCase()
+    : null;
+
+  if (normalizedPreferred && roles.includes(normalizedPreferred)) {
+    return normalizedPreferred;
+  }
+
+  for (const r of ROLE_PRIORITY) {
+    if (roles.includes(r)) return r;
+  }
+
+  return roles[0];
 };
 
 const Header = ({ title, toggleSidebar, isSidebarOpen }) => {
@@ -348,7 +433,6 @@ const Sidebar = ({
       ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"} 
       transition-transform duration-300 ease-in-out z-50`}
     >
-      {/* ENCABEZADO */}
       <div className="p-6 border-b bg-gradient-to-r from-[#E8F5EE] to-[#FFFFFF] flex justify-between items-start">
         <div>
           <div className="flex items-center gap-3 mb-3">
@@ -390,7 +474,7 @@ const Sidebar = ({
                 d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
               />
             </svg>
-            Cerrar Sesión
+            Cerrar Sesion
           </button>
 
           {(getMainRole(user) === "ADMIN_ESP_DEP" ||
@@ -438,7 +522,6 @@ const Sidebar = ({
         </button>
       </div>
 
-      {/* MENÚ — scrolleable */}
       <nav className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-[#23475F]/40 scrollbar-track-transparent">
         {routes.map((item) => (
           <Link
@@ -467,7 +550,7 @@ const PaginaPrincipal = () => {
   const [currentPage, setCurrentPage] = useState("");
   const [pageTitle, setPageTitle] = useState("");
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [loading, setLoading] = useState(true); // Nuevo estado para carga de auth
+  const [loading, setLoading] = useState(true);
   const [user, setUser] = useState(null);
   const [routes, setRoutes] = useState([]);
   const [empresa, setEmpresa] = useState(null);
@@ -479,12 +562,7 @@ const PaginaPrincipal = () => {
     const fetchEmpresa = async () => {
       try {
         const res = await api.get("/empresa/dato-individual/2");
-
-        console.log("EMPRESA API:", res.data);
-
-        // OBTENER EMPRESA CORRECTAMENTE
         const info = res.data?.datos?.empresa || null;
-
         setEmpresa(info);
       } catch (err) {
         console.error("Error cargando datos de empresa:", err);
@@ -508,10 +586,23 @@ const PaginaPrincipal = () => {
     try {
       const parsedUser = JSON.parse(userData);
       setUser(parsedUser);
-
       setIsAuthenticated(true);
 
-      const effectiveRole = pickEffectiveRole(parsedUser);
+      const searchParams = new URLSearchParams(location.search);
+      const roleParamRaw = searchParams.get("role");
+      const storedPanelRole = localStorage.getItem(PANEL_ROLE_KEY);
+
+      let preferredRole = null;
+
+      if (roleParamRaw) {
+        const up = roleParamRaw.toUpperCase();
+        localStorage.setItem(PANEL_ROLE_KEY, up);
+        preferredRole = up;
+      } else if (storedPanelRole) {
+        preferredRole = storedPanelRole.toUpperCase();
+      }
+
+      const effectiveRole = pickEffectiveRole(parsedUser, preferredRole);
       const roleRoutes = effectiveRole ? roleRoutesConfig[effectiveRole] : [];
       setRoutes(roleRoutes);
 
@@ -529,7 +620,6 @@ const PaginaPrincipal = () => {
       } else {
         setCurrentPage("");
         setPageTitle("Dashboard");
-        // Opcional: navigate('/'); si quieres sacarlo del panel cuando no hay rol de panel
       }
     } catch (error) {
       console.error("Error parsing user data:", error);
@@ -538,13 +628,11 @@ const PaginaPrincipal = () => {
       setIsAuthenticated(false);
       navigate("/");
     } finally {
-      setLoading(false); // Finaliza la carga siempre
+      setLoading(false);
     }
-  }, [navigate, location.pathname]);
+  }, [navigate, location.pathname, location.search]);
 
-  // 👇 pega esto debajo del useEffect que setea user/routes y hace navigate según ruta
   useEffect(() => {
-    // espera a que el primer efecto termine
     if (loading) return;
 
     const isAdminPath = location.pathname.startsWith("/administrador");
@@ -558,9 +646,7 @@ const PaginaPrincipal = () => {
     const hasPanelRole = roles.some((r) => PANEL_ROLES.includes(r));
 
     if (!hasPanelRole) {
-      // redirige a la vista pública o perfil del cliente
       navigate("/espacios-deportivos", { replace: true });
-      // o si tienes una ruta de perfil: navigate('/mi-perfil', { replace: true });
     }
   }, [loading, location.pathname, navigate]);
 
@@ -587,7 +673,7 @@ const PaginaPrincipal = () => {
       <div className="flex justify-center items-center h-screen">
         Cargando...
       </div>
-    ); // Pantalla de carga durante verificación
+    );
   }
 
   if (!isAuthenticated) {
@@ -626,7 +712,6 @@ const PaginaPrincipal = () => {
                 element={<route.component />}
               />
             ))}
-            {/* Ruta por defecto para evitar renderizado incorrecto */}
             <Route
               path="*"
               element={
