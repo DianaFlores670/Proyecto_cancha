@@ -324,11 +324,14 @@ const EspacioDeportivo = () => {
   const openViewModal = async (id) => {
     if (!permissions.canView) return;
     try {
-      const response = await api.get(
-        `/espacio_deportivo/dato-individual/${id}`
+      const res = await fetch(
+        `https://proyecto-cancha.onrender.com/espacio_deportivo/dato-individual/${id}`,
+        { headers: { "Content-Type": "application/json" } }
       );
-      if (response.data.exito) {
-        const e = response.data.datos.espacio;
+      const data = await res.json();
+
+      if (data.exito) {
+        const e = data.datos.espacio;
         setFormData({
           nombre: e.nombre || "",
           direccion: e.direccion || "",
@@ -344,15 +347,17 @@ const EspacioDeportivo = () => {
           imagen_sec_4: e.imagen_sec_4 || "",
           id_admin_esp_dep: e.id_admin_esp_dep || "",
         });
+
         setImagePreviews({
           imagen_principal: e.imagen_principal
-            ? getImageUrl(e.imagen_principal)
+            ? getImageUrlSafe(e.imagen_principal)
             : null,
-          imagen_sec_1: e.imagen_sec_1 ? getImageUrl(e.imagen_sec_1) : null,
-          imagen_sec_2: e.imagen_sec_2 ? getImageUrl(e.imagen_sec_2) : null,
-          imagen_sec_3: e.imagen_sec_3 ? getImageUrl(e.imagen_sec_3) : null,
-          imagen_sec_4: e.imagen_sec_4 ? getImageUrl(e.imagen_sec_4) : null,
+          imagen_sec_1: e.imagen_sec_1 ? getImageUrlSafe(e.imagen_sec_1) : null,
+          imagen_sec_2: e.imagen_sec_2 ? getImageUrlSafe(e.imagen_sec_2) : null,
+          imagen_sec_3: e.imagen_sec_3 ? getImageUrlSafe(e.imagen_sec_3) : null,
+          imagen_sec_4: e.imagen_sec_4 ? getImageUrlSafe(e.imagen_sec_4) : null,
         });
+
         setSelectedFiles({
           imagen_principal: null,
           imagen_sec_1: null,
@@ -365,12 +370,10 @@ const EspacioDeportivo = () => {
         setViewMode(true);
         setModalOpen(true);
       } else {
-        setError(response.data.mensaje || "No se pudo cargar el espacio");
+        setError(data.mensaje || "No se pudo cargar el espacio");
       }
     } catch (err) {
-      const errorMessage =
-        err.response?.data?.mensaje || "Error de conexion al servidor";
-      setError(errorMessage);
+      setError("Error de conexion al servidor");
     }
   };
 
