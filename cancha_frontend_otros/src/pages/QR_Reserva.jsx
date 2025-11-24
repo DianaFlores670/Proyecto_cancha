@@ -673,6 +673,8 @@ const QRReserva = () => {
                   </span>
                 </label>
               </div>
+              console.log("QR image URL raw:", qr.qr_url_imagen);
+              console.log("QR image URL final:", getImageUrl(qr.qr_url_imagen));
               {previewQR && (
                 <div className="col-span-2">
                   <label className="block text-sm font-medium mb-1">
@@ -823,6 +825,9 @@ const QRReserva = () => {
                 </div>
               )}
               <div className="grid grid-cols-1 gap-4">
+                console.log("QR image URL raw:", qr.qr_url_imagen);
+                console.log("QR image URL final:",
+                getImageUrl(qr.qr_url_imagen));
                 {selectedQR.qr_url_imagen && (
                   <div>
                     <label className="font-medium text-gray-700">
