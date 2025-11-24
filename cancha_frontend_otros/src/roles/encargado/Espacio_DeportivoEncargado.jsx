@@ -11,6 +11,9 @@ import api from "../../services/api";
 const getImageUrl = (path) => {
   if (!path) return "";
 
+  // Limpiar espacios y dobles barras
+  path = path.trim();
+
   // Si ya es URL completa, devolver tal cual
   if (path.startsWith("http://") || path.startsWith("https://")) return path;
 
@@ -19,12 +22,13 @@ const getImageUrl = (path) => {
       ? "http://localhost:3000"
       : "https://proyecto-cancha.onrender.com";
 
-  // Eliminar cualquier barra inicial y también "https://proyecto-cancha.onrender.com/" repetido
-  const clean = String(path)
-    .replace(/^\/+/, "")
-    .replace(/^https?:\/\/proyecto-cancha\.onrender\.com\//, "");
+  // Quitar cualquier duplicación de dominio
+  path = path.replace(/^(https?:\/\/proyecto-cancha\.onrender\.com\/)+/, "");
 
-  return `${base}/${clean}`;
+  // Quitar cualquier barra inicial sobrante
+  path = path.replace(/^\/+/, "");
+
+  return `${base}/${path}`;
 };
 
 const Espacio_DeportivoEncargado = () => {
