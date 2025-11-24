@@ -1,7 +1,6 @@
 /* eslint-disable no-empty */
 import React, { useState, useEffect } from "react";
 import api from "../services/api";
-import { getImageUrl } from "../utils";
 
 const permissionsConfig = {
   ADMINISTRADOR: {
@@ -142,9 +141,10 @@ const Cancha = () => {
   }, []);
 
   const getImageUrl = (path) => {
-    if (!path) return "";
+    if (!path) return null;
     try {
-      const base = (api.defaults?.baseURL || "").replace(/\/$/, "");
+      // Cambia a tu dominio de Render
+      const base = "https://proyecto-cancha.onrender.com".replace(/\/$/, "");
       const cleanPath = String(path).replace(/^\//, "");
       return `${base}/${cleanPath}`;
     } catch {
@@ -715,13 +715,14 @@ const Cancha = () => {
                 </label>
                 {imagePreview ? (
                   <img
-                    src={getImageUrl(imagePreview)}
+                    src={imagePreview}
                     alt="Imagen Cancha"
                     className="w-32 h-32 object-cover rounded mb-2"
                   />
                 ) : viewMode ? (
                   <p className="text-gray-500">No hay imagen</p>
                 ) : null}
+
                 {!viewMode && (
                   <input
                     type="file"
