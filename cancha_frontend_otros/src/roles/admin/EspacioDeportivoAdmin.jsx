@@ -296,14 +296,13 @@ const EspacioDeportivoAdmin = () => {
           (role === "ADMIN_ESP_DEP" && idAdminEspDep ? idAdminEspDep : ""),
       });
       setImagePreviews({
-        imagen_principal: e.imagen_principal
-          ? getImageUrl(e.imagen_principal)
-          : null,
-        imagen_sec_1: e.imagen_sec_1 ? getImageUrl(e.imagen_sec_1) : null,
-        imagen_sec_2: e.imagen_sec_2 ? getImageUrl(e.imagen_sec_2) : null,
-        imagen_sec_3: e.imagen_sec_3 ? getImageUrl(e.imagen_sec_3) : null,
-        imagen_sec_4: e.imagen_sec_4 ? getImageUrl(e.imagen_sec_4) : null,
+        imagen_principal: e.imagen_principal || null,
+        imagen_sec_1: e.imagen_sec_1 || null,
+        imagen_sec_2: e.imagen_sec_2 || null,
+        imagen_sec_3: e.imagen_sec_3 || null,
+        imagen_sec_4: e.imagen_sec_4 || null,
       });
+
       setImageFiles({
         imagen_principal: null,
         imagen_sec_1: null,
@@ -762,7 +761,7 @@ const EspacioDeportivoAdmin = () => {
 
               <div className="col-span-2">
                 <label className="block text-sm font-medium mb-1">
-                  Imagen principal 123
+                  Imagen principal
                 </label>
                 {imagePreviews.imagen_principal ? (
                   <img
@@ -773,6 +772,7 @@ const EspacioDeportivoAdmin = () => {
                 ) : viewMode ? (
                   <p className="text-gray-500">Sin imagen</p>
                 ) : null}
+
                 {!viewMode && (
                   <input
                     type="file"
@@ -800,6 +800,7 @@ const EspacioDeportivoAdmin = () => {
                   ) : viewMode ? (
                     <p className="text-gray-500">Sin imagen</p>
                   ) : null}
+
                   {!viewMode && (
                     <input
                       type="file"
