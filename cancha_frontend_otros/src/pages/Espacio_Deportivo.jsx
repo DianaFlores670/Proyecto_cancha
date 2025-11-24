@@ -2,6 +2,8 @@
 import React, { useState, useEffect } from "react";
 import api from "../services/api";
 
+import { getImageUrl } from "../utils";
+
 const permissionsConfig = {
   ADMINISTRADOR: {
     canView: true,
@@ -66,15 +68,6 @@ const getEffectiveRole = () => {
     norm2.find((r) => keys.includes(r)) ||
     "DEFAULT"
   );
-};
-
-// --- CORREGIDO: getImageUrl ---
-const getImageUrl = (path) => {
-  if (!path) return "";
-  if (path.startsWith("http")) return path; // ya es URL completa
-  const base = (api.defaults?.baseURL || "").replace(/\/$/, "");
-  const cleanPath = String(path).replace(/^\//, "");
-  return `${base}/${cleanPath}`;
 };
 
 const EspacioDeportivo = () => {
@@ -154,6 +147,17 @@ const EspacioDeportivo = () => {
     };
     fetchAdministradores();
   }, []);
+
+  // const getImageUrl = (path) => {
+  //   if (!path) return "";
+  //   try {
+  //     const base = (api.defaults?.baseURL || "").replace(/\/$/, "");
+  //     const cleanPath = String(path).replace(/^\//, "");
+  //     return `${base}/${cleanPath}`;
+  //   } catch {
+  //     return path;
+  //   }
+  // };
 
   const fetchEspacios = async (params = {}) => {
     if (!permissions.canView) {
@@ -449,9 +453,51 @@ const EspacioDeportivo = () => {
         if (selectedFiles[field]) data.append(field, selectedFiles[field]);
       });
 
-      // Validaciones simples
       if (filteredData.nombre && filteredData.nombre.length > 100) {
         setError("El nombre no debe exceder 100 caracteres");
+        return;
+      }
+      if (filteredData.direccion && filteredData.direccion.length > 255) {
+        setError("La direccion no debe exceder 255 caracteres");
+        return;
+      }
+      if (
+        filteredData.latitud &&
+        (filteredData.latitud < -90 || filteredData.latitud > 90)
+      ) {
+        setError("Latitud fuera de rango");
+        return;
+      }
+      if (
+        filteredData.longitud &&
+        (filteredData.longitud < -180 || filteredData.longitud > 180)
+      ) {
+        setError("Longitud fuera de rango");
+        return;
+      }
+      const validarHora = (h) =>
+        /^([0-1]?[0-9]|2[0-3]):[0-5][0-9](:[0-5][0-9])?$/.test(h);
+      if (
+        filteredData.horario_apertura &&
+        !validarHora(filteredData.horario_apertura)
+      ) {
+        setError("Hora de apertura invalida");
+        return;
+      }
+      if (
+        filteredData.horario_cierre &&
+        !validarHora(filteredData.horario_cierre)
+      ) {
+        setError("Hora de cierre invalida");
+        return;
+      }
+      if (
+        filteredData.id_admin_esp_dep &&
+        !administradores.some(
+          (a) => a.id_admin_esp_dep === parseInt(filteredData.id_admin_esp_dep)
+        )
+      ) {
+        setError("Administrador invalido");
         return;
       }
 
@@ -485,8 +531,434 @@ const EspacioDeportivo = () => {
 
   return (
     <div className="bg-white rounded-lg shadow p-6">
-      {/* Aquí iría todo tu renderizado de tabla, formulario y modal */}
-      {/* Asegúrate de que en todos los <img> uses `src={imagePreviews.[imagen]}` */}
+      <h2 className="text-xl font-semibold mb-4">
+        Gestion de Espacios Deportivos
+      </h2>
+
+      <div className="flex flex-col xl:flex-row gap-4 mb-6 items-stretch">
+        <div className="flex-1">
+          <form onSubmit={handleSearch} className="flex h-full">
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Buscar por nombre, direccion, descripcion o administrador"
+              className="border rounded-l px-4 py-2 w-full"
+              disabled={!permissions.canView}
+            />
+            <button
+              type="submit"
+              className="bg-blue-500 text-white px-4 py-2 rounded-r hover:bg-blue-600 whitespace-nowrap"
+              disabled={!permissions.canView}
+            >
+              Buscar
+            </button>
+          </form>
+        </div>
+
+        <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+          <select
+            value={filtro}
+            onChange={handleFiltroChange}
+            className="border rounded px-3 py-2 flex-1 sm:min-w-[160px]"
+            disabled={!permissions.canView}
+          >
+            <option value="">Sin filtro</option>
+            <option value="nombre">Por nombre</option>
+            <option value="direccion">Por direccion</option>
+            <option value="admin_nombre">Por administrador</option>
+            <option value="sin_admin">Sin administrador</option>
+          </select>
+
+          {permissions.canCreate && (
+            <button
+              onClick={openCreateModal}
+              className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 whitespace-nowrap sm:w-auto w-full"
+            >
+              Crear Espacio
+            </button>
+          )}
+        </div>
+      </div>
+
+      {loading ? (
+        <p>Cargando espacios deportivos...</p>
+      ) : error ? (
+        <p className="text-red-500">{error}</p>
+      ) : (
+        <>
+          <div className="overflow-x-auto">
+            <table className="min-w-full table-auto border-collapse">
+              <thead>
+                <tr className="bg-gray-50">
+                  <th className="px-4 py-2 text-left">#</th>
+                  <th className="px-4 py-2 text-left">Nombre</th>
+                  <th className="px-4 py-2 text-left">Direccion</th>
+                  <th className="px-4 py-2 text-left">Horario</th>
+                  <th className="px-4 py-2 text-left">Admin Esp Dep</th>
+                  <th className="px-4 py-2 text-left">Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {espacios.map((e, index) => (
+                  <tr key={e.id_espacio} className="border-t">
+                    <td className="px-4 py-2">
+                      {(page - 1) * limit + index + 1}
+                    </td>
+                    <td className="px-4 py-2">{e.nombre}</td>
+                    <td className="px-4 py-2">{e.direccion || "-"}</td>
+                    <td className="px-4 py-2">
+                      {e.horario_apertura && e.horario_cierre
+                        ? `${e.horario_apertura} - ${e.horario_cierre}`
+                        : "-"}
+                    </td>
+                    <td className="px-4 py-2">
+                      {e.id_admin_esp_dep
+                        ? `${e.admin_nombre} ${e.admin_apellido}`
+                        : "Sin administrador"}
+                    </td>
+
+                    <td className="px-4 py-2 flex gap-2">
+                      {permissions.canView && (
+                        <button
+                          onClick={() => openViewModal(e.id_espacio)}
+                          className="text-green-500 hover:text-green-700 mr-2"
+                        >
+                          Ver Datos
+                        </button>
+                      )}
+                      {permissions.canEdit && (
+                        <button
+                          onClick={() => openEditModal(e.id_espacio)}
+                          className="text-blue-500 hover:text-blue-700 mr-2"
+                        >
+                          Editar
+                        </button>
+                      )}
+                      {permissions.canDelete && (
+                        <button
+                          onClick={() => handleDelete(e.id_espacio)}
+                          className="text-red-500 hover:text-red-700"
+                        >
+                          Eliminar
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="flex justify-center mt-4">
+            <button
+              onClick={() => handlePageChange(page - 1)}
+              disabled={page === 1}
+              className="bg-gray-300 text-gray-800 px-4 py-2 rounded-l hover:bg-gray-400 disabled:opacity-50"
+            >
+              Anterior
+            </button>
+            <span className="px-4 py-2 bg-gray-100">
+              Pagina {page} de {Math.ceil(total / limit)}
+            </span>
+            <button
+              onClick={() => handlePageChange(page + 1)}
+              disabled={page === Math.ceil(total / limit)}
+              className="bg-gray-300 text-gray-800 px-4 py-2 rounded-r hover:bg-gray-400 disabled:opacity-50"
+            >
+              Siguiente
+            </button>
+          </div>
+        </>
+      )}
+
+      {modalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-8 max-w-2xl w-full max-h-[80vh] overflow-y-auto">
+            <h3 className="text-xl font-semibold mb-4">
+              {viewMode
+                ? "Ver Datos de Espacio Deportivo"
+                : editMode
+                ? "Editar Espacio Deportivo"
+                : "Crear Espacio Deportivo"}
+            </h3>
+            <form onSubmit={handleSubmit} className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">Nombre</label>
+                <input
+                  name="nombre"
+                  value={formData.nombre}
+                  onChange={handleInputChange}
+                  className="w-full border rounded px-3 py-2 bg-gray-100"
+                  required
+                  disabled={viewMode}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  Direccion
+                </label>
+                <input
+                  name="direccion"
+                  value={formData.direccion}
+                  onChange={handleInputChange}
+                  className="w-full border rounded px-3 py-2 bg-gray-100"
+                  disabled={viewMode}
+                />
+              </div>
+              <div className="col-span-2">
+                <label className="block text-sm font-medium mb-1">
+                  Descripcion
+                </label>
+                <textarea
+                  name="descripcion"
+                  value={formData.descripcion}
+                  onChange={handleInputChange}
+                  className="w-full border rounded px-3 py-2 bg-gray-100"
+                  rows="3"
+                  disabled={viewMode}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  Latitud
+                </label>
+                <input
+                  name="latitud"
+                  value={formData.latitud}
+                  onChange={handleInputChange}
+                  className="w-full border rounded px-3 py-2 bg-gray-100"
+                  type="number"
+                  step="0.000001"
+                  disabled={viewMode}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  Longitud
+                </label>
+                <input
+                  name="longitud"
+                  value={formData.longitud}
+                  onChange={handleInputChange}
+                  className="w-full border rounded px-3 py-2 bg-gray-100"
+                  type="number"
+                  step="0.000001"
+                  disabled={viewMode}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  Horario de Apertura
+                </label>
+                <input
+                  name="horario_apertura"
+                  value={formData.horario_apertura}
+                  onChange={handleInputChange}
+                  className="w-full border rounded px-3 py-2 bg-gray-100"
+                  type="time"
+                  step="1"
+                  disabled={viewMode}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  Horario de Cierre
+                </label>
+                <input
+                  name="horario_cierre"
+                  value={formData.horario_cierre}
+                  onChange={handleInputChange}
+                  className="w-full border rounded px-3 py-2 bg-gray-100"
+                  type="time"
+                  step="1"
+                  disabled={viewMode}
+                />
+              </div>
+
+              <div className="col-span-2">
+                <label className="block text-sm font-medium mb-1">
+                  Imagen Principal
+                </label>
+                {imagePreviews.imagen_principal && (
+                  <img
+                    src={
+                      selectedFiles.imagen_principal
+                        ? URL.createObjectURL(selectedFiles.imagen_principal)
+                        : getImageUrl(imagePreviews.imagen_principal)
+                    }
+                    alt="Imagen Principal"
+                    className="w-32 h-32 object-cover rounded mb-2"
+                  />
+                )}
+
+                {!viewMode && (
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => handleFileChange(e, "imagen_principal")}
+                    className="w-full border rounded px-3 py-2 bg-gray-100"
+                  />
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  Imagen Secundaria 1
+                </label>
+                {imagePreviews.imagen_sec_1 && (
+                  <img
+                    src={
+                      selectedFiles.imagen_sec_1
+                        ? URL.createObjectURL(selectedFiles.imagen_sec_1)
+                        : getImageUrl(imagePreviews.imagen_sec_1)
+                    }
+                    alt="Imagen Secundaria 1"
+                    className="w-32 h-32 object-cover rounded mb-2"
+                  />
+                )}
+                {!imagePreviews.imagen_sec_1 && viewMode && (
+                  <p className="text-gray-500">No hay imagen secundaria 1</p>
+                )}
+
+                {!viewMode && (
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => handleFileChange(e, "imagen_sec_1")}
+                    className="w-full border rounded px-3 py-2 bg-gray-100"
+                  />
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  Imagen Secundaria 2
+                </label>
+                {imagePreviews.imagen_sec_2 && (
+                  <img
+                    src={
+                      selectedFiles.imagen_sec_2
+                        ? URL.createObjectURL(selectedFiles.imagen_sec_2)
+                        : getImageUrl(imagePreviews.imagen_sec_2)
+                    }
+                    alt="Imagen Secundaria 2"
+                    className="w-32 h-32 object-cover rounded mb-2"
+                  />
+                )}
+                {!imagePreviews.imagen_sec_2 && viewMode && (
+                  <p className="text-gray-500">No hay imagen secundaria 2</p>
+                )}
+
+                {!viewMode && (
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => handleFileChange(e, "imagen_sec_2")}
+                    className="w-full border rounded px-3 py-2 bg-gray-100"
+                  />
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  Imagen Secundaria 3
+                </label>
+                {imagePreviews.imagen_sec_3 && (
+                  <img
+                    src={
+                      selectedFiles.imagen_sec_3
+                        ? URL.createObjectURL(selectedFiles.imagen_sec_3)
+                        : getImageUrl(imagePreviews.imagen_sec_3)
+                    }
+                    alt="Imagen Secundaria 3"
+                    className="w-32 h-32 object-cover rounded mb-2"
+                  />
+                )}
+                {!imagePreviews.imagen_sec_3 && viewMode && (
+                  <p className="text-gray-500">No hay imagen secundaria 3</p>
+                )}
+
+                {!viewMode && (
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => handleFileChange(e, "imagen_sec_3")}
+                    className="w-full border rounded px-3 py-2 bg-gray-100"
+                  />
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  Imagen Secundaria 4
+                </label>
+                {imagePreviews.imagen_sec_4 && (
+                  <img
+                    src={
+                      selectedFiles.imagen_sec_4
+                        ? URL.createObjectURL(selectedFiles.imagen_sec_4)
+                        : getImageUrl(imagePreviews.imagen_sec_4)
+                    }
+                    alt="Imagen Secundaria 4"
+                    className="w-32 h-32 object-cover rounded mb-2"
+                  />
+                )}
+                {!imagePreviews.imagen_sec_4 && viewMode && (
+                  <p className="text-gray-500">No hay imagen secundaria 4</p>
+                )}
+
+                {!viewMode && (
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => handleFileChange(e, "imagen_sec_4")}
+                    className="w-full border rounded px-3 py-2 bg-gray-100"
+                  />
+                )}
+              </div>
+
+              <div className="col-span-2">
+                <label className="block text-sm font-medium mb-1">
+                  Admin Esp Dep
+                </label>
+                <select
+                  name="id_admin_esp_dep"
+                  value={formData.id_admin_esp_dep}
+                  onChange={handleInputChange}
+                  className="w-full border rounded px-3 py-2 bg-gray-100"
+                  disabled={viewMode}
+                >
+                  <option value="">Ninguno (opcional)</option>
+                  {administradores.map((a) => (
+                    <option key={a.id_admin_esp_dep} value={a.id_admin_esp_dep}>
+                      {`${a.nombre} ${a.apellido}`}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="col-span-2 flex justify-end mt-4">
+                <button
+                  type="button"
+                  onClick={closeModal}
+                  className="bg-gray-500 text-white px-4 py-2 rounded mr-2 hover:bg-gray-600"
+                >
+                  Cerrar
+                </button>
+                {!viewMode && (
+                  <button
+                    type="submit"
+                    className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+                  >
+                    {editMode ? "Actualizar" : "Crear"}
+                  </button>
+                )}
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
