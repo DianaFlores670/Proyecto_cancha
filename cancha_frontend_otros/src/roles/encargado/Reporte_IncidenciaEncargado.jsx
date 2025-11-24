@@ -148,7 +148,7 @@ const Reporte_IncidenciaEncargado = () => {
   /* ========================= CREAR ========================= */
 
   const openCreate = async () => {
-    await loadReservas();
+    await loadReservas("pasadas");
     setDetalle(null);
     setEditMode("crear");
     setModalOpen(true);
@@ -205,16 +205,22 @@ const Reporte_IncidenciaEncargado = () => {
     }
   };
 
-  const loadReservas = async () => {
-    try {
-      const r = await api.get("/reporte-incidencia-encargado/reservas-disponibles");
-      if (r.data?.exito) {
-        setReservasDisponibles(r.data.datos.reservas);
-      }
-    } catch (e) {
-      console.error("Error al cargar reservas");
+const loadReservas = async (modo = "todas") => {
+  try {
+    const url =
+      modo === "pasadas"
+        ? "/reporte-incidencia-encargado/reservas-pasadas"
+        : "/reporte-incidencia-encargado/reservas-disponibles";
+
+    const r = await api.get(url);
+    if (r.data?.exito) {
+      setReservasDisponibles(r.data.datos.reservas);
     }
-  };
+  } catch (e) {
+    console.error("Error al cargar reservas");
+  }
+};
+
 
 
   /* ========================= RENDER ========================= */
