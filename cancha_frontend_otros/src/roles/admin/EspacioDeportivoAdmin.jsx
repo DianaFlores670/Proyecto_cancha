@@ -759,8 +759,9 @@ const EspacioDeportivoAdmin = () => {
               </div>
 
               <div className="col-span-2">
+                {/* esto es de la vista del adm_esp_dep */}
                 <label className="block text-sm font-medium mb-1">
-                  Imagen principal 123456
+                  Imagen principal
                 </label>
                 {imagePreviews.imagen_principal ? (
                   <img

@@ -739,7 +739,11 @@ const CanchaAdmin = () => {
                 </label>
                 {imagePreview ? (
                   <img
-                    src={getImageUrl(imagePreview)}
+                    src={
+                      imagePreview.startsWith("blob:")
+                        ? imagePreview
+                        : getImageUrl(imagePreview)
+                    }
                     alt="imagen_cancha"
                     className="w-32 h-32 object-cover rounded mb-2"
                   />
