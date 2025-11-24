@@ -321,9 +321,8 @@ const MisReservasCliente = () => {
     const url = getImageUrl(qrData.qr_url_imagen);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `qr_reserva_${
-      qrData.id_reserva || qrData.id_qr || "reserva"
-    }.png`;
+    link.download = `qr_reserva_${qrData.id_reserva || qrData.id_qr || "reserva"
+      }.png`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -385,7 +384,7 @@ const MisReservasCliente = () => {
         await api.post(
           `/qr-reserva/regenerar-por-reserva/${editReserva.id_reserva}`
         );
-      } catch (errQr) {}
+      } catch (errQr) { }
 
       setEditModalOpen(false);
       setEditReserva(null);
@@ -653,8 +652,8 @@ const MisReservasCliente = () => {
                               (r.estado === "pagada"
                                 ? "bg-green-100 text-green-700"
                                 : r.estado === "cancelada"
-                                ? "bg-red-100 text-red-700"
-                                : "bg-yellow-100 text-yellow-700")
+                                  ? "bg-red-100 text-red-700"
+                                  : "bg-yellow-100 text-yellow-700")
                             }
                           >
                             {r.estado}
@@ -703,50 +702,31 @@ const MisReservasCliente = () => {
                                   disabled
                                   className="inline-block px-3 py-1 rounded-full bg-gray-200 text-gray-500 text-xs font-semibold cursor-not-allowed"
                                 >
-                                  Reseña enviada
+                                  Reseña publicada
                                 </button>
                               )}
 
-                              {r.estado !== "cancelada" && (
+                              {r.estado !== "cancelada" && r.estado !== "pagada" && (
                                 <>
                                   <button
                                     type="button"
                                     onClick={() => handleOpenEdit(r)}
                                     className="inline-block px-3 py-1 rounded-full bg-[#FACC15] text-[#0F2634] text-xs font-semibold hover:bg-[#EAB308] transition-all"
                                   >
-                                    Editar reseña
+                                    Editar reserva
                                   </button>
-                                  </>
-                                )}
-
-                              {canLeaveReview(r) &&
-                                hasReview &&
-                                reviewVerified && (
-                                  <button
-                                    type="button"
-                                    onClick={() => handleCancel(r.id_reserva, r.estado)}
-                                    className="inline-block px-3 py-1 rounded-full bg-[#F97373] text-white text-xs font-semibold hover:bg-[#EF4444] transition-all"
-                                  >
-                                    Resena enviada
-                                  </button>
-                                )}
+                                </>
+                              )}
 
                               {r.estado !== "cancelada" &&
                                 r.estado !== "pagada" && (
                                   <>
                                     <button
                                       type="button"
-                                      onClick={() => handleOpenEdit(r)}
-                                      className="inline-block px-3 py-1 rounded-md bg-[#FACC15] text-[#0F2634] text-xs font-semibold hover:bg-[#EAB308] transition-all"
-                                    >
-                                      Editar
-                                    </button>
-                                    <button
-                                      type="button"
                                       onClick={() =>
                                         handleCancel(r.id_reserva, r.estado)
                                       }
-                                      className="inline-block px-3 py-1 rounded-md bg-[#F97373] text-white text-xs font-semibold hover:bg-[#EF4444] transition-all"
+                                      className="inline-block px-3 py-1 rounded-full bg-[#F97373] text-white text-xs font-semibold hover:bg-[#EF4444] transition-all"
                                     >
                                       Cancelar
                                     </button>
@@ -1075,12 +1055,12 @@ const MisReservasCliente = () => {
                 <p className="font-medium">
                   {detalleDepReserva.hora_inicio && detalleDepReserva.hora_fin
                     ? `${String(detalleDepReserva.hora_inicio).substring(
-                        0,
-                        5
-                      )} - ${String(detalleDepReserva.hora_fin).substring(
-                        0,
-                        5
-                      )}`
+                      0,
+                      5
+                    )} - ${String(detalleDepReserva.hora_fin).substring(
+                      0,
+                      5
+                    )}`
                     : "-"}
                 </p>
               </div>
