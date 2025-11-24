@@ -4,7 +4,6 @@ import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import api from "../../services/api";
 import Header from "../../Header";
-import { getImageUrl } from "../../utils";
 
 const canLeaveReview = (reserva) => {
   if (!reserva) return false;
@@ -29,18 +28,17 @@ const pickRoleForThisPage = (u) => {
   return "DEFAULT";
 };
 
-// const getImageUrl = (path) => {
-//   if (!path) return "";
-//   try {
-//     const base = api.defaults.baseURL
-//       ? api.defaults.baseURL.replace(/\/$/, "")
-//       : "";
-//     const clean = String(path).replace(/^\//, "");
-//     return `${base}/${clean}`;
-//   } catch (e) {
-//     return String(path);
-//   }
-// };
+const getImageUrl = (path) => {
+  if (!path) return "";
+
+  // Asegurarse de que la ruta comience con /
+  const clean = path.startsWith("/") ? path : `/${path}`;
+
+  // Dominio público donde está tu backend
+  const base = "https://proyecto-cancha.onrender.com";
+
+  return `${base}${clean}`;
+};
 
 const MisReservasCliente = () => {
   const [role, setRole] = useState("DEFAULT");
@@ -833,8 +831,7 @@ const MisReservasCliente = () => {
                   {qrImageUrl && (
                     <img
                       src={getImageUrl(qrImageUrl)}
-                      onError={(e) => (e.target.src = "/placeholder.png")}
-                      alt="Código QR"
+                      alt="Codigo QR de la reserva"
                       className="w-48 h-48 object-contain"
                     />
                   )}
