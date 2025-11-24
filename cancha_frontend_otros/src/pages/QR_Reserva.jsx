@@ -120,13 +120,10 @@ const QRReserva = () => {
       ? permissionsConfig[role]
       : permissionsConfig.DEFAULT;
 
-  // Función para obtener la URL correcta de la imagen
   const getImageUrl = (path) => {
-    if (!path) return null; // <--- antes estaba ""
-    if (/^https?:\/\//i.test(path)) return path;
-
+    if (!path) return "";
     const base = (api.defaults?.baseURL || "").replace(/\/$/, "");
-    const cleanPath = String(path).replace(/^\/+/, ""); // elimina todos los / iniciales
+    const cleanPath = String(path).replace(/^\//, "");
     return `${base}/${cleanPath}`;
   };
 
@@ -674,16 +671,12 @@ const QRReserva = () => {
                     Vista previa del QR
                   </label>
                   <img
-                    src={
-                      getImageUrl(previewQR) ||
-                      "https://via.placeholder.com/150"
-                    }
+                    src={getImageUrl(previewQR)}
                     alt="Vista previa del QR"
                     className="max-w-xs h-auto rounded"
-                    onError={(e) => {
-                      console.error("Error cargando QR:", e.target.src);
-                      e.target.src = "https://via.placeholder.com/150"; // fallback
-                    }}
+                    onError={(e) =>
+                      console.error("Error loading QR image:", e.target.src)
+                    }
                   />
                 </div>
               )}
@@ -826,16 +819,12 @@ const QRReserva = () => {
                       {selectedQR.qr_url_imagen}
                     </p>
                     <img
-                      src={
-                        getImageUrl(selectedQR.qr_url_imagen) ||
-                        "https://via.placeholder.com/150"
-                      }
+                      src={getImageUrl(selectedQR.qr_url_imagen)}
                       alt="QR"
                       className="mt-2 max-w-xs h-auto rounded"
-                      onError={(e) => {
-                        console.error("Error cargando QR:", e.target.src);
-                        e.target.src = "https://via.placeholder.com/150"; // placeholder si falla
-                      }}
+                      onError={(e) =>
+                        console.error("Error loading QR image:", e.target.src)
+                      }
                     />
                   </div>
                 )}
