@@ -830,12 +830,13 @@ const MisReservasCliente = () => {
                 <div className="flex justify-center mb-4">
                   {qrImageUrl && (
                     <img
-                      src={getImageUrl(qrImageUrl)}
+                      src={qrImageUrl} // aquí ya no se llama a getImageUrl
                       alt="Codigo QR de la reserva"
                       className="w-48 h-48 object-contain"
                     />
                   )}
                 </div>
+
                 <button
                   type="button"
                   onClick={handleDownloadQr}
