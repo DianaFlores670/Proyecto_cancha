@@ -38,9 +38,7 @@ const getEffectiveRole = () => {
     for (const r of arr) {
       if (typeof r === "string") bag.add(r);
       else if (r && typeof r === "object")
-        ["rol", "role", "nombre", "name"].forEach((k) => {
-          if (r[k]) bag.add(r[k]);
-        });
+        ["rol", "role", "nombre", "name"].forEach((k) => r[k] && bag.add(r[k]));
     }
     if (bag.size === 0 && u?.role) bag.add(u.role);
   } catch {}
@@ -58,14 +56,13 @@ const getEffectiveRole = () => {
       t.forEach((v) => bag.add(v));
     } catch {}
   }
-  const norm = Array.from(bag).map((v) =>
-    String(v || "")
+  const norm2 = Array.from(bag).map((v) => {
+    const val = String(v || "")
       .trim()
       .toUpperCase()
-      .replace(/\s+/g, "_")
-  );
-  const map = (v) => (v === "ADMIN" ? "ADMINISTRADOR" : v);
-  const norm2 = norm.map(map);
+      .replace(/\s+/g, "_");
+    return val === "ADMIN" ? "ADMINISTRADOR" : val;
+  });
   const prio = ["ADMINISTRADOR", "CONTROL", "ADMIN_ESP_DEP"];
   return (
     prio.find((r) => norm2.includes(r) && keys.includes(r)) ||
@@ -122,16 +119,9 @@ const QRReserva = () => {
 
   const getImageUrl = (path) => {
     if (!path) return "";
-
-    // Si ya es una URL absoluta, usar tal cual
     if (/^https?:\/\//i.test(path)) return path;
-
-    // Asegúrate que la ruta comience con '/'
     const cleanPath = path.startsWith("/") ? path : "/" + path;
-
-    // Combinar con la baseURL de tu API
     const base = (api.defaults?.baseURL || "").replace(/\/$/, "");
-
     return `${base}${cleanPath}`;
   };
 
@@ -199,9 +189,7 @@ const QRReserva = () => {
       if (r.data?.exito) {
         setQRs(r.data.datos?.qrs || []);
         setTotal(r.data.datos?.paginacion?.total || 0);
-      } else {
-        setError(r.data?.mensaje || "Error al cargar datos");
-      }
+      } else setError(r.data?.mensaje || "Error al cargar datos");
     } catch (e) {
       setError(e.response?.data?.mensaje || "Error de conexion al servidor");
     } finally {
@@ -284,9 +272,7 @@ const QRReserva = () => {
         setCurrentQR(qr);
         setEditMode(true);
         setModalOpen(true);
-      } else {
-        setError(r.data?.mensaje || "No se pudo cargar el registro");
-      }
+      } else setError(r.data?.mensaje || "No se pudo cargar el registro");
     } catch (e) {
       setError(e.response?.data?.mensaje || "Error de conexion al servidor");
     }
@@ -322,6 +308,7 @@ const QRReserva = () => {
           setError(`El campo ${f} es obligatorio`);
           return;
         }
+
       const fg = new Date(base.fecha_generado);
       if (isNaN(fg.getTime())) {
         setError("La fecha de generacion no es valida");
@@ -340,11 +327,13 @@ const QRReserva = () => {
           return;
         }
       }
+
       const rid = parseInt(base.id_reserva);
       if (!reservas.some((r) => r.id_reserva === rid)) {
         setError("La reserva seleccionada no es valida");
         return;
       }
+
       const payload = {
         id_reserva: rid,
         fecha_generado: base.fecha_generado,
@@ -354,18 +343,18 @@ const QRReserva = () => {
         id_control: base.id_control ? parseInt(base.id_control) : undefined,
         verificado: !!base.verificado,
       };
+
       let r;
       if (editMode)
         r = await api.patch(`/qr-reserva/${currentQR.id_qr}`, payload);
       else r = await api.post("/qr-reserva/", payload);
+
       if (r.data?.exito) {
         if (r.data.datos?.qr?.qr_url_imagen)
           setPreviewQR(getImageUrl(r.data.datos.qr.qr_url_imagen));
         closeModal();
         fetchQRs();
-      } else {
-        setError(r.data?.mensaje || "No se pudo guardar");
-      }
+      } else setError(r.data?.mensaje || "No se pudo guardar");
     } catch (err) {
       setError(err.response?.data?.mensaje || "Error de conexion al servidor");
     }
@@ -673,8 +662,7 @@ const QRReserva = () => {
                   </span>
                 </label>
               </div>
-              console.log("QR image URL raw:", qr.qr_url_imagen);
-              console.log("QR image URL final:", getImageUrl(qr.qr_url_imagen));
+
               {previewQR && (
                 <div className="col-span-2">
                   <label className="block text-sm font-medium mb-1">
@@ -825,9 +813,6 @@ const QRReserva = () => {
                 </div>
               )}
               <div className="grid grid-cols-1 gap-4">
-                console.log("QR image URL raw:", qr.qr_url_imagen);
-                console.log("QR image URL final:",
-                getImageUrl(qr.qr_url_imagen));
                 {selectedQR.qr_url_imagen && (
                   <div>
                     <label className="font-medium text-gray-700">
