@@ -126,16 +126,13 @@ const QRReserva = () => {
     // Si ya es una URL absoluta, usar tal cual
     if (/^https?:\/\//i.test(path)) return path;
 
-    // Asegurarse que baseURL termina sin slash
+    // Asegúrate que la ruta comience con '/'
+    const cleanPath = path.startsWith("/") ? path : "/" + path;
+
+    // Combinar con la baseURL de tu API
     const base = (api.defaults?.baseURL || "").replace(/\/$/, "");
 
-    // Normalizar path: quitar slashes al inicio, reemplazar backslashes, y forzar lowercase si quieres
-    const cleanPath = String(path)
-      .replace(/^\/+/, "") // quitar slashes al inicio
-      .replace(/\\/g, "/"); // reemplazar backslashes por slash
-
-    // Combinar base y path
-    return `${base}/${cleanPath}`;
+    return `${base}${cleanPath}`;
   };
 
   useEffect(() => {
@@ -691,7 +688,7 @@ const QRReserva = () => {
                     className="max-w-xs h-auto rounded"
                     onError={(e) => {
                       console.error("Error loading QR image:", e.target.src);
-                      e.target.src = "/fallback-qr.png"; // opcional: imagen por defecto
+                      e.target.src = "none"; // opcional: imagen por defecto
                     }}
                   />
                 </div>
@@ -844,7 +841,7 @@ const QRReserva = () => {
                       className="mt-2 max-w-xs h-auto rounded"
                       onError={(e) => {
                         console.error("Error loading QR image:", e.target.src);
-                        e.target.src = "/fallback-qr.png";
+                        e.target.src = "none";
                       }}
                     />
                   </div>
