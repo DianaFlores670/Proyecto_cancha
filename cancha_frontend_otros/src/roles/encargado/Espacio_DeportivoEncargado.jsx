@@ -11,19 +11,17 @@ import api from "../../services/api";
 const getImageUrl = (path) => {
   if (!path) return "";
 
-  // Limpiar espacios y dobles barras
+  // Limpiar espacios
   path = path.trim();
 
-  // Si ya es URL completa, devolver tal cual
+  // Si ya es una URL completa, devolver tal cual
   if (path.startsWith("http://") || path.startsWith("https://")) return path;
 
+  // Base según entorno
   const base =
     process.env.NODE_ENV === "development"
       ? "http://localhost:3000"
       : "https://proyecto-cancha.onrender.com";
-
-  // Quitar cualquier duplicación de dominio
-  path = path.replace(/^(https?:\/\/proyecto-cancha\.onrender\.com\/)+/, "");
 
   // Quitar cualquier barra inicial sobrante
   path = path.replace(/^\/+/, "");
@@ -344,20 +342,13 @@ const Espacio_DeportivoEncargado = () => {
                   const key = `imagen_sec_${i}`;
                   const imgPath = currentEspacio[key];
                   if (!imgPath) return null;
-
                   return (
-                    <div
-                      key={key}
-                      className="relative overflow-hidden rounded-xl border border-gray-200"
-                    >
+                    <div key={key}>
                       <img
                         src={getImageUrl(imgPath)}
                         alt={key}
                         className="w-full h-40 object-cover"
                       />
-                      <span className="absolute top-2 left-2 px-2 py-1 rounded-full bg-black/55 text-[10px] text-white font-medium">
-                        Extra {i}
-                      </span>
                     </div>
                   );
                 })}
