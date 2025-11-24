@@ -674,12 +674,17 @@ const QRReserva = () => {
                     Vista previa del QR
                   </label>
                   <img
-                    src={getImageUrl(previewQR)}
+                    src={
+                      /^https?:\/\//i.test(previewQR)
+                        ? previewQR
+                        : getImageUrl(previewQR)
+                    }
                     alt="Vista previa del QR"
                     className="max-w-xs h-auto rounded"
-                    onError={(e) =>
-                      console.error("Error loading QR image:", e.target.src)
-                    }
+                    onError={(e) => {
+                      console.error("Error loading QR image:", e.target.src);
+                      e.target.src = "/fallback-qr.png"; // opcional: imagen por defecto
+                    }}
                   />
                 </div>
               )}
@@ -822,12 +827,17 @@ const QRReserva = () => {
                       {selectedQR.qr_url_imagen}
                     </p>
                     <img
-                      src={getImageUrl(selectedQR.qr_url_imagen)}
+                      src={
+                        /^https?:\/\//i.test(selectedQR.qr_url_imagen)
+                          ? selectedQR.qr_url_imagen
+                          : getImageUrl(selectedQR.qr_url_imagen)
+                      }
                       alt="QR"
                       className="mt-2 max-w-xs h-auto rounded"
-                      onError={(e) =>
-                        console.error("Error loading QR image:", e.target.src)
-                      }
+                      onError={(e) => {
+                        console.error("Error loading QR image:", e.target.src);
+                        e.target.src = "/fallback-qr.png";
+                      }}
                     />
                   </div>
                 )}
