@@ -112,7 +112,7 @@ const Reporte_IncidenciaEncargado = () => {
   const openEditar = async (id) => {
     setLoading(true);
     try {
-      await loadReservas();
+      await loadReservas("pasadas");
 
       const r = await api.get(`/reporte-incidencia-encargado/dato-individual/${id}`);
       if (r.data?.exito) {
