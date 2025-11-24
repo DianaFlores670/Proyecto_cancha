@@ -154,7 +154,9 @@ const CanchaEncargado = () => {
               <tbody>
                 {canchas.map((c, index) => (
                   <tr key={c.id_cancha} className="border-t">
-                    <td className="px-4 py-2">{(page - 1) * limit + index + 1}</td>
+                    <td className="px-4 py-2">
+                      {(page - 1) * limit + index + 1}
+                    </td>
                     <td className="px-4 py-2">{c.nombre}</td>
                     <td className="px-4 py-2">{c.ubicacion || "-"}</td>
                     <td className="px-4 py-2">{c.capacidad || "-"}</td>
@@ -203,7 +205,6 @@ const CanchaEncargado = () => {
       {modalOpen && currentCancha && (
         <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
           <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full mx-4 p-6 md:p-8 max-h-[85vh] overflow-y-auto">
-
             <div className="flex items-start justify-between gap-4 mb-6">
               <div>
                 <p className="text-[11px] uppercase tracking-[0.14em] text-gray-400">
@@ -252,11 +253,15 @@ const CanchaEncargado = () => {
                     src={
                       currentCancha.imagen_cancha.startsWith("http")
                         ? currentCancha.imagen_cancha
-                        : `${api.defaults.baseURL}/${currentCancha.imagen_cancha}`
+                        : `https://proyecto-cancha.onrender.com/${currentCancha.imagen_cancha.replace(
+                            /^\/+/,
+                            ""
+                          )}`
                     }
                     alt="foto_cancha"
                     className="w-full h-64 object-cover"
                   />
+
                   <span className="absolute top-2 left-2 px-2 py-1 rounded-full bg-black/60 text-[10px] text-white font-medium">
                     Imagen principal
                   </span>
@@ -353,7 +358,6 @@ const CanchaEncargado = () => {
                 Cerrar
               </button>
             </div>
-
           </div>
         </div>
       )}
