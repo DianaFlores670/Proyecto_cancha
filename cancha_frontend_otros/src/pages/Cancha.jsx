@@ -37,7 +37,7 @@ const getEffectiveRole = () => {
         });
     }
     if (bag.size === 0 && u?.role) bag.add(u.role);
-  } catch {}
+  } catch { }
   const tok = localStorage.getItem("token");
   if (bag.size === 0 && tok && tok.split(".").length === 3) {
     try {
@@ -47,10 +47,10 @@ const getEffectiveRole = () => {
       const t = Array.isArray(payload?.roles)
         ? payload.roles
         : payload?.rol
-        ? [payload.rol]
-        : [];
+          ? [payload.rol]
+          : [];
       t.forEach((v) => bag.add(v));
-    } catch {}
+    } catch { }
   }
   const norm = Array.from(bag).map((v) =>
     String(v || "")
@@ -120,22 +120,30 @@ const Cancha = () => {
 
   useEffect(() => {
     const fetchEsp = async () => {
+      const limitEsp = 9999;
+      const offset = 0;
       try {
-        const response = await api.get("/espacio_deportivo/datos-especificos");
+        const response = await api.get("/espacio_deportivo/datos-especificos", {
+          params: { limit: limitEsp, offset }
+        });
         if (response.data?.exito)
           setEspacios(response.data.datos.espacios || []);
-      } catch {}
+      } catch { }
     };
     fetchEsp();
   }, []);
 
   useEffect(() => {
     const fetchDisc = async () => {
+      const limitEsp = 9999;
+      const offset = 0;
       try {
-        const response = await api.get("/cancha/disciplinas");
+        const response = await api.get("/cancha/disciplinas", {
+          params: { limit: limitEsp, offset }
+        });
         if (response.data?.exito)
           setDisciplinas(response.data.datos.disciplinas || []);
-      } catch {}
+      } catch { }
     };
     fetchDisc();
   }, []);
@@ -638,8 +646,8 @@ const Cancha = () => {
               {viewMode
                 ? "Ver Datos de Cancha"
                 : editMode
-                ? "Editar Cancha"
-                : "Crear Cancha"}
+                  ? "Editar Cancha"
+                  : "Crear Cancha"}
             </h3>
             <form onSubmit={handleSubmit} className="grid grid-cols-2 gap-4">
               <div>

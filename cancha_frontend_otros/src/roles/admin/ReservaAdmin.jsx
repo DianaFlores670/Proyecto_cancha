@@ -106,7 +106,7 @@ const ReservaAdmin = () => {
         if (response.data?.exito) setClientes(response.data.datos.clientes || []);
         else setError(response.data?.mensaje || 'Error al obtener clientes');
       } catch (err) {
-        setError(err.response?.data?.mensaje || 'Error de conexion al obtener clientes');
+        setError('Error de conexion al obtener clientes');
       }
     };
 
@@ -129,7 +129,6 @@ const ReservaAdmin = () => {
     setLoading(true);
     setError(null);
     const offset = (page - 1) * limit;
-    const fullParams = { ...params, limit, offset };
 
     try {
       if (!idAdminEspDep) {
@@ -139,28 +138,31 @@ const ReservaAdmin = () => {
       }
 
       let resp;
+
       if (params.q) {
         resp = await api.get('/reserva-admin/buscar', {
-          params: { ...fullParams, id_admin_esp_dep: idAdminEspDep }
+          params: { ...params, id_admin_esp_dep: idAdminEspDep, limit, offset }
         });
       } else if (params.tipo) {
         resp = await api.get('/reserva-admin/filtro', {
-          params: { ...fullParams, id_admin_esp_dep: idAdminEspDep }
+          params: { ...params, id_admin_esp_dep: idAdminEspDep, limit, offset }
         });
       } else {
         resp = await api.get('/reserva-admin/datos-especificos', {
-          params: { ...fullParams, id_admin_esp_dep: idAdminEspDep, id_cancha: canchaId || undefined }
+          params: { ...params, id_admin_esp_dep: idAdminEspDep, id_cancha: canchaId || undefined, limit, offset }
         });
       }
 
       if (resp.data?.exito) {
-        setReservas(resp.data.datos.reservas || []);
-        setTotal(resp.data.datos.paginacion?.total || 0);
+        const datos = resp.data.datos || resp.data;
+        setReservas(datos.reservas || []);
+        setTotal(datos?.paginacion?.total || datos.total || 0);
       } else {
         setError(resp.data?.mensaje || 'Error al cargar reservas');
       }
+
     } catch (e) {
-      setError(e.response?.data?.mensaje || 'Error de conexion');
+      setError('Error de conexion');
     } finally {
       setLoading(false);
     }
@@ -182,7 +184,7 @@ const ReservaAdmin = () => {
             setError('No se encontro la reserva');
           }
         })
-        .catch(() => setError('Error de conexion al servidor'));
+        .catch(() => setError('Error de conexion'));
     } else {
       fetchReservas({ id_cancha: canchaId });
     }
@@ -231,25 +233,23 @@ const ReservaAdmin = () => {
       if (response.data?.exito) {
         const r = response.data.datos.reserva;
         setFormData({
-          fecha_reserva: r.fecha_reserva
-            ? new Date(r.fecha_reserva).toISOString().split('T')[0]
-            : '',
+          fecha_reserva: r.fecha_reserva ? new Date(r.fecha_reserva).toISOString().split('T')[0] : '',
           cupo: r.cupo || '',
           monto_total: r.monto_total || '',
           saldo_pendiente: r.saldo_pendiente || '',
           estado: r.estado || 'pendiente',
-          id_cliente: r.id_cliente ? String(r.id_cliente) : '',
-          id_cancha: r.id_cancha ? String(r.id_cancha) : ''
+          id_cliente: String(r.id_cliente || ''),
+          id_cancha: String(r.id_cancha || '')
         });
         setCurrentReserva(r);
         setEditMode(true);
         setViewMode(false);
         setModalOpen(true);
       } else {
-        setError(response.data?.mensaje || 'No se pudo cargar la reserva');
+        setError('No se pudo cargar la reserva');
       }
-    } catch (err) {
-      setError(err.response?.data?.mensaje || 'Error de conexion al servidor');
+    } catch {
+      setError('Error de conexion al servidor');
     }
   };
 
@@ -267,18 +267,18 @@ const ReservaAdmin = () => {
           monto_total: r.monto_total || '',
           saldo_pendiente: r.saldo_pendiente || '',
           estado: r.estado || 'pendiente',
-          id_cliente: r.id_cliente ? String(r.id_cliente) : '',
-          id_cancha: r.id_cancha ? String(r.id_cancha) : ''
+          id_cliente: String(r.id_cliente || ''),
+          id_cancha: String(r.id_cancha || '')
         });
         setCurrentReserva(r);
         setEditMode(false);
         setViewMode(true);
         setModalOpen(true);
       } else {
-        setError(response.data?.mensaje || 'No se pudo cargar la reserva');
+        setError('No se pudo cargar la reserva');
       }
-    } catch (err) {
-      setError(err.response?.data?.mensaje || 'Error de conexion al servidor');
+    } catch {
+      setError('Error de conexion al servidor');
     }
   };
 
@@ -301,7 +301,7 @@ const ReservaAdmin = () => {
       };
 
       if (!data.fecha_reserva || isNaN(data.id_cliente) || isNaN(data.id_cancha)) {
-        setError('Faltan campos obligatorios o invalidos');
+        setError('Faltan campos obligatorios');
         return;
       }
 
@@ -320,10 +320,10 @@ const ReservaAdmin = () => {
         setModalOpen(false);
         fetchReservas();
       } else {
-        setError(resp.data?.mensaje || 'Error al guardar');
+        setError('Error al guardar');
       }
-    } catch (e) {
-      setError(e.response?.data?.mensaje || 'Error de conexion con el servidor');
+    } catch {
+      setError('Error de conexion');
     }
   };
 
@@ -332,19 +332,21 @@ const ReservaAdmin = () => {
     try {
       const r = await api.delete(`/reserva-admin/${id}`);
       if (r.data?.exito) fetchReservas();
-      else setError(r.data?.mensaje || 'No se pudo eliminar');
-    } catch (e) { setError('Error de conexion'); }
+      else setError('No se pudo eliminar');
+    } catch {
+      setError('Error de conexion');
+    }
+  };
+
+  const handlePageChange = (newPage) => {
+    const totalPages = Math.ceil(total / limit);
+    if (newPage >= 1 && newPage <= totalPages) setPage(newPage);
   };
 
   if (!role || (role === 'ADMIN_ESP_DEP' && !idAdminEspDep)) return <p>Cargando permisos...</p>;
 
-  const baseUrl = api.defaults.baseURL
-    ? api.defaults.baseURL.replace(/\/$/, '')
-    : '';
-
-  const qrImageUrl = currentReserva && currentReserva.qr_url_imagen
-    ? `${baseUrl}${currentReserva.qr_url_imagen}`
-    : '';
+  const baseUrl = api.defaults.baseURL ? api.defaults.baseURL.replace(/\/$/, '') : '';
+  const qrImageUrl = currentReserva && currentReserva.qr_url_imagen ? `${baseUrl}${currentReserva.qr_url_imagen}` : '';
 
   return (
     <div className="bg-white rounded-lg shadow p-6">
@@ -428,6 +430,28 @@ const ReservaAdmin = () => {
               </tbody>
             </table>
           </div>
+
+          {total > 0 && (
+            <div className="flex justify-center mt-4">
+              <button
+                onClick={() => handlePageChange(page - 1)}
+                disabled={page === 1}
+                className="bg-gray-300 text-gray-800 px-4 py-2 rounded-l hover:bg-gray-400 disabled:opacity-50"
+              >
+                Anterior
+              </button>
+              <span className="px-4 py-2 bg-gray-100">
+                Pagina {page} de {Math.ceil(total / limit)}
+              </span>
+              <button
+                onClick={() => handlePageChange(page + 1)}
+                disabled={page === Math.ceil(total / limit)}
+                className="bg-gray-300 text-gray-800 px-4 py-2 rounded-r hover:bg-gray-400 disabled:opacity-50"
+              >
+                Siguiente
+              </button>
+            </div>
+          )}
         </>
       )}
 

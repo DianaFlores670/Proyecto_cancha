@@ -1,3 +1,4 @@
+/* eslint-disable no-unused-vars */
 /* eslint-disable no-empty */
 import React, { useState, useEffect } from "react";
 import api from "../services/api";
@@ -37,7 +38,7 @@ const getEffectiveRole = () => {
         });
     }
     if (bag.size === 0 && u?.role) bag.add(u.role);
-  } catch {}
+  } catch { }
   const tok = localStorage.getItem("token");
   if (bag.size === 0 && tok && tok.split(".").length === 3) {
     try {
@@ -47,10 +48,10 @@ const getEffectiveRole = () => {
       const t = Array.isArray(payload?.roles)
         ? payload.roles
         : payload?.rol
-        ? [payload.rol]
-        : [];
+          ? [payload.rol]
+          : [];
       t.forEach((v) => bag.add(v));
-    } catch {}
+    } catch { }
   }
   const norm = Array.from(bag).map((v) =>
     String(v || "")
@@ -137,11 +138,15 @@ const EspacioDeportivo = () => {
 
   useEffect(() => {
     const fetchAdministradores = async () => {
+      const limitEsp = 9999;
+      const offset = 0;
       try {
-        const response = await api.get("/admin_esp_dep/datos-especificos");
+        const response = await api.get("/admin_esp_dep/datos-especificos", {
+          params: { limit: limitEsp, offset }
+        });
         if (response.data?.exito)
           setAdministradores(response.data.datos.administradores || []);
-      } catch {}
+      } catch { }
     };
     fetchAdministradores();
   }, []);
@@ -151,9 +156,8 @@ const EspacioDeportivo = () => {
     // Si es URL completa
     if (path.startsWith("http://") || path.startsWith("https://")) return path;
     // Si es ruta relativa
-    return `https://proyecto-cancha.onrender.com${
-      path.startsWith("/") ? "" : "/"
-    }${path}`;
+    return `https://proyecto-cancha.onrender.com${path.startsWith("/") ? "" : "/"
+      }${path}`;
   };
 
   const fetchEspacios = async (params = {}) => {
@@ -680,8 +684,8 @@ const EspacioDeportivo = () => {
               {viewMode
                 ? "Ver Datos de Espacio Deportivo"
                 : editMode
-                ? "Editar Espacio Deportivo"
-                : "Crear Espacio Deportivo"}
+                  ? "Editar Espacio Deportivo"
+                  : "Crear Espacio Deportivo"}
             </h3>
             <form onSubmit={handleSubmit} className="grid grid-cols-2 gap-4">
               <div>

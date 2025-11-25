@@ -41,7 +41,7 @@ const getEffectiveRole = () => {
         ["rol", "role", "nombre", "name"].forEach((k) => r[k] && bag.add(r[k]));
     }
     if (bag.size === 0 && u?.role) bag.add(u.role);
-  } catch {}
+  } catch { }
   const tok = localStorage.getItem("token");
   if (bag.size === 0 && tok && tok.split(".").length === 3) {
     try {
@@ -51,10 +51,10 @@ const getEffectiveRole = () => {
       const t = Array.isArray(payload?.roles)
         ? payload.roles
         : payload?.rol
-        ? [payload.rol]
-        : [];
+          ? [payload.rol]
+          : [];
       t.forEach((v) => bag.add(v));
-    } catch {}
+    } catch { }
   }
   const norm2 = Array.from(bag).map((v) => {
     const val = String(v || "")
@@ -128,7 +128,11 @@ const QRReserva = () => {
   useEffect(() => {
     const fetchReservas = async () => {
       try {
-        const r = await api.get("/reserva/datos-especificos");
+        const limitEsp = 9999;
+        const offset = 0;
+        const r = await api.get("/reserva/datos-especificos", {
+          params: { limit: limitEsp, offset }
+        });
         if (r.data?.exito) setReservas(r.data.datos?.reservas || []);
         else setError(r.data?.mensaje || "Error al obtener reservas");
       } catch (e) {
@@ -138,8 +142,12 @@ const QRReserva = () => {
       }
     };
     const fetchControles = async () => {
+      const limitEsp = 9999;
+      const offset = 0;
       try {
-        const r = await api.get("/control/datos-especificos");
+        const r = await api.get("/control/datos-especificos", {
+          params: { limit: limitEsp, offset }
+        });
         if (r.data?.exito) setControles(r.data.datos?.controles || []);
         else setError(r.data?.mensaje || "Error al obtener controles");
       } catch (e) {
@@ -445,28 +453,26 @@ const QRReserva = () => {
                     </td>
                     <td className="px-4 py-2">
                       <span
-                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                          qr.estado === "activo"
-                            ? "bg-green-100 text-green-800"
-                            : qr.estado === "expirado"
+                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${qr.estado === "activo"
+                          ? "bg-green-100 text-green-800"
+                          : qr.estado === "expirado"
                             ? "bg-red-100 text-red-800"
                             : "bg-yellow-100 text-yellow-800"
-                        }`}
+                          }`}
                       >
                         {qr.estado === "activo"
                           ? "Activo"
                           : qr.estado === "expirado"
-                          ? "Expirado"
-                          : "Usado"}
+                            ? "Expirado"
+                            : "Usado"}
                       </span>
                     </td>
                     <td className="px-4 py-2">
                       <span
-                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                          qr.verificado
-                            ? "bg-green-100 text-green-800"
-                            : "bg-red-100 text-red-800"
-                        }`}
+                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${qr.verificado
+                          ? "bg-green-100 text-green-800"
+                          : "bg-red-100 text-red-800"
+                          }`}
                       >
                         {qr.verificado ? "Si" : "No"}
                       </span>
@@ -648,14 +654,12 @@ const QRReserva = () => {
                     className="sr-only"
                   />
                   <div
-                    className={`w-11 h-6 rounded-full transition-colors duration-300 ${
-                      formData.verificado ? "bg-green-500" : "bg-gray-300"
-                    }`}
+                    className={`w-11 h-6 rounded-full transition-colors duration-300 ${formData.verificado ? "bg-green-500" : "bg-gray-300"
+                      }`}
                   />
                   <div
-                    className={`absolute left-0.5 top-0.5 bg-white w-5 h-5 rounded-full shadow transform transition-transform duration-300 ${
-                      formData.verificado ? "translate-x-5" : ""
-                    }`}
+                    className={`absolute left-0.5 top-0.5 bg-white w-5 h-5 rounded-full shadow transform transition-transform duration-300 ${formData.verificado ? "translate-x-5" : ""
+                      }`}
                   />
                   <span className="ml-3 text-sm text-gray-600">
                     {formData.verificado ? "Verificado" : "No verificado"}
@@ -766,19 +770,18 @@ const QRReserva = () => {
                   <label className="font-medium text-gray-700">Estado:</label>
                   <div className="mt-1">
                     <span
-                      className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
-                        selectedQR.estado === "activo"
-                          ? "bg-green-100 text-green-800"
-                          : selectedQR.estado === "expirado"
+                      className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${selectedQR.estado === "activo"
+                        ? "bg-green-100 text-green-800"
+                        : selectedQR.estado === "expirado"
                           ? "bg-red-100 text-red-800"
                           : "bg-yellow-100 text-yellow-800"
-                      }`}
+                        }`}
                     >
                       {selectedQR.estado === "activo"
                         ? "Activo"
                         : selectedQR.estado === "expirado"
-                        ? "Expirado"
-                        : "Usado"}
+                          ? "Expirado"
+                          : "Usado"}
                     </span>
                   </div>
                 </div>
@@ -788,11 +791,10 @@ const QRReserva = () => {
                   </label>
                   <div className="mt-1">
                     <span
-                      className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
-                        selectedQR.verificado
-                          ? "bg-green-100 text-green-800"
-                          : "bg-gray-100 text-gray-800"
-                      }`}
+                      className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${selectedQR.verificado
+                        ? "bg-green-100 text-green-800"
+                        : "bg-gray-100 text-gray-800"
+                        }`}
                     >
                       {selectedQR.verificado ? "Si" : "No"}
                     </span>

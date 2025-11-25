@@ -182,21 +182,21 @@ const roleRoutesConfig = {
     },
     {
       id: "resena",
-      label: "Resena",
+      label: "Reseña",
       icon: "⭐",
       path: "resena",
       component: Resena,
     },
     {
       id: "se_practica",
-      label: "Se Practica",
+      label: "Canchas-Disciplinas",
       icon: "🏸",
       path: "se-practica",
       component: Se_Practica,
     },
     {
       id: "participa_en",
-      label: "Participa En",
+      label: "Cliente-Reserva-Deportistas",
       icon: "👥",
       path: "participa-en",
       component: Participa_En,
@@ -254,7 +254,7 @@ const roleRoutesConfig = {
     },
     {
       id: "resena",
-      label: "Resena",
+      label: "Reseña",
       icon: "⭐",
       path: "resena",
       component: ResenaAdmin,

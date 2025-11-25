@@ -17,22 +17,22 @@ const getEffectiveRole = () => {
     const arr = Array.isArray(u?.roles) ? u.roles : [];
     for (const r of arr) {
       if (typeof r === 'string') bag.add(r);
-      else if (r && typeof r === 'object') ['rol','role','nombre','name'].forEach(k => { if (r[k]) bag.add(r[k]); });
+      else if (r && typeof r === 'object') ['rol', 'role', 'nombre', 'name'].forEach(k => { if (r[k]) bag.add(r[k]); });
     }
     if (bag.size === 0 && u?.role) bag.add(u.role);
-  } catch {}
+  } catch { }
   const tok = localStorage.getItem('token');
   if (bag.size === 0 && tok && tok.split('.').length === 3) {
     try {
-      const payload = JSON.parse(atob(tok.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')));
+      const payload = JSON.parse(atob(tok.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
       const t = Array.isArray(payload?.roles) ? payload.roles : (payload?.rol ? [payload.rol] : []);
       t.forEach(v => bag.add(v));
-    } catch {}
+    } catch { }
   }
-  const norm = Array.from(bag).map(v => String(v || '').trim().toUpperCase().replace(/\s+/g,'_'));
+  const norm = Array.from(bag).map(v => String(v || '').trim().toUpperCase().replace(/\s+/g, '_'));
   const map = v => v === 'ADMIN' ? 'ADMINISTRADOR' : v;
   const norm2 = norm.map(map);
-  const prio = ['ADMINISTRADOR','CONTROL','ADMIN_ESP_DEP'];
+  const prio = ['ADMINISTRADOR', 'CONTROL', 'ADMIN_ESP_DEP'];
   return prio.find(r => norm2.includes(r) && keys.includes(r)) || norm2.find(r => keys.includes(r)) || 'DEFAULT';
 };
 
@@ -76,8 +76,12 @@ const ReporteIncidencia = () => {
 
   useEffect(() => {
     const fetchReservas = async () => {
+      const limitEsp = 9999;
+      const offset = 0;
       try {
-        const r = await api.get('/reserva/datos-especificos');
+        const r = await api.get('/reserva/datos-especificos', {
+          params: { limit: limitEsp, offset }
+        });
         if (r.data?.exito) setReservas(r.data.datos?.reservas || []);
         else setError(r.data?.mensaje || 'Error al obtener reservas');
       } catch (e) {
@@ -86,7 +90,11 @@ const ReporteIncidencia = () => {
     };
     const fetchEncargados = async () => {
       try {
-        const r = await api.get('/encargado/datos-especificos');
+        const limitEsp = 9999;
+        const offset = 0;
+        const r = await api.get('/encargado/datos-especificos', {
+          params: { limit: limitEsp, offset }
+        });
         if (r.data?.exito) setEncargados(r.data.datos?.encargados || []);
         else setError(r.data?.mensaje || 'Error al obtener encargados');
       } catch (e) {

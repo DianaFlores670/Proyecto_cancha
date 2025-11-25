@@ -225,6 +225,16 @@ const ReservarCliente = () => {
       setError("La fecha no es valida");
       return;
     }
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const selectedDate = new Date(fechaReserva);
+    selectedDate.setHours(0, 0, 0, 0);
+
+    if (selectedDate < today) {
+      setError("No puede reservar en fechas pasadas");
+      return;
+    }
+
     const cupoNum = cupo ? Number(cupo) : 0;
     if (!cupoNum || Number.isNaN(cupoNum) || cupoNum <= 0) {
       setError("El cupo debe ser un numero positivo");
@@ -302,8 +312,8 @@ const ReservarCliente = () => {
           setQrInfo(qr);
           const origin =
             typeof window !== "undefined" &&
-            window.location &&
-            window.location.origin
+              window.location &&
+              window.location.origin
               ? window.location.origin
               : "";
           if (origin && qr.codigo_qr) {
@@ -330,10 +340,19 @@ const ReservarCliente = () => {
     }
   };
 
-    const handleCloseModal = () => {
+  const handleCloseModal = () => {
     setShowQrModal(false);
-      navigate(`/mis-reservas`);
+    navigate(`/mis-reservas`);
   };
+
+  const todayString = (() => {
+    const t = new Date();
+    t.setHours(0, 0, 0, 0);
+    const y = t.getFullYear();
+    const m = String(t.getMonth() + 1).padStart(2, "0");
+    const d = String(t.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+  })();
 
 
   if (role !== "CLIENTE") {
@@ -485,7 +504,9 @@ const ReservarCliente = () => {
                       onChange={(e) => setFechaReserva(e.target.value)}
                       className="w-full border border-[#CBD5E1] rounded-md px-3 py-2 text-[#23475F]"
                       required
+                      min={todayString}
                     />
+
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-[#23475F] mb-1">
@@ -520,8 +541,8 @@ const ReservarCliente = () => {
                       (busy
                         ? "bg-gray-200 border-gray-300 text-gray-500 cursor-not-allowed"
                         : active
-                        ? "bg-[#01CD6C] border-[#01CD6C] text-white shadow"
-                        : "bg-white border-[#CBD5E1] text-[#23475F] hover:border-[#01CD6C]");
+                          ? "bg-[#01CD6C] border-[#01CD6C] text-white shadow"
+                          : "bg-white border-[#CBD5E1] text-[#23475F] hover:border-[#01CD6C]");
                     return (
                       <button
                         key={slot.id}

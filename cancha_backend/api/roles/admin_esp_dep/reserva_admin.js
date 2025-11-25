@@ -46,6 +46,10 @@ const obtenerDatosEspecificos = async (id_admin_esp_dep, limite = 10, offset = 0
       LIMIT $${params.length - 1} OFFSET $${params.length}
     `;
 
+    const totalParams = id_cancha
+      ? [id_admin_esp_dep, id_cancha]
+      : [id_admin_esp_dep];
+
     const queryTotal = `
       SELECT COUNT(*) 
       FROM reserva r
@@ -55,20 +59,20 @@ const obtenerDatosEspecificos = async (id_admin_esp_dep, limite = 10, offset = 0
       ${filterCancha}
     `;
 
-    const [resultDatos, resultTotal] = await Promise.all([
-      pool.query(queryDatos, params),
-      pool.query(queryTotal, params.slice(0, id_cancha ? 2 : 1))
-    ]);
+    const resultDatos = await pool.query(queryDatos, params);
+    const resultTotal = await pool.query(queryTotal, totalParams);
 
     return {
       reservas: resultDatos.rows,
       total: parseInt(resultTotal.rows[0].count)
     };
+
   } catch (error) {
     console.error('Error en obtenerDatosEspecificos:', error);
     throw error;
   }
 };
+
 
 /**
  * Filtros de ordenamiento
