@@ -6,7 +6,7 @@ import api from '../services/api';
 
 const permissionsConfig = {
   ADMINISTRADOR: { canView: true, canApprove: true, canReject: true },
-  DEFAULT:       { canView: false, canApprove: false, canReject: false }
+  DEFAULT: { canView: false, canApprove: false, canReject: false }
 };
 
 const getEffectiveRole = () => {
@@ -41,7 +41,7 @@ const getEffectiveRole = () => {
         if (payload.rol && String(payload.rol).toUpperCase() === "ADMINISTRADOR") {
           return "ADMINISTRADOR";
         }
-      } catch {}
+      } catch { }
     }
 
     return "DEFAULT";
@@ -112,30 +112,30 @@ const SolicitudAdminEspDep = () => {
   };
 
   useEffect(() => {
-  const params = {};
-  if (appliedSearch.trim()) {
-    params.q = appliedSearch.trim();
-  } else if (estado) {
-    params.estado = estado;
-  }
-  fetchSolicitudes(params);
-}, [page, role, estado, appliedSearch]);
+    const params = {};
+    if (appliedSearch.trim()) {
+      params.q = appliedSearch.trim();
+    } else if (estado) {
+      params.estado = estado;
+    }
+    fetchSolicitudes(params);
+  }, [page, role, estado, appliedSearch]);
 
 
   const handleSearch = (e) => {
-  e.preventDefault();
-  setPage(1);
-  setAppliedSearch(searchTerm.trim());
-};
+    e.preventDefault();
+    setPage(1);
+    setAppliedSearch(searchTerm.trim());
+  };
 
 
   const handleEstadoChange = (e) => {
-  const v = e.target.value;
-  setEstado(v);
-  setPage(1);
-  setAppliedSearch('');
-  setSearchTerm('');
-};
+    const v = e.target.value;
+    setEstado(v);
+    setPage(1);
+    setAppliedSearch('');
+    setSearchTerm('');
+  };
 
 
   const openView = async (id) => {
@@ -162,6 +162,7 @@ const SolicitudAdminEspDep = () => {
   const openApprove = (row) => {
     setCurrent(row);
     setApproveComment('');
+    setError(null);
     setApproveOpen(true);
   };
 
@@ -179,17 +180,29 @@ const SolicitudAdminEspDep = () => {
       });
 
       if (r.data?.exito) {
-        closeApprove();
+        // Cerrar modal + limpiar
+        setApproveOpen(false);
+        setApproveComment("");
+        setCurrent(null);
+
+        // Pequeño feedback visual opcional
+        setError(null);
+
+        // Recargar
         fetchSolicitudes(estado ? { estado } : {});
-      } else setError('No se pudo aprobar');
+      } else {
+        setError('No se pudo aprobar');
+      }
     } catch {
       setError('Error de conexión');
     }
   };
 
+
   const openReject = (row) => {
     setCurrent(row);
     setRejectComment('');
+    setError(null);
     setRejectOpen(true);
   };
 
@@ -207,13 +220,22 @@ const SolicitudAdminEspDep = () => {
       });
 
       if (r.data?.exito) {
-        closeReject();
+        // Cerrar modal + limpiar
+        setRejectOpen(false);
+        setRejectComment("");
+        setCurrent(null);
+
+        setError(null);
+
         fetchSolicitudes(estado ? { estado } : {});
-      } else setError('No se pudo rechazar');
+      } else {
+        setError('No se pudo rechazar');
+      }
     } catch {
       setError('Error de conexión');
     }
   };
+
 
   const handlePageChange = (newPage) => {
     if (newPage >= 1 && newPage <= Math.ceil(total / limit)) setPage(newPage);
@@ -357,239 +379,238 @@ const SolicitudAdminEspDep = () => {
       )}
 
       {viewOpen && current && (
-  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-    <div className="w-full max-w-2xl max-h-[80vh] overflow-y-auto rounded-2xl bg-white shadow-2xl border border-gray-100 transform transition-all duration-200">
-      <div className="flex items-center justify-between gap-4 border-b border-gray-100 px-6 py-4">
-        <div>
-          <h3 className="text-lg font-semibold text-gray-900">Detalle de solicitud</h3>
-          <p className="text-xs text-gray-500">
-            Revisa la informacion completa de la solicitud seleccionada
-          </p>
-        </div>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="w-full max-w-2xl max-h-[80vh] overflow-y-auto rounded-2xl bg-white shadow-2xl border border-gray-100 transform transition-all duration-200">
+            <div className="flex items-center justify-between gap-4 border-b border-gray-100 px-6 py-4">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Detalle de solicitud</h3>
+                <p className="text-xs text-gray-500">
+                  Revisa la informacion completa de la solicitud seleccionada
+                </p>
+              </div>
 
-        <span
-          className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium
-            ${
-              current.estado === 'aprobada'
-                ? 'bg-emerald-50 text-emerald-700 border border-emerald-100'
-                : current.estado === 'rechazada'
-                ? 'bg-red-50 text-red-700 border border-red-100'
-                : current.estado === 'pendiente'
-                ? 'bg-amber-50 text-amber-700 border border-amber-100'
-                : 'bg-gray-50 text-gray-700 border border-gray-100'
-            }
+              <span
+                className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium
+            ${current.estado === 'aprobada'
+                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-100'
+                    : current.estado === 'rechazada'
+                      ? 'bg-red-50 text-red-700 border border-red-100'
+                      : current.estado === 'pendiente'
+                        ? 'bg-amber-50 text-amber-700 border border-amber-100'
+                        : 'bg-gray-50 text-gray-700 border border-gray-100'
+                  }
           `}
-        >
-          <span className="mr-1 h-1.5 w-1.5 rounded-full bg-current" />
-          {current.estado || 'Sin estado'}
-        </span>
-      </div>
+              >
+                <span className="mr-1 h-1.5 w-1.5 rounded-full bg-current" />
+                {current.estado || 'Sin estado'}
+              </span>
+            </div>
 
-      <div className="px-6 py-5">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="space-y-1">
-            <div className="text-[11px] font-medium uppercase tracking-wide text-gray-400">
-              Id solicitud
-            </div>
-            <div className="text-sm font-semibold text-gray-900">
-              {current.id_solicitud}
-            </div>
-          </div>
+            <div className="px-6 py-5">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <div className="text-[11px] font-medium uppercase tracking-wide text-gray-400">
+                    Id solicitud
+                  </div>
+                  <div className="text-sm font-semibold text-gray-900">
+                    {current.id_solicitud}
+                  </div>
+                </div>
 
-          <div className="space-y-1">
-            <div className="text-[11px] font-medium uppercase tracking-wide text-gray-400">
-              Usuario
-            </div>
-            <div className="text-sm font-semibold text-gray-900">
-              {current.usuario_nombre || '-'}
-            </div>
-          </div>
+                <div className="space-y-1">
+                  <div className="text-[11px] font-medium uppercase tracking-wide text-gray-400">
+                    Usuario
+                  </div>
+                  <div className="text-sm font-semibold text-gray-900">
+                    {current.usuario_nombre || '-'}
+                  </div>
+                </div>
 
-          <div className="space-y-1">
-            <div className="text-[11px] font-medium uppercase tracking-wide text-gray-400">
-              Correo
-            </div>
-            <div className="text-sm text-gray-800">
-              {current.correo || '-'}
-            </div>
-          </div>
+                <div className="space-y-1">
+                  <div className="text-[11px] font-medium uppercase tracking-wide text-gray-400">
+                    Correo
+                  </div>
+                  <div className="text-sm text-gray-800">
+                    {current.correo || '-'}
+                  </div>
+                </div>
 
-          <div className="space-y-1">
-            <div className="text-[11px] font-medium uppercase tracking-wide text-gray-400">
-              Estado
-            </div>
-            <div className="text-sm text-gray-800 capitalize">
-              {current.estado || '-'}
-            </div>
-          </div>
+                <div className="space-y-1">
+                  <div className="text-[11px] font-medium uppercase tracking-wide text-gray-400">
+                    Estado
+                  </div>
+                  <div className="text-sm text-gray-800 capitalize">
+                    {current.estado || '-'}
+                  </div>
+                </div>
 
-          <div className="space-y-1">
-            <div className="text-[11px] font-medium uppercase tracking-wide text-gray-400">
-              Fecha solicitud
-            </div>
-            <div className="text-sm text-gray-800">
-              {current.fecha_solicitud
-                ? new Date(current.fecha_solicitud).toLocaleString()
-                : '-'}
-            </div>
-          </div>
+                <div className="space-y-1">
+                  <div className="text-[11px] font-medium uppercase tracking-wide text-gray-400">
+                    Fecha solicitud
+                  </div>
+                  <div className="text-sm text-gray-800">
+                    {current.fecha_solicitud
+                      ? new Date(current.fecha_solicitud).toLocaleString()
+                      : '-'}
+                  </div>
+                </div>
 
-          <div className="space-y-1">
-            <div className="text-[11px] font-medium uppercase tracking-wide text-gray-400">
-              Fecha decision
-            </div>
-            <div className="text-sm text-gray-800">
-              {current.fecha_decision
-                ? new Date(current.fecha_decision).toLocaleString()
-                : '-'}
-            </div>
-          </div>
+                <div className="space-y-1">
+                  <div className="text-[11px] font-medium uppercase tracking-wide text-gray-400">
+                    Fecha decision
+                  </div>
+                  <div className="text-sm text-gray-800">
+                    {current.fecha_decision
+                      ? new Date(current.fecha_decision).toLocaleString()
+                      : '-'}
+                  </div>
+                </div>
 
-          <div className="md:col-span-2 space-y-2">
-            <div className="text-[11px] font-medium uppercase tracking-wide text-gray-400">
-              Motivo
-            </div>
-            <div className="rounded-xl border border-gray-100 bg-gray-50 px-3 py-2 text-sm text-gray-800 whitespace-pre-wrap">
-              {current.motivo || '-'}
-            </div>
-          </div>
+                <div className="md:col-span-2 space-y-2">
+                  <div className="text-[11px] font-medium uppercase tracking-wide text-gray-400">
+                    Motivo
+                  </div>
+                  <div className="rounded-xl border border-gray-100 bg-gray-50 px-3 py-2 text-sm text-gray-800 whitespace-pre-wrap">
+                    {current.motivo || '-'}
+                  </div>
+                </div>
 
-          <div className="md:col-span-2 space-y-2">
-            <div className="text-[11px] font-medium uppercase tracking-wide text-gray-400">
-              Comentario decision
+                <div className="md:col-span-2 space-y-2">
+                  <div className="text-[11px] font-medium uppercase tracking-wide text-gray-400">
+                    Comentario decision
+                  </div>
+                  <div className="rounded-xl border border-gray-100 bg-gray-50 px-3 py-2 text-sm text-gray-800 whitespace-pre-wrap">
+                    {current.comentario_decision || '-'}
+                  </div>
+                </div>
+              </div>
             </div>
-            <div className="rounded-xl border border-gray-100 bg-gray-50 px-3 py-2 text-sm text-gray-800 whitespace-pre-wrap">
-              {current.comentario_decision || '-'}
+
+            <div className="flex items-center justify-end gap-3 border-t border-gray-100 px-6 py-4">
+              <button
+                onClick={closeView}
+                className="inline-flex items-center justify-center rounded-full border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                Cerrar
+              </button>
             </div>
           </div>
         </div>
-      </div>
+      )}
 
-      <div className="flex items-center justify-end gap-3 border-t border-gray-100 px-6 py-4">
-        <button
-          onClick={closeView}
-          className="inline-flex items-center justify-center rounded-full border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
-        >
-          Cerrar
-        </button>
-      </div>
-    </div>
-  </div>
-)}
+      {approveOpen && current && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl border border-gray-100 transform transition-all duration-200">
+            <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Aprobar solicitud</h3>
+                <p className="text-xs text-gray-500">
+                  Confirma la aprobacion y agrega un comentario si lo ves necesario
+                </p>
+              </div>
+              <div className="rounded-full bg-emerald-50 text-emerald-600 px-3 py-1 text-xs font-medium flex items-center gap-2">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                Aprobar
+              </div>
+            </div>
 
-{approveOpen && current && (
-  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-    <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl border border-gray-100 transform transition-all duration-200">
-      <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
-        <div>
-          <h3 className="text-lg font-semibold text-gray-900">Aprobar solicitud</h3>
-          <p className="text-xs text-gray-500">
-            Confirma la aprobacion y agrega un comentario si lo ves necesario
-          </p>
-        </div>
-        <div className="rounded-full bg-emerald-50 text-emerald-600 px-3 py-1 text-xs font-medium flex items-center gap-2">
-          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-          Aprobar
-        </div>
-      </div>
+            <div className="px-6 py-4 space-y-4">
+              <div className="rounded-xl bg-gray-50 border border-gray-100 px-3 py-2 text-xs text-gray-600 flex flex-col gap-1">
+                <span className="font-semibold text-gray-800 text-sm">
+                  {current.usuario_nombre || "Usuario sin nombre"}
+                </span>
+                <span>Solicitud #{current.id_solicitud}</span>
+                <span>{current.espacio_nombre || "Sin espacio asignado"}</span>
+              </div>
 
-      <div className="px-6 py-4 space-y-4">
-        <div className="rounded-xl bg-gray-50 border border-gray-100 px-3 py-2 text-xs text-gray-600 flex flex-col gap-1">
-          <span className="font-semibold text-gray-800 text-sm">
-            {current.usuario_nombre || "Usuario sin nombre"}
-          </span>
-          <span>Solicitud #{current.id_solicitud}</span>
-          <span>{current.espacio_nombre || "Sin espacio asignado"}</span>
-        </div>
+              <div>
+                <div className="text-[11px] font-medium uppercase tracking-wide text-gray-400 mb-1.5">
+                  Comentario decision (opcional)
+                </div>
+                <textarea
+                  value={approveComment}
+                  onChange={(e) => setApproveComment(e.target.value)}
+                  rows={4}
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/60 focus:border-emerald-500 transition"
+                  placeholder="Escribe un breve comentario de aprobacion"
+                />
+              </div>
+            </div>
 
-        <div>
-          <div className="text-[11px] font-medium uppercase tracking-wide text-gray-400 mb-1.5">
-            Comentario decision (opcional)
+            <div className="flex items-center justify-end gap-3 border-t border-gray-100 px-6 py-4">
+              <button
+                onClick={closeApprove}
+                className="inline-flex items-center justify-center rounded-full border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmApprove}
+                className="inline-flex items-center justify-center rounded-full bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 transition-colors"
+              >
+                Confirmar aprobacion
+              </button>
+            </div>
           </div>
-          <textarea
-            value={approveComment}
-            onChange={(e) => setApproveComment(e.target.value)}
-            rows={4}
-            className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/60 focus:border-emerald-500 transition"
-            placeholder="Escribe un breve comentario de aprobacion"
-          />
         </div>
-      </div>
+      )}
 
-      <div className="flex items-center justify-end gap-3 border-t border-gray-100 px-6 py-4">
-        <button
-          onClick={closeApprove}
-          className="inline-flex items-center justify-center rounded-full border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
-        >
-          Cancelar
-        </button>
-        <button
-          onClick={confirmApprove}
-          className="inline-flex items-center justify-center rounded-full bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 transition-colors"
-        >
-          Confirmar aprobacion
-        </button>
-      </div>
-    </div>
-  </div>
-)}
+      {rejectOpen && current && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl border border-gray-100 transform transition-all duration-200">
+            <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Rechazar solicitud</h3>
+                <p className="text-xs text-gray-500">
+                  Explica brevemente el motivo del rechazo para dejar registro claro
+                </p>
+              </div>
+              <div className="rounded-full bg-red-50 text-red-600 px-3 py-1 text-xs font-medium flex items-center gap-2">
+                <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
+                Rechazar
+              </div>
+            </div>
 
-{rejectOpen && current && (
-  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-    <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl border border-gray-100 transform transition-all duration-200">
-      <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
-        <div>
-          <h3 className="text-lg font-semibold text-gray-900">Rechazar solicitud</h3>
-          <p className="text-xs text-gray-500">
-            Explica brevemente el motivo del rechazo para dejar registro claro
-          </p>
-        </div>
-        <div className="rounded-full bg-red-50 text-red-600 px-3 py-1 text-xs font-medium flex items-center gap-2">
-          <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
-          Rechazar
-        </div>
-      </div>
+            <div className="px-6 py-4 space-y-4">
+              <div className="rounded-xl bg-gray-50 border border-gray-100 px-3 py-2 text-xs text-gray-600 flex flex-col gap-1">
+                <span className="font-semibold text-gray-800 text-sm">
+                  {current.usuario_nombre || "Usuario sin nombre"}
+                </span>
+                <span>Solicitud #{current.id_solicitud}</span>
+                <span>{current.espacio_nombre || "Sin espacio asignado"}</span>
+              </div>
 
-      <div className="px-6 py-4 space-y-4">
-        <div className="rounded-xl bg-gray-50 border border-gray-100 px-3 py-2 text-xs text-gray-600 flex flex-col gap-1">
-          <span className="font-semibold text-gray-800 text-sm">
-            {current.usuario_nombre || "Usuario sin nombre"}
-          </span>
-          <span>Solicitud #{current.id_solicitud}</span>
-          <span>{current.espacio_nombre || "Sin espacio asignado"}</span>
-        </div>
+              <div>
+                <div className="text-[11px] font-medium uppercase tracking-wide text-gray-400 mb-1.5">
+                  Comentario decision (opcional)
+                </div>
+                <textarea
+                  value={rejectComment}
+                  onChange={(e) => setRejectComment(e.target.value)}
+                  rows={4}
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-red-500/60 focus:border-red-500 transition"
+                  placeholder="Describe de forma breve el motivo del rechazo"
+                />
+              </div>
+            </div>
 
-        <div>
-          <div className="text-[11px] font-medium uppercase tracking-wide text-gray-400 mb-1.5">
-            Comentario decision (opcional)
+            <div className="flex items-center justify-end gap-3 border-t border-gray-100 px-6 py-4">
+              <button
+                onClick={closeReject}
+                className="inline-flex items-center justify-center rounded-full border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={reject}
+                className="inline-flex items-center justify-center rounded-full bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 transition-colors"
+              >
+                Confirmar rechazo
+              </button>
+            </div>
           </div>
-          <textarea
-            value={rejectComment}
-            onChange={(e) => setRejectComment(e.target.value)}
-            rows={4}
-            className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-red-500/60 focus:border-red-500 transition"
-            placeholder="Describe de forma breve el motivo del rechazo"
-          />
         </div>
-      </div>
-
-      <div className="flex items-center justify-end gap-3 border-t border-gray-100 px-6 py-4">
-        <button
-          onClick={closeReject}
-          className="inline-flex items-center justify-center rounded-full border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
-        >
-          Cancelar
-        </button>
-        <button
-          onClick={reject}
-          className="inline-flex items-center justify-center rounded-full bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 transition-colors"
-        >
-          Confirmar rechazo
-        </button>
-      </div>
-    </div>
-  </div>
-)}
+      )}
 
     </div>
   );

@@ -233,7 +233,7 @@ const buscarSolicitudes = async ({ q, limite, offset }) => {
 
     const like = `%${q}%`;
 
-const sql = `
+    const sql = `
     SELECT s.*, u.usuario AS usuario_nombre, u.correo, e.nombre AS espacio_nombre
     FROM solicitud_rol s
     JOIN usuario u ON u.id_persona = s.id_usuario
@@ -347,13 +347,11 @@ const crearSolicitudController = async (req, res) => {
 
         const sol = await crearSolicitud({ id_usuario, id_espacio, motivo });
 
-        try {
-            await notifyAdminNuevaSolicitudRol({
-                id_solicitud: sol.id_solicitud,
-                id_usuario,
-                rol: 'encargado'
-            });
-        } catch { }
+        notifyAdminNuevaSolicitudRol({
+            id_solicitud: sol.id_solicitud,
+            id_usuario,
+            rol: 'encargado'
+        }).catch(err => console.error("EMAIL ERROR:", err));
 
         res.json(respuesta(true, 'Solicitud enviada correctamente', sol));
 
@@ -369,13 +367,11 @@ const aprobarSolicitudController = async (req, res) => {
 
         const out = await aprobarSolicitud({ id_solicitud, adminId });
 
-        try {
-            await notifyUsuarioResultadoRol({
-                to: out.to,
-                aprobado: true,
-                rol: `encargado de ${out.espacio}`
-            });
-        } catch { }
+        notifyUsuarioResultadoRol({
+            to: out.to,
+            aprobado: true,
+            rol: `encargado de ${out.espacio}`
+        }).catch(err => console.error("EMAIL ERROR:", err));
 
         res.json(respuesta(true, 'Solicitud aprobada correctamente'));
 
@@ -392,14 +388,12 @@ const rechazarSolicitudController = async (req, res) => {
 
         const out = await rechazarSolicitud({ id_solicitud, comentario, adminId });
 
-        try {
-            await notifyUsuarioResultadoRol({
-                to: out.to,
-                aprobado: false,
-                rol: `encargado de ${out.espacio}`,
-                comentario: out.comentario
-            });
-        } catch { }
+        notifyUsuarioResultadoRol({
+            to: out.to,
+            aprobado: false,
+            comentario: out.comentario,
+            rol: `encargado de ${out.espacio}`
+        }).catch(err => console.error("EMAIL ERROR:", err));
 
         res.json(respuesta(true, 'Solicitud rechazada correctamente'));
 

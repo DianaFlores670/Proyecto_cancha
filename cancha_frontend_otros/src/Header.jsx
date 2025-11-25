@@ -451,7 +451,9 @@ const Header = () => {
       // =============================
       // 3) MOSTRAR MENSAJE EXITOSO
       // =============================
+      // ÉXITO: cerrar modal, limpiar errores y mostrar mensaje
       setShowRegisterModal(false);
+      setRegisterError(null);
 
       setTitleSubmissionMessage(
         rol === "cliente" ? "Registro Completado" : "Solicitud enviada"
@@ -463,6 +465,7 @@ const Header = () => {
       );
       setShowSubmissionModal(true);
 
+      // reset total
       setRegisterData({
         usuario: "",
         correo: "",
@@ -473,6 +476,7 @@ const Header = () => {
         motivo: "",
       });
       setShowRoleSection(false);
+
     } catch (err) {
       setRegisterError(err?.message || "Error de conexion");
     } finally {
@@ -758,6 +762,21 @@ const Header = () => {
         if (!ok) throw new Error(res.data?.mensaje || "No se pudo crear la solicitud");
 
         setRoleRequestSuccess("Solicitud enviada correctamente");
+
+        setTimeout(() => {
+          // cerrar modal
+          setShowRoleRequestModal(false);
+
+          // limpiar formulario y mensajes
+          setRoleRequest({
+            rol: "",
+            id_espacio: "",
+            motivo: "",
+          });
+
+          setRoleRequestError(null);
+          setRoleRequestSuccess(null);
+        }, 600);
       } else if (roleRequest.rol === "encargado") {
         if (!roleRequest.id_espacio) {
           setRoleRequestError("Debes seleccionar un espacio");
@@ -777,6 +796,21 @@ const Header = () => {
         if (!ok) throw new Error(res.data?.mensaje || "No se pudo crear la solicitud");
 
         setRoleRequestSuccess("Solicitud enviada correctamente");
+
+        setTimeout(() => {
+          // cerrar modal
+          setShowRoleRequestModal(false);
+
+          // limpiar formulario y mensajes
+          setRoleRequest({
+            rol: "",
+            id_espacio: "",
+            motivo: "",
+          });
+
+          setRoleRequestError(null);
+          setRoleRequestSuccess(null);
+        }, 600);
       } else if (roleRequest.rol === "control") {
         if (!roleRequest.id_espacio) {
           setRoleRequestError("Debes seleccionar un espacio");
@@ -796,6 +830,21 @@ const Header = () => {
         if (!ok) throw new Error(res.data?.mensaje || "No se pudo crear la solicitud");
 
         setRoleRequestSuccess("Solicitud enviada correctamente");
+
+        setTimeout(() => {
+          // cerrar modal
+          setShowRoleRequestModal(false);
+
+          // limpiar formulario y mensajes
+          setRoleRequest({
+            rol: "",
+            id_espacio: "",
+            motivo: "",
+          });
+
+          setRoleRequestError(null);
+          setRoleRequestSuccess(null);
+        }, 600);
       } else {
         setRoleRequestError("Rol no soportado");
       }
