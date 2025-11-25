@@ -347,11 +347,15 @@ const crearSolicitudController = async (req, res) => {
 
         const sol = await crearSolicitud({ id_usuario, id_espacio, motivo });
 
-        notifyAdminNuevaSolicitudRol({
-            id_solicitud: sol.id_solicitud,
-            id_usuario,
-            rol: 'encargado'
-        }).catch(err => console.error("EMAIL ERROR:", err));
+        try {
+            notifyAdminNuevaSolicitudRol({
+                id_solicitud: sol.id_solicitud,
+                id_usuario,
+                rol: 'encargado'
+            });
+        } catch (err) {
+            console.error("EMAIL ERROR:", err);
+        }
 
         res.json(respuesta(true, 'Solicitud enviada correctamente', sol));
 
@@ -367,11 +371,15 @@ const aprobarSolicitudController = async (req, res) => {
 
         const out = await aprobarSolicitud({ id_solicitud, adminId });
 
-        notifyUsuarioResultadoRol({
-            to: out.to,
-            aprobado: true,
-            rol: `encargado de ${out.espacio}`
-        }).catch(err => console.error("EMAIL ERROR:", err));
+        try {
+            notifyUsuarioResultadoRol({
+                to: out.to,
+                aprobado: true,
+                rol: `encargado de ${out.espacio}`
+            });
+        } catch (err) {
+            console.error("EMAIL ERROR:", err);
+        }
 
         res.json(respuesta(true, 'Solicitud aprobada correctamente'));
 
@@ -388,12 +396,16 @@ const rechazarSolicitudController = async (req, res) => {
 
         const out = await rechazarSolicitud({ id_solicitud, comentario, adminId });
 
-        notifyUsuarioResultadoRol({
-            to: out.to,
-            aprobado: false,
-            comentario: out.comentario,
-            rol: `encargado de ${out.espacio}`
-        }).catch(err => console.error("EMAIL ERROR:", err));
+        try {
+            notifyUsuarioResultadoRol({
+                to: out.to,
+                aprobado: false,
+                comentario: out.comentario,
+                rol: `encargado de ${out.espacio}`
+            });
+        } catch (err) {
+            console.error("EMAIL ERROR:", err);
+        }
 
         res.json(respuesta(true, 'Solicitud rechazada correctamente'));
 

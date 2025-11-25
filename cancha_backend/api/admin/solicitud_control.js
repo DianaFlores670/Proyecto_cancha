@@ -329,11 +329,15 @@ const crearSolicitudController = async (req, res) => {
             id_espacio
         });
 
-        notifyAdminNuevaSolicitudRol({
-            id_solicitud: s.id_solicitud,
-            id_usuario,
-            rol: 'control'
-        }).catch(err => console.error("EMAIL ERROR:", err));
+        try {
+            notifyAdminNuevaSolicitudRol({
+                id_solicitud: sol.id_solicitud,
+                id_usuario,
+                rol: 'control'
+            });
+        } catch (err) {
+            console.error("EMAIL ERROR:", err);
+        }
 
         res.json(respuesta(true, 'Solicitud creada', s));
 
@@ -350,11 +354,15 @@ const aprobarController = async (req, res) => {
 
         const out = await aprobarSolicitud({ id_solicitud, adminId });
 
-        notifyUsuarioResultadoRol({
-            to: out.to,
-            aprobado: true,
-            rol: 'control'
-        }).catch(err => console.error("EMAIL ERROR:", err));
+        try {
+            notifyUsuarioResultadoRol({
+                to: out.to,
+                aprobado: true,
+                rol: `control de ${out.espacio}`
+            });
+        } catch (err) {
+            console.error("EMAIL ERROR:", err);
+        }
 
         res.json(respuesta(true, 'Solicitud aprobada'));
 
@@ -376,12 +384,16 @@ const rechazarController = async (req, res) => {
             adminId
         });
 
-        notifyUsuarioResultadoRol({
-            to: out.to,
-            aprobado: false,
-            comentario: out.comentario,
-            rol: 'control'
-        }).catch(err => console.error("EMAIL ERROR:", err));
+        try {
+            notifyUsuarioResultadoRol({
+                to: out.to,
+                aprobado: false,
+                comentario: out.comentario,
+                rol: `control de ${out.espacio}`
+            });
+        } catch (err) {
+            console.error("EMAIL ERROR:", err);
+        }
 
         res.json(respuesta(true, 'Solicitud rechazada'));
 

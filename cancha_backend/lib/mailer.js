@@ -4,69 +4,76 @@ const pool = require('../config/database');
 
 let transporter = null;
 
-// Crear transporter con POOL SMTP (MUY RÁPIDO)
 if (mailCfg.ENABLED) {
   transporter = nodemailer.createTransport({
     host: mailCfg.HOST,
     port: mailCfg.PORT,
     secure: !!mailCfg.SECURE,
-
     auth: mailCfg.USER && mailCfg.PASS
       ? { user: mailCfg.USER, pass: mailCfg.PASS }
       : undefined,
-
-    pool: true,               // Reusar conexiones SMTP
-    maxConnections: 5,        // Mantener abiertas 5 conexiones activas
-    maxMessages: 200,         // Reusar cada conexión para 200 correos
-    rateDelta: 1000,          // Ventana de tiempo 1s
-    rateLimit: 5,             // Máximo 5 correos por segundo
+    pool: true,
+    maxConnections: 5,
+    maxMessages: 200,
+    rateDelta: 1000,
+    rateLimit: 5,
     tls: {
       rejectUnauthorized: false
     }
   });
 }
 
-// Enviar correo sin esperar la promesa (background)
 function sendMail({ to, subject, html, text, bcc }) {
   if (!mailCfg.ENABLED) {
     console.log('[MAIL DISABLED]', { to, subject });
     return;
   }
   if (!transporter) {
-    console.log('[MAIL ERROR] Transporter null');
+    console.log('[MAIL ERROR] transporter null');
     return;
   }
 
   setImmediate(() => {
-    transporter.sendMail({
-      from: mailCfg.FROM,
-      to,
-      bcc,
-      subject,
-      html,
-      text
-    }, (err, info) => {
-      if (err) console.error('[MAIL ERROR]', err);
-    });
+    transporter.sendMail(
+      {
+        from: mailCfg.FROM,
+        to,
+        bcc,
+        subject,
+        html,
+        text
+      },
+      (err) => {
+        if (err) console.error('[MAIL ERROR]', err);
+      }
+    );
   });
 }
 
-// =========================
-// ADMIN ESP DEP
-// =========================
-function notifyAdminNuevaSolicitud({ id_solicitud, usuario, correo, espacio_nombre }) {
-  if (!mailCfg.ADMIN_TO) return;
-
-  const subject = 'Nueva solicitud para Admin de Espacio Deportivo';
-
-  const html = `
-    <h3>Nueva solicitud para administrar un espacio</h3>
-    <p><b>ID Solicitud:</b> ${id_solicitud}</p>
-    <p><b>Solicitante:</b> ${usuario} (${correo})</p>
-    <p><b>Espacio:</b> ${espacio_nombre}</p>
+async function getCorreosAdmins() {
+  const q = `
+    select lower(trim(u.correo)) as correo
+    from administrador a
+    join usuario u on u.id_persona = a.id_administrador
+    where u.correo is not null and u.correo <> ''
   `;
+  const { rows } = await pool.query(q);
+  return [...new Set(rows.map(r => r.correo).filter(Boolean))];
+}
 
-  sendMail({ to: mailCfg.ADMIN_TO, subject, html });
+function notifyAdminNuevaSolicitud({ id_solicitud, usuario, correo, espacio_nombre }) {
+  const destinos = [];
+  if (mailCfg.ADMIN_TO) destinos.push(mailCfg.ADMIN_TO);
+  sendMail({
+    to: destinos,
+    subject: 'Nueva solicitud para Admin de Espacio Deportivo',
+    html: `
+      <h3>Nueva solicitud para administrar un espacio</h3>
+      <p><b>ID Solicitud:</b> ${id_solicitud}</p>
+      <p><b>Solicitante:</b> ${usuario} (${correo})</p>
+      <p><b>Espacio:</b> ${espacio_nombre}</p>
+    `
+  });
 }
 
 function notifyUsuarioResultado({ to, aprobado, usuario, espacio_nombre, comentario }) {
@@ -81,14 +88,22 @@ function notifyUsuarioResultado({ to, aprobado, usuario, espacio_nombre, comenta
   sendMail({ to, subject, html });
 }
 
-// =========================
-// ROLES (control / encargado)
-// =========================
 async function notifyAdminNuevaSolicitudRol({ id_solicitud, rol, id_usuario }) {
-  if (!mailCfg.ADMIN_TO) return;
+  const destinos = [];
+  if (mailCfg.ADMIN_TO) destinos.push(mailCfg.ADMIN_TO);
+
+  const adminsDb = await getCorreosAdmins();
+  adminsDb.forEach(c => destinos.push(c));
+
+  const to = [...new Set(destinos.filter(Boolean))];
+
+  if (!to.length) {
+    console.log('[MAIL] sin destino para notifyAdminNuevaSolicitudRol');
+    return;
+  }
 
   const u = await pool.query(
-    `SELECT usuario, correo FROM usuario WHERE id_persona=$1`,
+    'select usuario, correo from usuario where id_persona=$1',
     [id_usuario]
   );
 
@@ -104,7 +119,7 @@ async function notifyAdminNuevaSolicitudRol({ id_solicitud, rol, id_usuario }) {
     <p><b>Rol solicitado:</b> ${rol}</p>
   `;
 
-  sendMail({ to: mailCfg.ADMIN_TO, subject, html });
+  sendMail({ to, subject, html });
 }
 
 function notifyUsuarioResultadoRol({ to, aprobado, rol, comentario }) {

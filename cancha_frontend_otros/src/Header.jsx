@@ -2011,7 +2011,7 @@ const Header = () => {
                 </div>
               )}
 
-              {roleRequest.rol === "encargado" && (
+              {(roleRequest.rol === "encargado" || roleRequest.rol === "control") && (
                 <div>
                   <label className="block text-sm font-medium mb-1 text-[#23475F] flex items-center gap-2">
                     <FaMapMarkerAlt className="text-[#01CD6C]" />

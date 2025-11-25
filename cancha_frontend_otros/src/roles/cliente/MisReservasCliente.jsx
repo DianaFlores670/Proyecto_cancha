@@ -5,14 +5,22 @@ import { Link } from "react-router-dom";
 import api from "../../services/api";
 import Header from "../../Header";
 
+const isReservaExpired = (reserva) => {
+  if (!reserva || !reserva.fecha_reserva) return false;
+  const fecha = new Date(reserva.fecha_reserva);
+  if (Number.isNaN(fecha.getTime())) return false;
+  const now = new Date();
+  return fecha.getTime() <= now.getTime();
+};
+
+const isExpiredAndNotPaid = (reserva) => {
+  return isReservaExpired(reserva) && reserva.estado !== "pagada";
+};
+
 const canLeaveReview = (reserva) => {
   if (!reserva) return false;
   if (reserva.estado !== "pagada") return false;
-  if (!reserva.fecha_reserva) return false;
-  const now = new Date();
-  const fecha = new Date(reserva.fecha_reserva);
-  if (Number.isNaN(fecha.getTime())) return false;
-  return fecha.getTime() <= now.getTime();
+  return isReservaExpired(reserva);
 };
 
 const getUserRoles = (u) => {
@@ -30,13 +38,8 @@ const pickRoleForThisPage = (u) => {
 
 const getImageUrl = (path) => {
   if (!path) return "";
-
-  // Asegurarse de que la ruta comience con /
   const clean = path.startsWith("/") ? path : `/${path}`;
-
-  // Dominio público donde está tu backend
   const base = "https://proyecto-cancha.onrender.com";
-
   return `${base}${clean}`;
 };
 
@@ -250,9 +253,12 @@ const MisReservasCliente = () => {
     setCurrentPage(page);
   };
 
-  const handleCancel = async (idReserva, estado) => {
+  const handleCancel = async (reserva) => {
     if (viewMode === "DEPORTISTA") return;
-    if (estado === "cancelada" || estado === "pagada") return;
+    if (!reserva) return;
+    if (reserva.estado === "cancelada" || reserva.estado === "pagada") return;
+    if (isExpiredAndNotPaid(reserva)) return;
+
     const ok = window.confirm("Desea cancelar esta reserva?");
     if (!ok) return;
 
@@ -261,7 +267,7 @@ const MisReservasCliente = () => {
       setError(null);
       setSuccess(null);
 
-      const resp = await api.delete(`/reserva-cliente/${idReserva}`, {
+      const resp = await api.delete(`/reserva-cliente/${reserva.id_reserva}`, {
         params: { id_cliente: idCliente },
       });
 
@@ -321,8 +327,9 @@ const MisReservasCliente = () => {
     const url = getImageUrl(qrData.qr_url_imagen);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `qr_reserva_${qrData.id_reserva || qrData.id_qr || "reserva"
-      }.png`;
+    link.download = `qr_reserva_${
+      qrData.id_reserva || qrData.id_qr || "reserva"
+    }.png`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -384,7 +391,7 @@ const MisReservasCliente = () => {
         await api.post(
           `/qr-reserva/regenerar-por-reserva/${editReserva.id_reserva}`
         );
-      } catch (errQr) { }
+      } catch (errQr) {}
 
       setEditModalOpen(false);
       setEditReserva(null);
@@ -628,6 +635,9 @@ const MisReservasCliente = () => {
                   {reservas.map((r) => {
                     const hasReview = Boolean(r.id_resena);
                     const reviewVerified = Boolean(r.resena_verificado);
+                    const expiredNotPaid = isExpiredAndNotPaid(r);
+                    const estadoMostrar = expiredNotPaid ? "cancelada" : r.estado;
+                    const isCanceled = estadoMostrar === "cancelada";
 
                     return (
                       <tr
@@ -649,106 +659,116 @@ const MisReservasCliente = () => {
                           <span
                             className={
                               "inline-block px-2 py-1 rounded-full text-xs font-semibold " +
-                              (r.estado === "pagada"
+                              (estadoMostrar === "pagada"
                                 ? "bg-green-100 text-green-700"
-                                : r.estado === "cancelada"
-                                  ? "bg-red-100 text-red-700"
-                                  : "bg-yellow-100 text-yellow-700")
+                                : estadoMostrar === "cancelada"
+                                ? "bg-red-100 text-red-700"
+                                : "bg-yellow-100 text-yellow-700")
                             }
                           >
-                            {r.estado}
+                            {estadoMostrar}
                           </span>
                         </td>
+
                         <td className="px-3 py-2 space-x-2">
-                          {isResponsableView ? (
+                          {!isCanceled && (
                             <>
-                              <Link
-                                to={`/reserva-detalle/${r.id_reserva}`}
-                                className="inline-block px-3 py-1 rounded-full bg-[#0F2634] text-white text-xs font-semibold hover:bg-[#01CD6C] transition-all"
-                              >
-                                Ver detalle
-                              </Link>
-                              <button
-                                type="button"
-                                onClick={() => handleOpenQr(r.id_reserva)}
-                                className="inline-block px-3 py-1 rounded-full bg-[#38BDF8] text-white text-xs font-semibold hover:bg-[#0EA5E9] transition-all"
-                              >
-                                Ver QR
-                              </button>
-
-                              {canLeaveReview(r) && !hasReview && (
-                                <button
-                                  type="button"
-                                  onClick={() => handleOpenReview("create", r)}
-                                  className="inline-block px-3 py-1 rounded-full bg-[#4ADE80] text-white text-xs font-semibold hover:bg-[#22C55E] transition-all"
-                                >
-                                  Dejar reseña
-                                </button>
-                              )}
-
-                              {canLeaveReview(r) && hasReview && !reviewVerified && (
-                                <button
-                                  type="button"
-                                  onClick={() => handleOpenReview("edit", r)}
-                                  className="inline-block px-3 py-1 rounded-full bg-[#22C55E] text-white text-xs font-semibold hover:bg-[#16A34A] transition-all"
-                                >
-                                  Editar reseña
-                                </button>
-                              )}
-
-                              {canLeaveReview(r) && hasReview && reviewVerified && (
-                                <button
-                                  type="button"
-                                  disabled
-                                  className="inline-block px-3 py-1 rounded-full bg-gray-200 text-gray-500 text-xs font-semibold cursor-not-allowed"
-                                >
-                                  Reseña publicada
-                                </button>
-                              )}
-
-                              {r.estado !== "cancelada" && r.estado !== "pagada" && (
+                              {isResponsableView ? (
                                 <>
+                                  <Link
+                                    to={`/reserva-detalle/${r.id_reserva}`}
+                                    className="inline-block px-3 py-1 rounded-full bg-[#0F2634] text-white text-xs font-semibold hover:bg-[#01CD6C] transition-all"
+                                  >
+                                    Ver detalle
+                                  </Link>
                                   <button
                                     type="button"
-                                    onClick={() => handleOpenEdit(r)}
-                                    className="inline-block px-3 py-1 rounded-full bg-[#FACC15] text-[#0F2634] text-xs font-semibold hover:bg-[#EAB308] transition-all"
+                                    onClick={() => handleOpenQr(r.id_reserva)}
+                                    className="inline-block px-3 py-1 rounded-full bg-[#38BDF8] text-white text-xs font-semibold hover:bg-[#0EA5E9] transition-all"
                                   >
-                                    Editar reserva
+                                    Ver QR
                                   </button>
-                                </>
-                              )}
 
-                              {r.estado !== "cancelada" &&
-                                r.estado !== "pagada" && (
-                                  <>
+                                  {canLeaveReview(r) && !hasReview && (
                                     <button
                                       type="button"
                                       onClick={() =>
-                                        handleCancel(r.id_reserva, r.estado)
+                                        handleOpenReview("create", r)
                                       }
-                                      className="inline-block px-3 py-1 rounded-full bg-[#F97373] text-white text-xs font-semibold hover:bg-[#EF4444] transition-all"
+                                      className="inline-block px-3 py-1 rounded-full bg-[#4ADE80] text-white text-xs font-semibold hover:bg-[#22C55E] transition-all"
                                     >
-                                      Cancelar
+                                      Dejar resena
                                     </button>
-                                  </>
-                                )}
-                            </>
-                          ) : (
-                            <>
-                              <button
-                                type="button"
-                                onClick={() => handleOpenDetalleDeportista(r)}
-                                className="inline-block px-3 py-1 rounded-full bg-[#0F2634] text-white text-xs font-semibold hover:bg-[#01CD6C] transition-all"
-                              >
-                                Ver detalle
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleOpenQr(r.id_reserva)}
-                                className="inline-block px-3 py-1 rounded-full bg-[#38BDF8] text-white text-xs font-semibold hover:bg-[#0EA5E9] transition-all"
-                              >
-                                Ver QR
-                              </button>
+                                  )}
+
+                                  {canLeaveReview(r) &&
+                                    hasReview &&
+                                    !reviewVerified && (
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          handleOpenReview("edit", r)
+                                        }
+                                        className="inline-block px-3 py-1 rounded-full bg-[#22C55E] text-white text-xs font-semibold hover:bg-[#16A34A] transition-all"
+                                      >
+                                        Editar resena
+                                      </button>
+                                    )}
+
+                                  {canLeaveReview(r) &&
+                                    hasReview &&
+                                    reviewVerified && (
+                                      <button
+                                        type="button"
+                                        disabled
+                                        className="inline-block px-3 py-1 rounded-full bg-gray-200 text-gray-500 text-xs font-semibold cursor-not-allowed"
+                                      >
+                                        Resena publicada
+                                      </button>
+                                    )}
+
+                                  {!expiredNotPaid &&
+                                    r.estado !== "cancelada" &&
+                                    r.estado !== "pagada" && (
+                                      <>
+                                        <button
+                                          type="button"
+                                          onClick={() => handleOpenEdit(r)}
+                                          className="inline-block px-3 py-1 rounded-full bg-[#FACC15] text-[#0F2634] text-xs font-semibold hover:bg-[#EAB308] transition-all"
+                                        >
+                                          Editar reserva
+                                        </button>
+
+                                        <button
+                                          type="button"
+                                          onClick={() => handleCancel(r)}
+                                          className="inline-block px-3 py-1 rounded-full bg-[#F97373] text-white text-xs font-semibold hover:bg-[#EF4444] transition-all"
+                                        >
+                                          Cancelar
+                                        </button>
+                                      </>
+                                    )}
+                                </>
+                              ) : (
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      handleOpenDetalleDeportista(r)
+                                    }
+                                    className="inline-block px-3 py-1 rounded-full bg-[#0F2634] text-white text-xs font-semibold hover:bg-[#01CD6C] transition-all"
+                                  >
+                                    Ver detalle
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenQr(r.id_reserva)}
+                                    className="inline-block px-3 py-1 rounded-full bg-[#38BDF8] text-white text-xs font-semibold hover:bg-[#0EA5E9] transition-all"
+                                  >
+                                    Ver QR
+                                  </button>
+                                </>
+                              )}
                             </>
                           )}
                         </td>
@@ -830,7 +850,7 @@ const MisReservasCliente = () => {
                 <div className="flex justify-center mb-4">
                   {qrImageUrl && (
                     <img
-                      src={qrImageUrl} // aquí ya no se llama a getImageUrl
+                      src={qrImageUrl}
                       alt="Codigo QR de la reserva"
                       className="w-48 h-48 object-contain"
                     />
@@ -996,7 +1016,9 @@ const MisReservasCliente = () => {
                   disabled={reviewSaving}
                   className={
                     "flex-1 px-4 py-2 rounded-full bg-[#01CD6C] text-white text-sm font-semibold transition-all " +
-                    (reviewSaving ? "opacity-70 cursor-not-allowed" : "hover:bg-[#00b359]")
+                    (reviewSaving
+                      ? "opacity-70 cursor-not-allowed"
+                      : "hover:bg-[#00b359]")
                   }
                 >
                   {reviewSaving ? "Enviando..." : "Enviar resena"}
@@ -1055,12 +1077,12 @@ const MisReservasCliente = () => {
                 <p className="font-medium">
                   {detalleDepReserva.hora_inicio && detalleDepReserva.hora_fin
                     ? `${String(detalleDepReserva.hora_inicio).substring(
-                      0,
-                      5
-                    )} - ${String(detalleDepReserva.hora_fin).substring(
-                      0,
-                      5
-                    )}`
+                        0,
+                        5
+                      )} - ${String(detalleDepReserva.hora_fin).substring(
+                        0,
+                        5
+                      )}`
                     : "-"}
                 </p>
               </div>

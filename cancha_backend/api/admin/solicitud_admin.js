@@ -256,20 +256,25 @@ const crearSolicitudController = async (req, res) => {
 
     getCorreosAdmins()
       .then(async adminEmails => {
-        const u = await pool.query(
-          'SELECT usuario, correo FROM usuario WHERE id_persona=$1',
-          [id_usuario]
-        );
+        try {
+          const u = await pool.query(
+            'SELECT usuario, correo FROM usuario WHERE id_persona=$1',
+            [id_usuario]
+          );
 
-        notifyAdminNuevaSolicitud({
-          toList: adminEmails,
-          id_solicitud: solicitud.id_solicitud,
-          usuario: u.rows[0]?.usuario,
-          correo: u.rows[0]?.correo,
-          espacio_nombre
-        }).catch(err => console.error("EMAIL ERROR:", err));
+          notifyAdminNuevaSolicitud({
+            toList: adminEmails,
+            id_solicitud: solicitud.id_solicitud,
+            usuario: u.rows[0]?.usuario,
+            correo: u.rows[0]?.correo,
+            espacio_nombre
+          });
+        } catch (err) {
+          console.error("EMAIL ERROR:", err);
+        }
       })
       .catch(err => console.error("EMAIL ADMIN FETCH ERROR:", err));
+
 
 
     res.status(201).json(respuesta(true, 'Solicitud creada correctamente', solicitud));
@@ -337,12 +342,16 @@ const aprobarSolicitudController = async (req, res) => {
 
     const out = await aprobarSolicitud({ id_solicitud, adminId });
 
-    notifyUsuarioResultado({
-      to: out.to,
-      aprobado: true,
-      usuario: out.usuario,
-      espacio_nombre: out.espacio_nombre
-    }).catch(err => console.error("EMAIL ERROR:", err));
+    try {
+      notifyUsuarioResultado({
+        to: out.to,
+        aprobado: true,
+        usuario: out.usuario,
+        espacio_nombre: out.espacio_nombre
+      });
+    } catch (err) {
+      console.error("EMAIL ERROR:", err);
+    }
 
     res.json(respuesta(true, 'Solicitud aprobada correctamente'));
 
@@ -359,13 +368,17 @@ const rechazarSolicitudController = async (req, res) => {
 
     const out = await rechazarSolicitud({ id_solicitud, adminId, comentario });
 
-    notifyUsuarioResultado({
-      to: out.to,
-      aprobado: false,
-      usuario: out.usuario,
-      espacio_nombre: out.espacio_nombre,
-      comentario: out.comentario
-    }).catch(err => console.error("EMAIL ERROR:", err));
+    try {
+      notifyUsuarioResultado({
+        to: out.to,
+        aprobado: false,
+        usuario: out.usuario,
+        espacio_nombre: out.espacio_nombre,
+        comentario: out.comentario
+      });
+    } catch (err) {
+      console.error("EMAIL ERROR:", err);
+    }
 
     res.json(respuesta(true, 'Solicitud rechazada correctamente', out.solicitud));
 
