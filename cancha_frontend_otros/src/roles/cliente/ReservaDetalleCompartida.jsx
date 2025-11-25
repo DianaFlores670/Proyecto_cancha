@@ -110,33 +110,19 @@ const ReservaDetalleCompartida = () => {
     const fetchLinkUnirse = async () => {
       if (!idReserva) return;
       try {
-        const resp = await api.get("/qr-reserva/buscar", {
-          params: { q: String(idReserva), limit: 1, offset: 0 }
-        });
+        const resp = await api.get(`/qr-reserva/por-reserva/${idReserva}`);
 
         if (!resp.data?.exito) return;
 
-        const datos = resp.data?.datos || {};
-        const lista = datos.qrs || [];
-        if (!Array.isArray(lista) || lista.length === 0) return;
+        const qr = resp.data?.datos?.qr;
+        if (!qr || !qr.codigo_qr) return;
 
-        const codigo = lista[0].codigo_qr;
-        if (!codigo) return;
-
-        const origin =
-          typeof window !== "undefined" &&
-          window.location &&
-          window.location.origin
-            ? window.location.origin
-            : "";
-
-        if (!origin) return;
-
-        const link = `${origin}/unirse-reserva?code=${encodeURIComponent(
-          codigo
-        )}`;
+        const origin = window.location.origin;
+        const link = `${origin}/unirse-reserva?code=${encodeURIComponent(qr.codigo_qr)}`;
         setLinkUnirse(link);
-      } catch (e) {}
+      } catch (e) {
+        // silencioso igual que tu código original
+      }
     };
 
     fetchLinkUnirse();
@@ -202,7 +188,7 @@ const ReservaDetalleCompartida = () => {
   const handleCopyLinkUnirse = () => {
     if (!linkUnirse) return;
     if (navigator && navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(linkUnirse).catch(() => {});
+      navigator.clipboard.writeText(linkUnirse).catch(() => { });
     }
   };
 
@@ -262,8 +248,8 @@ const ReservaDetalleCompartida = () => {
                         (reserva.estado === "pagada"
                           ? "bg-green-100 text-green-700"
                           : reserva.estado === "cancelada"
-                          ? "bg-red-100 text-red-700"
-                          : "bg-yellow-100 text-yellow-700")
+                            ? "bg-red-100 text-red-700"
+                            : "bg-yellow-100 text-yellow-700")
                       }
                     >
                       {reserva.estado || "pendiente"}
@@ -398,11 +384,15 @@ const ReservaDetalleCompartida = () => {
                     <div className="text-sm text-[#64748B]">
                       Cupo usado
                     </div>
-                    <div className="px-3 py-1 rounded-full bg-[#E0F2FE] text-[#0F2634] text-sm font-semibold">
-                      {cupoInfo && cupoInfo.indice_cupo
-                        ? cupoInfo.indice_cupo
-                        : "0/0"}
-                    </div>
+                    {cupoInfo && cupoInfo.indice_cupo ? (
+                      (() => {
+                        const [ocupado, total] = cupoInfo.indice_cupo.split("/").map(Number);
+                        return `${ocupado}/${total - 1}`;
+                      })()
+                    ) : (
+                      "0/0"
+                    )}
+
                   </div>
                 </div>
 

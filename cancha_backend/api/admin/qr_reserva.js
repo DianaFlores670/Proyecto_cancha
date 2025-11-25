@@ -794,6 +794,35 @@ const regenerarQRPorReservaController = async (req, res) => {
   }
 };
 
+const obtenerQRPorReservaController = async (req, res) => {
+  try {
+    const { id_reserva } = req.params;
+
+    if (!id_reserva || isNaN(id_reserva)) {
+      return res
+        .status(400)
+        .json(respuesta(false, "ID de reserva no valido"));
+    }
+
+    const qr = await obtenerQRPorReserva(parseInt(id_reserva, 10));
+
+    if (!qr) {
+      return res
+        .status(404)
+        .json(respuesta(false, "No existe un QR para esta reserva"));
+    }
+
+    return res.json(
+      respuesta(true, "QR obtenido correctamente", { qr })
+    );
+  } catch (error) {
+    console.error("Error en obtenerQRPorReservaController:", error.message);
+    return res
+      .status(500)
+      .json(respuesta(false, error.message || "Error interno"));
+  }
+};
+
 router.get("/datos-especificos", obtenerDatosEspecificosController);
 router.get("/filtro", obtenerQRsFiltradosController);
 router.get("/buscar", buscarQRsController);
@@ -804,5 +833,6 @@ router.patch("/:id", actualizarQRController);
 router.delete("/:id", eliminarQRController);
 
 router.post("/regenerar-por-reserva/:idReserva", regenerarQRPorReservaController);
+router.get("/por-reserva/:id_reserva", obtenerQRPorReservaController);
 
 module.exports = router;
