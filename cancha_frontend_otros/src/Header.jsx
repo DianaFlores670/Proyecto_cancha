@@ -333,63 +333,47 @@ const Header = () => {
       const data = response.data;
 
       if (data.success && data.data.token && data.data.usuario) {
+
         const normalized = normalizeUser(data.data.usuario);
-        if (data.success && data.data.token && data.data.usuario) {
-          const normalized = normalizeUser(data.data.usuario);
-          console.log(normalized.roles);
-          const hasRole =
-            Array.isArray(normalized.roles) && normalized.roles.length > 0;
-          if (!hasRole) {
-            setLoginError(
-              "Tu cuenta no tiene roles habilitados. Solicita acceso o espera aprobacion."
-            );
-            setLoginLoading(false);
-            return;
-          }
+        const hasRole =
+          Array.isArray(normalized.roles) && normalized.roles.length > 0;
 
-          localStorage.setItem("token", data.data.token);
-          localStorage.setItem("user", JSON.stringify(normalized));
-          setIsLoggedIn(true);
-          setUser(normalized);
-          setFormData({
-            nombre: normalized.nombre || "",
-            apellido: normalized.apellido || "",
-            correo: normalized.correo || "",
-            usuario: normalized.usuario || "",
-            telefono: normalized.telefono || "",
-            sexo: normalized.sexo || "",
-            imagen_perfil: normalized.imagen_perfil || "",
-            latitud: normalized.latitud || "",
-            longitud: normalized.longitud || "",
-            datos_especificos: normalized.roles?.[0]?.datos || {},
-          });
-          setImagePreview(
-            normalized.imagen_perfil
-              ? getImageUrl(normalized.imagen_perfil)
-              : null
-          );
-
-          const roleSet = new Set(
-            (normalized.roles ?? []).map((r) => (r.rol || "").toUpperCase())
-          );
-          if (roleSet.has("ADMINISTRADOR")) {
-            navigate("/administrador");
-          } else {
-            navigate("/espacios-deportivos");
-          }
-        } else {
-          setLoginError("Respuesta del servidor invalida. Intenta de nuevo.");
-          setLoginLoading(false);
+        if (!hasRole) {
+          setLoginError("Tu cuenta no tiene roles habilitados. Solicita acceso o espera aprobacion.");
+          return;
         }
+
+        localStorage.setItem("token", data.data.token);
+        localStorage.setItem("user", JSON.stringify(normalized));
+        setIsLoggedIn(true);
+        setUser(normalized);
+
+        // CERRAR MODAL Y RESET
+        setShowLoginModal(false);
+        setCorreo("");
+        setContrasena("");
+
+        // REDIRECCIÓN SEGÚN ROL
+        const roleSet = new Set(
+          (normalized.roles ?? []).map((r) => (r.rol || "").toUpperCase())
+        );
+
+        if (roleSet.has("ADMINISTRADOR")) {
+          navigate("/administrador");
+        } else {
+          navigate("/espacios-deportivos");
+        }
+
       } else {
-        setLoginError("Respuesta del servidor inválida. Intenta de nuevo.");
-        setLoginLoading(false);
+        setLoginError("Respuesta inválida del servidor");
       }
+
     } catch (err) {
       setLoginError(
         err.response?.data?.message ||
         "Error al iniciar sesión. Verifica tus credenciales."
       );
+    } finally {
       setLoginLoading(false);
     }
   };
