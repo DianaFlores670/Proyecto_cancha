@@ -2,8 +2,6 @@
 import React, { useState, useEffect } from "react";
 import api from "../services/api";
 
-import { getImageUrl } from "../utils";
-
 const permissionsConfig = {
   ADMINISTRADOR: {
     canView: true,
@@ -148,15 +146,14 @@ const EspacioDeportivo = () => {
     fetchAdministradores();
   }, []);
 
-  const getImageUrl = (path) => {
-    if (!path) return "";
-    try {
-      const base = (api.defaults?.baseURL || "").replace(/\/$/, "");
-      const cleanPath = String(path).replace(/^\//, "");
-      return `${base}/${cleanPath}`;
-    } catch {
-      return path;
-    }
+  const getImageUrlSafe = (path) => {
+    if (!path) return null;
+    // Si es URL completa
+    if (path.startsWith("http://") || path.startsWith("https://")) return path;
+    // Si es ruta relativa
+    return `https://proyecto-cancha.onrender.com${
+      path.startsWith("/") ? "" : "/"
+    }${path}`;
   };
 
   const fetchEspacios = async (params = {}) => {
@@ -295,13 +292,14 @@ const EspacioDeportivo = () => {
         });
         setImagePreviews({
           imagen_principal: e.imagen_principal
-            ? getImageUrl(e.imagen_principal)
+            ? getImageUrlSafe(e.imagen_principal)
             : null,
-          imagen_sec_1: e.imagen_sec_1 ? getImageUrl(e.imagen_sec_1) : null,
-          imagen_sec_2: e.imagen_sec_2 ? getImageUrl(e.imagen_sec_2) : null,
-          imagen_sec_3: e.imagen_sec_3 ? getImageUrl(e.imagen_sec_3) : null,
-          imagen_sec_4: e.imagen_sec_4 ? getImageUrl(e.imagen_sec_4) : null,
+          imagen_sec_1: e.imagen_sec_1 ? getImageUrlSafe(e.imagen_sec_1) : null,
+          imagen_sec_2: e.imagen_sec_2 ? getImageUrlSafe(e.imagen_sec_2) : null,
+          imagen_sec_3: e.imagen_sec_3 ? getImageUrlSafe(e.imagen_sec_3) : null,
+          imagen_sec_4: e.imagen_sec_4 ? getImageUrlSafe(e.imagen_sec_4) : null,
         });
+
         setSelectedFiles({
           imagen_principal: null,
           imagen_sec_1: null,
@@ -326,11 +324,14 @@ const EspacioDeportivo = () => {
   const openViewModal = async (id) => {
     if (!permissions.canView) return;
     try {
-      const response = await api.get(
-        `/espacio_deportivo/dato-individual/${id}`
+      const res = await fetch(
+        `https://proyecto-cancha.onrender.com/espacio_deportivo/dato-individual/${id}`,
+        { headers: { "Content-Type": "application/json" } }
       );
-      if (response.data.exito) {
-        const e = response.data.datos.espacio;
+      const data = await res.json();
+
+      if (data.exito) {
+        const e = data.datos.espacio;
         setFormData({
           nombre: e.nombre || "",
           direccion: e.direccion || "",
@@ -346,15 +347,17 @@ const EspacioDeportivo = () => {
           imagen_sec_4: e.imagen_sec_4 || "",
           id_admin_esp_dep: e.id_admin_esp_dep || "",
         });
+
         setImagePreviews({
           imagen_principal: e.imagen_principal
-            ? getImageUrl(e.imagen_principal)
+            ? getImageUrlSafe(e.imagen_principal)
             : null,
-          imagen_sec_1: e.imagen_sec_1 ? getImageUrl(e.imagen_sec_1) : null,
-          imagen_sec_2: e.imagen_sec_2 ? getImageUrl(e.imagen_sec_2) : null,
-          imagen_sec_3: e.imagen_sec_3 ? getImageUrl(e.imagen_sec_3) : null,
-          imagen_sec_4: e.imagen_sec_4 ? getImageUrl(e.imagen_sec_4) : null,
+          imagen_sec_1: e.imagen_sec_1 ? getImageUrlSafe(e.imagen_sec_1) : null,
+          imagen_sec_2: e.imagen_sec_2 ? getImageUrlSafe(e.imagen_sec_2) : null,
+          imagen_sec_3: e.imagen_sec_3 ? getImageUrlSafe(e.imagen_sec_3) : null,
+          imagen_sec_4: e.imagen_sec_4 ? getImageUrlSafe(e.imagen_sec_4) : null,
         });
+
         setSelectedFiles({
           imagen_principal: null,
           imagen_sec_1: null,
@@ -367,12 +370,10 @@ const EspacioDeportivo = () => {
         setViewMode(true);
         setModalOpen(true);
       } else {
-        setError(response.data.mensaje || "No se pudo cargar el espacio");
+        setError(data.mensaje || "No se pudo cargar el espacio");
       }
     } catch (err) {
-      const errorMessage =
-        err.response?.data?.mensaje || "Error de conexion al servidor";
-      setError(errorMessage);
+      setError("Error de conexion al servidor");
     }
   };
 
@@ -780,15 +781,18 @@ const EspacioDeportivo = () => {
                 <label className="block text-sm font-medium mb-1">
                   Imagen Principal
                 </label>
-                {imagePreviews.imagen_principal ? (
+                {imagePreviews.imagen_principal && (
                   <img
-                    src={getImageUrl(imagePreviews.imagen_principal)}
+                    src={
+                      selectedFiles.imagen_principal
+                        ? URL.createObjectURL(selectedFiles.imagen_principal)
+                        : imagePreviews.imagen_principal
+                    }
                     alt="Imagen Principal"
                     className="w-32 h-32 object-cover rounded mb-2"
                   />
-                ) : viewMode ? (
-                  <p className="text-gray-500">No hay imagen principal</p>
-                ) : null}
+                )}
+
                 {!viewMode && (
                   <input
                     type="file"
@@ -803,15 +807,21 @@ const EspacioDeportivo = () => {
                 <label className="block text-sm font-medium mb-1">
                   Imagen Secundaria 1
                 </label>
-                {imagePreviews.imagen_sec_1 ? (
+                {imagePreviews.imagen_sec_1 && (
                   <img
-                    src={getImageUrl(imagePreviews.imagen_sec_1)}
+                    src={
+                      selectedFiles.imagen_sec_1
+                        ? URL.createObjectURL(selectedFiles.imagen_sec_1)
+                        : imagePreviews.imagen_sec_1
+                    }
                     alt="Imagen Secundaria 1"
                     className="w-32 h-32 object-cover rounded mb-2"
                   />
-                ) : viewMode ? (
+                )}
+                {!imagePreviews.imagen_sec_1 && viewMode && (
                   <p className="text-gray-500">No hay imagen secundaria 1</p>
-                ) : null}
+                )}
+
                 {!viewMode && (
                   <input
                     type="file"
@@ -826,15 +836,21 @@ const EspacioDeportivo = () => {
                 <label className="block text-sm font-medium mb-1">
                   Imagen Secundaria 2
                 </label>
-                {imagePreviews.imagen_sec_2 ? (
+                {imagePreviews.imagen_sec_2 && (
                   <img
-                    src={getImageUrl(imagePreviews.imagen_sec_2)}
+                    src={
+                      selectedFiles.imagen_sec_2
+                        ? URL.createObjectURL(selectedFiles.imagen_sec_2)
+                        : imagePreviews.imagen_sec_2
+                    }
                     alt="Imagen Secundaria 2"
                     className="w-32 h-32 object-cover rounded mb-2"
                   />
-                ) : viewMode ? (
+                )}
+                {!imagePreviews.imagen_sec_2 && viewMode && (
                   <p className="text-gray-500">No hay imagen secundaria 2</p>
-                ) : null}
+                )}
+
                 {!viewMode && (
                   <input
                     type="file"
@@ -849,15 +865,21 @@ const EspacioDeportivo = () => {
                 <label className="block text-sm font-medium mb-1">
                   Imagen Secundaria 3
                 </label>
-                {imagePreviews.imagen_sec_3 ? (
+                {imagePreviews.imagen_sec_3 && (
                   <img
-                    src={getImageUrl(imagePreviews.imagen_sec_3)}
+                    src={
+                      selectedFiles.imagen_sec_3
+                        ? URL.createObjectURL(selectedFiles.imagen_sec_3)
+                        : imagePreviews.imagen_sec_3
+                    }
                     alt="Imagen Secundaria 3"
                     className="w-32 h-32 object-cover rounded mb-2"
                   />
-                ) : viewMode ? (
+                )}
+                {!imagePreviews.imagen_sec_3 && viewMode && (
                   <p className="text-gray-500">No hay imagen secundaria 3</p>
-                ) : null}
+                )}
+
                 {!viewMode && (
                   <input
                     type="file"
@@ -872,15 +894,22 @@ const EspacioDeportivo = () => {
                 <label className="block text-sm font-medium mb-1">
                   Imagen Secundaria 4
                 </label>
-                {imagePreviews.imagen_sec_4 ? (
+                {/* Imagen Secundaria 4 */}
+                {imagePreviews.imagen_sec_4 && (
                   <img
-                    src={getImageUrl(imagePreviews.imagen_sec_4)}
+                    src={
+                      selectedFiles.imagen_sec_4
+                        ? URL.createObjectURL(selectedFiles.imagen_sec_4)
+                        : imagePreviews.imagen_sec_4
+                    }
                     alt="Imagen Secundaria 4"
                     className="w-32 h-32 object-cover rounded mb-2"
                   />
-                ) : viewMode ? (
+                )}
+                {!imagePreviews.imagen_sec_4 && viewMode && (
                   <p className="text-gray-500">No hay imagen secundaria 4</p>
-                ) : null}
+                )}
+
                 {!viewMode && (
                   <input
                     type="file"

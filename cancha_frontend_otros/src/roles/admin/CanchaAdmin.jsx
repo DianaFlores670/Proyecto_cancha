@@ -82,11 +82,17 @@ const permissionsConfig = {
   },
 };
 
-const getImageUrl = (path) => {
+// utils.js
+export const getImageUrl = (path) => {
   if (!path) return "";
-  const base = (api.defaults?.baseURL || "").replace(/\/$/, "");
-  const clean = String(path).replace(/^\//, "");
-  return `${base}/${clean}`;
+
+  // Si ya viene como URL completa, NO añadir dominio
+  if (path.startsWith("http://") || path.startsWith("https://")) {
+    return path;
+  }
+
+  // Si viene solo la ruta, concatenar dominio
+  return `https://proyecto-cancha.onrender.com${path}`;
 };
 
 const CanchaAdmin = () => {
@@ -739,7 +745,11 @@ const CanchaAdmin = () => {
                 </label>
                 {imagePreview ? (
                   <img
-                    src={getImageUrl(imagePreview)}
+                    src={
+                      imagePreview.startsWith("blob:")
+                        ? imagePreview
+                        : getImageUrl(imagePreview)
+                    }
                     alt="imagen_cancha"
                     className="w-32 h-32 object-cover rounded mb-2"
                   />

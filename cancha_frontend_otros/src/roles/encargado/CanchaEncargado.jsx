@@ -1,6 +1,25 @@
 import React, { useState, useEffect } from "react";
 import api from "../../services/api";
 
+const getImageUrl = (path) => {
+  if (!path) return "";
+
+  path = path.trim();
+
+  // Si ya es URL completa, devolver tal cual
+  if (path.startsWith("http://") || path.startsWith("https://")) return path;
+
+  const base =
+    process.env.NODE_ENV === "development"
+      ? "http://localhost:3000"
+      : "https://proyecto-cancha.onrender.com";
+
+  // Quitar cualquier barra inicial sobrante
+  path = path.replace(/^\/+/, "");
+
+  return `${base}/${path}`;
+};
+
 const CanchaEncargado = () => {
   const [canchas, setCanchas] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -154,7 +173,9 @@ const CanchaEncargado = () => {
               <tbody>
                 {canchas.map((c, index) => (
                   <tr key={c.id_cancha} className="border-t">
-                    <td className="px-4 py-2">{(page - 1) * limit + index + 1}</td>
+                    <td className="px-4 py-2">
+                      {(page - 1) * limit + index + 1}
+                    </td>
                     <td className="px-4 py-2">{c.nombre}</td>
                     <td className="px-4 py-2">{c.ubicacion || "-"}</td>
                     <td className="px-4 py-2">{c.capacidad || "-"}</td>
@@ -203,7 +224,6 @@ const CanchaEncargado = () => {
       {modalOpen && currentCancha && (
         <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
           <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full mx-4 p-6 md:p-8 max-h-[85vh] overflow-y-auto">
-
             <div className="flex items-start justify-between gap-4 mb-6">
               <div>
                 <p className="text-[11px] uppercase tracking-[0.14em] text-gray-400">
@@ -249,11 +269,7 @@ const CanchaEncargado = () => {
               {currentCancha.imagen_cancha ? (
                 <div className="relative overflow-hidden rounded-2xl border border-gray-200">
                   <img
-                    src={
-                      currentCancha.imagen_cancha.startsWith("http")
-                        ? currentCancha.imagen_cancha
-                        : `${api.defaults.baseURL}/${currentCancha.imagen_cancha}`
-                    }
+                    src={getImageUrl(currentCancha.imagen_cancha)}
                     alt="foto_cancha"
                     className="w-full h-64 object-cover"
                   />
@@ -353,7 +369,6 @@ const CanchaEncargado = () => {
                 Cerrar
               </button>
             </div>
-
           </div>
         </div>
       )}

@@ -38,9 +38,7 @@ const getEffectiveRole = () => {
     for (const r of arr) {
       if (typeof r === "string") bag.add(r);
       else if (r && typeof r === "object")
-        ["rol", "role", "nombre", "name"].forEach((k) => {
-          if (r[k]) bag.add(r[k]);
-        });
+        ["rol", "role", "nombre", "name"].forEach((k) => r[k] && bag.add(r[k]));
     }
     if (bag.size === 0 && u?.role) bag.add(u.role);
   } catch {}
@@ -58,14 +56,13 @@ const getEffectiveRole = () => {
       t.forEach((v) => bag.add(v));
     } catch {}
   }
-  const norm = Array.from(bag).map((v) =>
-    String(v || "")
+  const norm2 = Array.from(bag).map((v) => {
+    const val = String(v || "")
       .trim()
       .toUpperCase()
-      .replace(/\s+/g, "_")
-  );
-  const map = (v) => (v === "ADMIN" ? "ADMINISTRADOR" : v);
-  const norm2 = norm.map(map);
+      .replace(/\s+/g, "_");
+    return val === "ADMIN" ? "ADMINISTRADOR" : val;
+  });
   const prio = ["ADMINISTRADOR", "CONTROL", "ADMIN_ESP_DEP"];
   return (
     prio.find((r) => norm2.includes(r) && keys.includes(r)) ||
@@ -122,9 +119,10 @@ const QRReserva = () => {
 
   const getImageUrl = (path) => {
     if (!path) return "";
+    if (/^https?:\/\//i.test(path)) return path;
+    const cleanPath = path.startsWith("/") ? path : "/" + path;
     const base = (api.defaults?.baseURL || "").replace(/\/$/, "");
-    const cleanPath = String(path).replace(/^\//, "");
-    return `${base}/${cleanPath}`;
+    return `${base}${cleanPath}`;
   };
 
   useEffect(() => {
@@ -180,15 +178,18 @@ const QRReserva = () => {
     const fullParams = { ...params, limit, offset };
     try {
       let r;
-      if (params.q) r = await api.get('/qr-reserva/buscar', { params: fullParams });
-      else if (params.tipo) r = await api.get('/qr-reserva/filtro', { params: fullParams });
-      else r = await api.get('/qr-reserva/datos-especificos', { params: fullParams });
+      if (params.q)
+        r = await api.get("/qr-reserva/buscar", { params: fullParams });
+      else if (params.tipo)
+        r = await api.get("/qr-reserva/filtro", { params: fullParams });
+      else
+        r = await api.get("/qr-reserva/datos-especificos", {
+          params: fullParams,
+        });
       if (r.data?.exito) {
         setQRs(r.data.datos?.qrs || []);
         setTotal(r.data.datos?.paginacion?.total || 0);
-      } else {
-        setError(r.data?.mensaje || "Error al cargar datos");
-      }
+      } else setError(r.data?.mensaje || "Error al cargar datos");
     } catch (e) {
       setError(e.response?.data?.mensaje || "Error de conexion al servidor");
     } finally {
@@ -271,9 +272,7 @@ const QRReserva = () => {
         setCurrentQR(qr);
         setEditMode(true);
         setModalOpen(true);
-      } else {
-        setError(r.data?.mensaje || "No se pudo cargar el registro");
-      }
+      } else setError(r.data?.mensaje || "No se pudo cargar el registro");
     } catch (e) {
       setError(e.response?.data?.mensaje || "Error de conexion al servidor");
     }
@@ -309,6 +308,7 @@ const QRReserva = () => {
           setError(`El campo ${f} es obligatorio`);
           return;
         }
+
       const fg = new Date(base.fecha_generado);
       if (isNaN(fg.getTime())) {
         setError("La fecha de generacion no es valida");
@@ -327,11 +327,13 @@ const QRReserva = () => {
           return;
         }
       }
+
       const rid = parseInt(base.id_reserva);
       if (!reservas.some((r) => r.id_reserva === rid)) {
         setError("La reserva seleccionada no es valida");
         return;
       }
+
       const payload = {
         id_reserva: rid,
         fecha_generado: base.fecha_generado,
@@ -341,17 +343,18 @@ const QRReserva = () => {
         id_control: base.id_control ? parseInt(base.id_control) : undefined,
         verificado: !!base.verificado,
       };
+
       let r;
-      if (editMode) r = await api.patch(`/qr-reserva/${currentQR.id_qr}`, payload);
-      else r = await api.post('/qr-reserva/', payload);
+      if (editMode)
+        r = await api.patch(`/qr-reserva/${currentQR.id_qr}`, payload);
+      else r = await api.post("/qr-reserva/", payload);
+
       if (r.data?.exito) {
         if (r.data.datos?.qr?.qr_url_imagen)
           setPreviewQR(getImageUrl(r.data.datos.qr.qr_url_imagen));
         closeModal();
         fetchQRs();
-      } else {
-        setError(r.data?.mensaje || "No se pudo guardar");
-      }
+      } else setError(r.data?.mensaje || "No se pudo guardar");
     } catch (err) {
       setError(err.response?.data?.mensaje || "Error de conexion al servidor");
     }
@@ -659,18 +662,24 @@ const QRReserva = () => {
                   </span>
                 </label>
               </div>
+
               {previewQR && (
                 <div className="col-span-2">
                   <label className="block text-sm font-medium mb-1">
                     Vista previa del QR
                   </label>
                   <img
-                    src={getImageUrl(previewQR)}
+                    src={
+                      /^https?:\/\//i.test(previewQR)
+                        ? previewQR
+                        : getImageUrl(previewQR)
+                    }
                     alt="Vista previa del QR"
                     className="max-w-xs h-auto rounded"
-                    onError={(e) =>
-                      console.error("Error loading QR image:", e.target.src)
-                    }
+                    onError={(e) => {
+                      console.error("Error loading QR image:", e.target.src);
+                      e.target.src = "none"; // opcional: imagen por defecto
+                    }}
                   />
                 </div>
               )}
@@ -792,7 +801,9 @@ const QRReserva = () => {
               </div>
               {selectedQR.id_control && (
                 <div>
-                  <label className="font-medium text-gray-700">Control asociado:</label>
+                  <label className="font-medium text-gray-700">
+                    Control asociado:
+                  </label>
                   <p className="mt-1 p-2 bg-gray-50 rounded">
                     #{selectedQR.id_control}{" "}
                     {selectedQR.control_nombre
@@ -811,12 +822,17 @@ const QRReserva = () => {
                       {selectedQR.qr_url_imagen}
                     </p>
                     <img
-                      src={getImageUrl(selectedQR.qr_url_imagen)}
+                      src={
+                        /^https?:\/\//i.test(selectedQR.qr_url_imagen)
+                          ? selectedQR.qr_url_imagen
+                          : getImageUrl(selectedQR.qr_url_imagen)
+                      }
                       alt="QR"
                       className="mt-2 max-w-xs h-auto rounded"
-                      onError={(e) =>
-                        console.error("Error loading QR image:", e.target.src)
-                      }
+                      onError={(e) => {
+                        console.error("Error loading QR image:", e.target.src);
+                        e.target.src = "none";
+                      }}
                     />
                   </div>
                 )}
