@@ -2,6 +2,7 @@
 /* eslint-disable no-unused-vars */
 import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
+import QRCode from 'react-qr-code';
 import api from '../../services/api';
 
 const norm = (v) => String(v || '').trim().toUpperCase().replace(/\s+/g, '_');
@@ -221,6 +222,7 @@ const ReservaAdmin = () => {
     });
     setCurrentReserva(null);
     setModalOpen(true);
+    setError(null);
   };
 
   const openEditModal = async (id) => {
@@ -245,6 +247,7 @@ const ReservaAdmin = () => {
         setEditMode(true);
         setViewMode(false);
         setModalOpen(true);
+        setError(null);
       } else {
         setError('No se pudo cargar la reserva');
       }
@@ -274,6 +277,7 @@ const ReservaAdmin = () => {
         setEditMode(false);
         setViewMode(true);
         setModalOpen(true);
+        setError(null);
       } else {
         setError('No se pudo cargar la reserva');
       }
@@ -312,15 +316,45 @@ const ReservaAdmin = () => {
           data,
           { params: { id_admin_esp_dep: idAdminEspDep } }
         );
+
+        if (resp.data?.exito) {
+          setModalOpen(false);
+          fetchReservas();
+        } else {
+          setError('Error al guardar');
+        }
       } else {
         resp = await api.post('/reserva-admin/', { ...data, id_admin_esp_dep: idAdminEspDep });
-      }
 
-      if (resp.data?.exito) {
-        setModalOpen(false);
-        fetchReservas();
-      } else {
-        setError('Error al guardar');
+        if (resp.data?.exito) {
+          let nuevaReserva =
+            resp.data.datos?.reserva ||
+            resp.data.datos ||
+            resp.data.reserva ||
+            null;
+
+          const idNueva =
+            (nuevaReserva && nuevaReserva.id_reserva) ||
+            resp.data.id_reserva ||
+            null;
+
+          if (idNueva) {
+            try {
+              await api.post('/qr-reserva/', {
+                id_reserva: idNueva,
+                fecha_generado: new Date().toISOString(),
+                estado: 'activo'
+              });
+            } catch (errQr) {
+              setError('La reserva se creo pero no se pudo generar el QR');
+            }
+          }
+
+          setModalOpen(false);
+          fetchReservas();
+        } else {
+          setError('Error al guardar');
+        }
       }
     } catch {
       setError('Error de conexion');
@@ -344,9 +378,6 @@ const ReservaAdmin = () => {
   };
 
   if (!role || (role === 'ADMIN_ESP_DEP' && !idAdminEspDep)) return <p>Cargando permisos...</p>;
-
-  const baseUrl = api.defaults.baseURL ? api.defaults.baseURL.replace(/\/$/, '') : '';
-  const qrImageUrl = currentReserva && currentReserva.qr_url_imagen ? `${baseUrl}${currentReserva.qr_url_imagen}` : '';
 
   return (
     <div className="bg-white rounded-lg shadow p-6">
@@ -427,6 +458,13 @@ const ReservaAdmin = () => {
                     </td>
                   </tr>
                 ))}
+                {reservas.length === 0 && (
+                  <tr>
+                    <td colSpan={7} className="px-4 py-4 text-center text-gray-500">
+                      No hay reservas para mostrar
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
@@ -570,18 +608,18 @@ const ReservaAdmin = () => {
               {viewMode && currentReserva && (
                 <div className="col-span-2 mt-4 border rounded-lg p-4 bg-gray-50">
                   <p className="text-sm font-medium mb-2">Codigo QR de la reserva</p>
-                  {qrImageUrl ? (
+                  {currentReserva.codigo_qr ? (
                     <div className="flex flex-col items-center gap-2">
-                      <img
-                        src={qrImageUrl}
-                        alt="Codigo QR"
-                        className="w-40 h-40 object-contain"
-                      />
-                      {currentReserva.codigo_qr && (
-                        <p className="text-xs text-gray-700 break-all">
-                          {currentReserva.codigo_qr}
-                        </p>
-                      )}
+                      <div className="bg-white p-2 rounded">
+                        <QRCode
+                          value={currentReserva.codigo_qr}
+                          size={160}
+                          style={{ height: 'auto', maxWidth: '100%', width: '160px' }}
+                        />
+                      </div>
+                      <p className="text-xs text-gray-700 break-all">
+                        {currentReserva.codigo_qr}
+                      </p>
                     </div>
                   ) : (
                     <p className="text-sm text-gray-500">

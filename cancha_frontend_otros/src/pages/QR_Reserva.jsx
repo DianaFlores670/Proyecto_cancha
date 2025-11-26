@@ -1,5 +1,6 @@
 /* eslint-disable no-empty */
 import React, { useState, useEffect } from "react";
+import QRCode from "react-qr-code";
 import api from "../services/api";
 
 const permissionsConfig = {
@@ -7,26 +8,26 @@ const permissionsConfig = {
     canView: true,
     canCreate: true,
     canEdit: true,
-    canDelete: true,
+    canDelete: true
   },
   ADMIN_ESP_DEP: {
     canView: false,
     canCreate: false,
     canEdit: false,
-    canDelete: false,
+    canDelete: false
   },
   CONTROL: {
     canView: true,
     canCreate: false,
     canEdit: false,
-    canDelete: false,
+    canDelete: false
   },
   DEFAULT: {
     canView: false,
     canCreate: false,
     canEdit: false,
-    canDelete: false,
-  },
+    canDelete: false
+  }
 };
 
 const getEffectiveRole = () => {
@@ -41,7 +42,7 @@ const getEffectiveRole = () => {
         ["rol", "role", "nombre", "name"].forEach((k) => r[k] && bag.add(r[k]));
     }
     if (bag.size === 0 && u?.role) bag.add(u.role);
-  } catch { }
+  } catch {}
   const tok = localStorage.getItem("token");
   if (bag.size === 0 && tok && tok.split(".").length === 3) {
     try {
@@ -51,10 +52,10 @@ const getEffectiveRole = () => {
       const t = Array.isArray(payload?.roles)
         ? payload.roles
         : payload?.rol
-          ? [payload.rol]
-          : [];
+        ? [payload.rol]
+        : [];
       t.forEach((v) => bag.add(v));
-    } catch { }
+    } catch {}
   }
   const norm2 = Array.from(bag).map((v) => {
     const val = String(v || "")
@@ -88,17 +89,16 @@ const QRReserva = () => {
     id_reserva: "",
     fecha_generado: new Date().toISOString().slice(0, 16),
     fecha_expira: "",
-    qr_url_imagen: "",
     codigo_qr: "",
     estado: "activo",
     id_control: "",
-    verificado: false,
+    verificado: false
   });
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const limit = 10;
-  const [previewQR, setPreviewQR] = useState(null);
   const [role, setRole] = useState(() => getEffectiveRole());
+  const [joinLink, setJoinLink] = useState(null);
 
   useEffect(() => {
     const sync = () => setRole(getEffectiveRole());
@@ -116,14 +116,6 @@ const QRReserva = () => {
     role && permissionsConfig[role]
       ? permissionsConfig[role]
       : permissionsConfig.DEFAULT;
-
-  const getImageUrl = (path) => {
-    if (!path) return "";
-    if (/^https?:\/\//i.test(path)) return path;
-    const cleanPath = path.startsWith("/") ? path : "/" + path;
-    const base = (api.defaults?.baseURL || "").replace(/\/$/, "");
-    return `${base}${cleanPath}`;
-  };
 
   useEffect(() => {
     const fetchReservas = async () => {
@@ -160,19 +152,17 @@ const QRReserva = () => {
       fetchReservas();
       fetchControles();
     }
-  }, [role]);
+  }, [role, permissions.canView]);
 
   const openDetailModal = (qr) => {
     if (!permissions.canView) return;
     setSelectedQR(qr);
-    setPreviewQR(qr.qr_url_imagen ? getImageUrl(qr.qr_url_imagen) : null);
     setDetailModalOpen(true);
   };
 
   const closeDetailModal = () => {
     setDetailModalOpen(false);
     setSelectedQR(null);
-    setPreviewQR(null);
   };
 
   const fetchQRs = async (params = {}) => {
@@ -192,7 +182,7 @@ const QRReserva = () => {
         r = await api.get("/qr-reserva/filtro", { params: fullParams });
       else
         r = await api.get("/qr-reserva/datos-especificos", {
-          params: fullParams,
+          params: fullParams
         });
       if (r.data?.exito) {
         setQRs(r.data.datos?.qrs || []);
@@ -241,19 +231,19 @@ const QRReserva = () => {
   const openCreateModal = () => {
     if (!permissions.canCreate) return;
     setEditMode(false);
+    setCurrentQR(null);
     setFormData({
       id_reserva: "",
       fecha_generado: new Date().toISOString().slice(0, 16),
       fecha_expira: "",
-      qr_url_imagen: "",
       codigo_qr: "",
       estado: "activo",
       id_control: "",
-      verificado: false,
+      verificado: false
     });
-    setPreviewQR(null);
-    setCurrentQR(null);
+    setJoinLink(null);
     setModalOpen(true);
+    setError(null);
   };
 
   const openEditModal = async (id) => {
@@ -270,16 +260,16 @@ const QRReserva = () => {
           fecha_expira: qr.fecha_expira
             ? new Date(qr.fecha_expira).toISOString().slice(0, 16)
             : "",
-          qr_url_imagen: qr.qr_url_imagen || "",
           codigo_qr: qr.codigo_qr || "",
           estado: qr.estado || "activo",
           id_control: qr.id_control || "",
-          verificado: !!qr.verificado,
+          verificado: !!qr.verificado
         });
-        setPreviewQR(qr.qr_url_imagen ? getImageUrl(qr.qr_url_imagen) : null);
         setCurrentQR(qr);
         setEditMode(true);
+        setJoinLink(null);
         setModalOpen(true);
+        setError(null);
       } else setError(r.data?.mensaje || "No se pudo cargar el registro");
     } catch (e) {
       setError(e.response?.data?.mensaje || "Error de conexion al servidor");
@@ -289,7 +279,7 @@ const QRReserva = () => {
   const closeModal = () => {
     setModalOpen(false);
     setCurrentQR(null);
-    setPreviewQR(null);
+    setJoinLink(null);
     setError(null);
   };
 
@@ -297,7 +287,7 @@ const QRReserva = () => {
     const { name, value, type, checked } = e.target;
     setFormData((prev) => ({
       ...prev,
-      [name]: type === "checkbox" ? checked : value,
+      [name]: type === "checkbox" ? checked : value
     }));
   };
 
@@ -311,11 +301,12 @@ const QRReserva = () => {
     try {
       const base = { ...formData };
       const required = ["id_reserva", "fecha_generado"];
-      for (const f of required)
+      for (const f of required) {
         if (!base[f]) {
           setError(`El campo ${f} es obligatorio`);
           return;
         }
+      }
 
       const fg = new Date(base.fecha_generado);
       if (isNaN(fg.getTime())) {
@@ -342,25 +333,43 @@ const QRReserva = () => {
         return;
       }
 
-      const payload = {
+      const payloadBase = {
         id_reserva: rid,
         fecha_generado: base.fecha_generado,
         fecha_expira: base.fecha_expira || undefined,
-        codigo_qr: base.codigo_qr || undefined,
         estado: base.estado || "activo",
         id_control: base.id_control ? parseInt(base.id_control) : undefined,
-        verificado: !!base.verificado,
+        verificado: !!base.verificado
       };
 
       let r;
-      if (editMode)
+      if (editMode) {
+        const payload = {
+          ...payloadBase,
+          codigo_qr: base.codigo_qr || undefined
+        };
         r = await api.patch(`/qr-reserva/${currentQR.id_qr}`, payload);
-      else r = await api.post("/qr-reserva/", payload);
+      } else {
+        r = await api.post("/qr-reserva/", payloadBase);
+      }
 
       if (r.data?.exito) {
-        if (r.data.datos?.qr?.qr_url_imagen)
-          setPreviewQR(getImageUrl(r.data.datos.qr.qr_url_imagen));
-        closeModal();
+        const qrResp = r.data.datos?.qr;
+        if (!editMode && r.data.datos?.link_unirse) {
+          setJoinLink(r.data.datos.link_unirse);
+        } else if (editMode) {
+          setJoinLink(null);
+        }
+        if (qrResp) {
+          setCurrentQR(qrResp);
+          setFormData((prev) => ({
+            ...prev,
+            codigo_qr: qrResp.codigo_qr || prev.codigo_qr
+          }));
+        }
+        if (editMode) {
+          closeModal();
+        }
         fetchQRs();
       } else setError(r.data?.mensaje || "No se pudo guardar");
     } catch (err) {
@@ -368,11 +377,57 @@ const QRReserva = () => {
     }
   };
 
+  const handleRegenerarQR = async () => {
+    if (!editMode || !currentQR?.id_reserva) return;
+    try {
+      setError(null);
+      const r = await api.post(
+        `/qr-reserva/regenerar-por-reserva/${currentQR.id_reserva}`
+      );
+      if (r.data?.exito) {
+        const qr = r.data.datos?.qr;
+        if (qr) {
+          setCurrentQR(qr);
+          setFormData((prev) => ({
+            ...prev,
+            fecha_generado: qr.fecha_generado
+              ? new Date(qr.fecha_generado).toISOString().slice(0, 16)
+              : prev.fecha_generado,
+            fecha_expira: qr.fecha_expira
+              ? new Date(qr.fecha_expira).toISOString().slice(0, 16)
+              : prev.fecha_expira,
+            codigo_qr: qr.codigo_qr || "",
+            estado: qr.estado || prev.estado,
+            verificado:
+              typeof qr.verificado === "boolean"
+                ? qr.verificado
+                : prev.verificado
+          }));
+          setJoinLink(null);
+          fetchQRs();
+        }
+      } else {
+        setError(r.data?.mensaje || "No se pudo regenerar el QR");
+      }
+    } catch (e) {
+      setError(
+        e.response?.data?.mensaje || "Error de conexion al regenerar el QR"
+      );
+    }
+  };
+
   const handlePageChange = (newPage) => {
     if (newPage >= 1 && newPage <= Math.ceil(total / limit)) setPage(newPage);
   };
 
-  if (!role) return <p>Cargando permisos...</p>;
+  if (!permissions.canView) {
+    return (
+      <div className="bg-white rounded-lg shadow p-6">
+        <h2 className="text-xl font-semibold mb-4">Gestion de QR de Reservas</h2>
+        <p className="text-gray-600">No tienes permisos para ver esta pagina.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-white rounded-lg shadow p-6">
@@ -453,26 +508,28 @@ const QRReserva = () => {
                     </td>
                     <td className="px-4 py-2">
                       <span
-                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${qr.estado === "activo"
-                          ? "bg-green-100 text-green-800"
-                          : qr.estado === "expirado"
+                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          qr.estado === "activo"
+                            ? "bg-green-100 text-green-800"
+                            : qr.estado === "expirado"
                             ? "bg-red-100 text-red-800"
                             : "bg-yellow-100 text-yellow-800"
-                          }`}
+                        }`}
                       >
                         {qr.estado === "activo"
                           ? "Activo"
                           : qr.estado === "expirado"
-                            ? "Expirado"
-                            : "Usado"}
+                          ? "Expirado"
+                          : "Usado"}
                       </span>
                     </td>
                     <td className="px-4 py-2">
                       <span
-                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${qr.verificado
-                          ? "bg-green-100 text-green-800"
-                          : "bg-red-100 text-red-800"
-                          }`}
+                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          qr.verificado
+                            ? "bg-green-100 text-green-800"
+                            : "bg-red-100 text-red-800"
+                        }`}
                       >
                         {qr.verificado ? "Si" : "No"}
                       </span>
@@ -494,7 +551,7 @@ const QRReserva = () => {
                           Eliminar
                         </button>
                       )}
-                      {permissions.canView && qr.qr_url_imagen && (
+                      {permissions.canView && qr.codigo_qr && (
                         <button
                           onClick={() => openDetailModal(qr)}
                           className="text-green-500 hover:text-green-700"
@@ -505,6 +562,16 @@ const QRReserva = () => {
                     </td>
                   </tr>
                 ))}
+                {qrs.length === 0 && (
+                  <tr>
+                    <td
+                      colSpan={7}
+                      className="px-4 py-4 text-center text-gray-500"
+                    >
+                      No hay registros para mostrar
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
@@ -518,11 +585,11 @@ const QRReserva = () => {
               Anterior
             </button>
             <span className="px-4 py-2 bg-gray-100">
-              Pagina {page} de {Math.ceil(total / limit)}
+              Pagina {page} de {Math.max(1, Math.ceil(total / limit))}
             </span>
             <button
               onClick={() => handlePageChange(page + 1)}
-              disabled={page === Math.ceil(total / limit)}
+              disabled={page === Math.ceil(total / limit) || total === 0}
               className="bg-gray-300 text-gray-800 px-4 py-2 rounded-r hover:bg-gray-400 disabled:opacity-50"
             >
               Siguiente
@@ -593,7 +660,11 @@ const QRReserva = () => {
                   onChange={handleInputChange}
                   className="w-full border rounded px-3 py-2"
                   type="text"
-                  maxLength="255"
+                  maxLength={255}
+                  readOnly={!editMode}
+                  placeholder={
+                    editMode ? "" : "Se generara automaticamente al crear"
+                  }
                 />
               </div>
               <div>
@@ -627,20 +698,7 @@ const QRReserva = () => {
                   ))}
                 </select>
               </div>
-              {editMode && formData.qr_url_imagen && (
-                <div className="col-span-2">
-                  <label className="block text-sm font-medium mb-1">
-                    Imagen QR
-                  </label>
-                  <input
-                    name="qr_url_imagen"
-                    value={formData.qr_url_imagen}
-                    className="w-full border rounded px-3 py-2 bg-gray-100"
-                    type="text"
-                    disabled
-                  />
-                </div>
-              )}
+
               <div className="col-span-2">
                 <label className="block text-sm font-medium mb-2">
                   Verificado
@@ -654,12 +712,14 @@ const QRReserva = () => {
                     className="sr-only"
                   />
                   <div
-                    className={`w-11 h-6 rounded-full transition-colors duration-300 ${formData.verificado ? "bg-green-500" : "bg-gray-300"
-                      }`}
+                    className={`w-11 h-6 rounded-full transition-colors duration-300 ${
+                      formData.verificado ? "bg-green-500" : "bg-gray-300"
+                    }`}
                   />
                   <div
-                    className={`absolute left-0.5 top-0.5 bg-white w-5 h-5 rounded-full shadow transform transition-transform duration-300 ${formData.verificado ? "translate-x-5" : ""
-                      }`}
+                    className={`absolute left-0.5 top-0.5 bg-white w-5 h-5 rounded-full shadow transform transition-transform duration-300 ${
+                      formData.verificado ? "translate-x-5" : ""
+                    }`}
                   />
                   <span className="ml-3 text-sm text-gray-600">
                     {formData.verificado ? "Verificado" : "No verificado"}
@@ -667,40 +727,56 @@ const QRReserva = () => {
                 </label>
               </div>
 
-              {previewQR && (
+              {formData.codigo_qr && (
                 <div className="col-span-2">
                   <label className="block text-sm font-medium mb-1">
                     Vista previa del QR
                   </label>
-                  <img
-                    src={
-                      /^https?:\/\//i.test(previewQR)
-                        ? previewQR
-                        : getImageUrl(previewQR)
-                    }
-                    alt="Vista previa del QR"
-                    className="max-w-xs h-auto rounded"
-                    onError={(e) => {
-                      console.error("Error loading QR image:", e.target.src);
-                      e.target.src = "none"; // opcional: imagen por defecto
-                    }}
-                  />
+                  <div className="inline-block p-4 border rounded bg-white">
+                    <QRCode value={formData.codigo_qr} size={180} />
+                  </div>
+                  <p className="mt-2 p-2 bg-gray-100 rounded break-words font-mono text-xs">
+                    {formData.codigo_qr}
+                  </p>
                 </div>
               )}
-              <div className="col-span-2 flex justify-end mt-4">
-                <button
-                  type="button"
-                  onClick={closeModal}
-                  className="bg-gray-500 text-white px-4 py-2 rounded mr-2 hover:bg-gray-600"
-                >
-                  Cerrar
-                </button>
-                <button
-                  type="submit"
-                  className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
-                >
-                  {editMode ? "Actualizar" : "Crear"}
-                </button>
+
+              {joinLink && (
+                <div className="col-span-2">
+                  <label className="block text-sm font-medium mb-1">
+                    Link para unirse a la reserva
+                  </label>
+                  <p className="mt-1 p-2 bg-gray-100 rounded break-words text-sm">
+                    {joinLink}
+                  </p>
+                </div>
+              )}
+
+              <div className="col-span-2 flex justify-between mt-4">
+                {editMode && (
+                  <button
+                    type="button"
+                    onClick={handleRegenerarQR}
+                    className="bg-yellow-500 text-white px-4 py-2 rounded hover:bg-yellow-600"
+                  >
+                    Regenerar QR
+                  </button>
+                )}
+                <div className="ml-auto flex gap-2">
+                  <button
+                    type="button"
+                    onClick={closeModal}
+                    className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600"
+                  >
+                    Cerrar
+                  </button>
+                  <button
+                    type="submit"
+                    className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+                  >
+                    {editMode ? "Actualizar" : "Crear"}
+                  </button>
+                </div>
               </div>
             </form>
             {error && <p className="text-red-500 mt-4">{error}</p>}
@@ -770,18 +846,19 @@ const QRReserva = () => {
                   <label className="font-medium text-gray-700">Estado:</label>
                   <div className="mt-1">
                     <span
-                      className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${selectedQR.estado === "activo"
-                        ? "bg-green-100 text-green-800"
-                        : selectedQR.estado === "expirado"
+                      className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
+                        selectedQR.estado === "activo"
+                          ? "bg-green-100 text-green-800"
+                          : selectedQR.estado === "expirado"
                           ? "bg-red-100 text-red-800"
                           : "bg-yellow-100 text-yellow-800"
-                        }`}
+                      }`}
                     >
                       {selectedQR.estado === "activo"
                         ? "Activo"
                         : selectedQR.estado === "expirado"
-                          ? "Expirado"
-                          : "Usado"}
+                        ? "Expirado"
+                        : "Usado"}
                     </span>
                   </div>
                 </div>
@@ -791,10 +868,11 @@ const QRReserva = () => {
                   </label>
                   <div className="mt-1">
                     <span
-                      className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${selectedQR.verificado
-                        ? "bg-green-100 text-green-800"
-                        : "bg-gray-100 text-gray-800"
-                        }`}
+                      className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
+                        selectedQR.verificado
+                          ? "bg-green-100 text-green-800"
+                          : "bg-gray-100 text-gray-800"
+                      }`}
                     >
                       {selectedQR.verificado ? "Si" : "No"}
                     </span>
@@ -814,41 +892,19 @@ const QRReserva = () => {
                   </p>
                 </div>
               )}
-              <div className="grid grid-cols-1 gap-4">
-                {selectedQR.qr_url_imagen && (
-                  <div>
-                    <label className="font-medium text-gray-700">
-                      Imagen QR:
-                    </label>
-                    <p className="mt-1 p-2 bg-gray-100 rounded break-words font-mono text-sm">
-                      {selectedQR.qr_url_imagen}
-                    </p>
-                    <img
-                      src={
-                        /^https?:\/\//i.test(selectedQR.qr_url_imagen)
-                          ? selectedQR.qr_url_imagen
-                          : getImageUrl(selectedQR.qr_url_imagen)
-                      }
-                      alt="QR"
-                      className="mt-2 max-w-xs h-auto rounded"
-                      onError={(e) => {
-                        console.error("Error loading QR image:", e.target.src);
-                        e.target.src = "none";
-                      }}
-                    />
+              {selectedQR.codigo_qr && (
+                <div>
+                  <label className="font-medium text-gray-700">
+                    QR generado desde codigo
+                  </label>
+                  <div className="mt-2 inline-block p-4 border rounded bg-white">
+                    <QRCode value={selectedQR.codigo_qr} size={200} />
                   </div>
-                )}
-                {selectedQR.codigo_qr && (
-                  <div>
-                    <label className="font-medium text-gray-700">
-                      Codigo QR:
-                    </label>
-                    <p className="mt-1 p-2 bg-gray-100 rounded break-words font-mono text-sm">
-                      {selectedQR.codigo_qr}
-                    </p>
-                  </div>
-                )}
-              </div>
+                  <p className="mt-2 p-2 bg-gray-100 rounded break-words font-mono text-sm">
+                    {selectedQR.codigo_qr}
+                  </p>
+                </div>
+              )}
             </div>
             <div className="flex justify-end mt-6 pt-4 border-t">
               <button

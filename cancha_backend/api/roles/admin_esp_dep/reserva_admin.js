@@ -3,20 +3,12 @@ const pool = require('../../../config/database');
 
 const router = express.Router();
 
-// === Función de respuesta estandarizada ===
 const respuesta = (exito, mensaje, datos = null) => ({
   exito,
   mensaje,
-  datos,
+  datos
 });
 
-// =====================================================
-// MODELOS - Funciones puras para operaciones en la BD
-// =====================================================
-
-/**
- * Obtener todas las reservas asociadas a un admin_esp_dep
- */
 const obtenerDatosEspecificos = async (id_admin_esp_dep, limite = 10, offset = 0, id_cancha = null) => {
   try {
     const params = [id_admin_esp_dep];
@@ -66,21 +58,16 @@ const obtenerDatosEspecificos = async (id_admin_esp_dep, limite = 10, offset = 0
       reservas: resultDatos.rows,
       total: parseInt(resultTotal.rows[0].count)
     };
-
   } catch (error) {
     console.error('Error en obtenerDatosEspecificos:', error);
     throw error;
   }
 };
 
-
-/**
- * Filtros de ordenamiento
- */
 const obtenerReservasFiltradas = async (id_admin_esp_dep, tipoFiltro, limite = 10, offset = 0, id_cancha = null) => {
   try {
     if (!id_admin_esp_dep || isNaN(id_admin_esp_dep)) {
-      throw new Error('id_admin_esp_dep es requerido y debe ser numérico');
+      throw new Error('id_admin_esp_dep es requerido y debe ser numerico');
     }
 
     const ordenesPermitidas = {
@@ -141,9 +128,6 @@ const obtenerReservasFiltradas = async (id_admin_esp_dep, tipoFiltro, limite = 1
   }
 };
 
-/**
- * Buscar reservas (nombre, apellido, cancha, estado)
- */
 const buscarReservas = async (id_admin_esp_dep, texto, limite = 10, offset = 0, id_cancha = null) => {
   try {
     const params = [id_admin_esp_dep];
@@ -195,9 +179,12 @@ const buscarReservas = async (id_admin_esp_dep, texto, limite = 10, offset = 0, 
         )
     `;
 
+    const baseParams = params.slice(0, id_cancha ? 2 : 1);
+    const searchParam = params[params.length - 3];
+
     const [resultDatos, resultTotal] = await Promise.all([
       pool.query(queryDatos, params),
-      pool.query(queryTotal, params.slice(0, id_cancha ? 2 : 1).concat(params[params.length - 3]))
+      pool.query(queryTotal, baseParams.concat(searchParam))
     ]);
 
     return {
@@ -210,9 +197,6 @@ const buscarReservas = async (id_admin_esp_dep, texto, limite = 10, offset = 0, 
   }
 };
 
-/**
- * Obtener una reserva específica (solo si pertenece al admin)
- */
 const obtenerReservaPorId = async (id_reserva, id_admin_esp_dep) => {
   try {
     const query = `
@@ -228,10 +212,10 @@ const obtenerReservaPorId = async (id_reserva, id_admin_esp_dep) => {
         e.nombre AS espacio_nombre,
         qr.id_qr,
         qr.codigo_qr,
-        qr.qr_url_imagen,
         qr.estado AS qr_estado,
-        qr.fecha_generado,
-        qr.fecha_expira
+        qr.fecha_generado AS qr_fecha_generado,
+        qr.fecha_expira AS qr_fecha_expira,
+        qr.verificado AS qr_verificado
       FROM reserva r
       JOIN cliente c ON r.id_cliente = c.id_cliente
       JOIN usuario u ON c.id_cliente = u.id_persona
@@ -241,10 +225,10 @@ const obtenerReservaPorId = async (id_reserva, id_admin_esp_dep) => {
         SELECT
           id_qr,
           codigo_qr,
-          qr_url_imagen,
           estado,
           fecha_generado,
-          fecha_expira
+          fecha_expira,
+          verificado
         FROM qr_reserva
         WHERE id_reserva = r.id_reserva
         ORDER BY fecha_generado DESC
@@ -253,6 +237,7 @@ const obtenerReservaPorId = async (id_reserva, id_admin_esp_dep) => {
       WHERE r.id_reserva = $1
         AND e.id_admin_esp_dep = $2
     `;
+
     const result = await pool.query(query, [id_reserva, id_admin_esp_dep]);
     return result.rows[0] || null;
   } catch (error) {
@@ -261,9 +246,6 @@ const obtenerReservaPorId = async (id_reserva, id_admin_esp_dep) => {
   }
 };
 
-/**
- * Crear nueva reserva (solo en canchas del admin)
- */
 const crearReserva = async (datos) => {
   try {
     const { id_cliente, id_cancha, fecha_reserva, cupo, monto_total, saldo_pendiente, estado } = datos;
@@ -272,16 +254,14 @@ const crearReserva = async (datos) => {
       throw new Error('Faltan campos obligatorios');
     }
 
-    // Verificar que la cancha pertenece al admin
     const validacion = `
-  SELECT e.id_admin_esp_dep
-  FROM cancha ca
-  JOIN espacio_deportivo e ON ca.id_espacio = e.id_espacio
-  WHERE ca.id_cancha = $1 AND e.id_admin_esp_dep = $2
-`;
+      SELECT e.id_admin_esp_dep
+      FROM cancha ca
+      JOIN espacio_deportivo e ON ca.id_espacio = e.id_espacio
+      WHERE ca.id_cancha = $1 AND e.id_admin_esp_dep = $2
+    `;
     const resultVal = await pool.query(validacion, [id_cancha, datos.id_admin_esp_dep]);
     if (!resultVal.rows.length) throw new Error('La cancha no pertenece al administrador actual');
-
 
     const query = `
       INSERT INTO reserva (fecha_reserva, cupo, monto_total, saldo_pendiente, estado, id_cliente, id_cancha)
@@ -297,15 +277,11 @@ const crearReserva = async (datos) => {
   }
 };
 
-/**
- * Actualizar reserva (solo si pertenece al admin)
- */
 const actualizarReserva = async (id, id_admin_esp_dep, camposActualizar) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
 
-    // Verificar que la reserva pertenezca al admin
     const reserva = await obtenerReservaPorId(id, id_admin_esp_dep);
     if (!reserva) throw new Error('Reserva no encontrada o no pertenece al administrador');
 
@@ -319,9 +295,8 @@ const actualizarReserva = async (id, id_admin_esp_dep, camposActualizar) => {
       'id_cancha'
     ];
     const campos = Object.keys(camposActualizar).filter(c => camposPermitidos.includes(c));
-    if (!campos.length) throw new Error('No hay campos válidos para actualizar');
+    if (!campos.length) throw new Error('No hay campos validos para actualizar');
 
-    // Validaciones
     if (camposActualizar.id_cliente) {
       const clienteExiste = await client.query('SELECT 1 FROM cliente WHERE id_cliente=$1', [camposActualizar.id_cliente]);
       if (!clienteExiste.rows.length) throw new Error('El cliente indicado no existe');
@@ -329,16 +304,17 @@ const actualizarReserva = async (id, id_admin_esp_dep, camposActualizar) => {
 
     if (camposActualizar.id_cancha) {
       const canchaValida = await client.query(
-        `SELECT ca.id_cancha
+        `
+         SELECT ca.id_cancha
          FROM cancha ca
          JOIN espacio_deportivo e ON ca.id_espacio = e.id_espacio
-         WHERE ca.id_cancha=$1 AND e.id_admin_esp_dep=$2`,
+         WHERE ca.id_cancha=$1 AND e.id_admin_esp_dep=$2
+        `,
         [camposActualizar.id_cancha, id_admin_esp_dep]
       );
       if (!canchaValida.rows.length) throw new Error('La cancha indicada no pertenece a este administrador');
     }
 
-    // Actualizar reserva principal
     const setClause = campos.map((c, i) => `${c}=$${i + 3}`).join(', ');
     const values = [id, id_admin_esp_dep, ...campos.map(c => camposActualizar[c])];
 
@@ -358,7 +334,6 @@ const actualizarReserva = async (id, id_admin_esp_dep, camposActualizar) => {
     const updated = result.rows[0];
     if (!updated) throw new Error('No se pudo actualizar la reserva');
 
-    // ---- SINCRONIZAR reserva_horario ----
     if (updated && (camposActualizar.fecha_reserva || camposActualizar.monto_total)) {
       const queryUpdateHorario = `
         UPDATE reserva_horario
@@ -386,9 +361,6 @@ const actualizarReserva = async (id, id_admin_esp_dep, camposActualizar) => {
   }
 };
 
-/**
- * Eliminar reserva (solo si pertenece al admin)
- */
 const eliminarReserva = async (id, id_admin_esp_dep) => {
   try {
     const query = `
@@ -411,11 +383,22 @@ const eliminarReserva = async (id, id_admin_esp_dep) => {
 
 const obtenerCalendario = async (id_admin_esp_dep, startISO, endISO, id_cancha, id_espacio) => {
   try {
-    const filtros = ['e.id_admin_esp_dep = $1', "tsrange(($2)::timestamp, ($3)::timestamp, '[)') && tsrange(rh.fecha + rh.hora_inicio, rh.fecha + rh.hora_fin, '[)')"];
+    const filtros = [
+      'e.id_admin_esp_dep = $1',
+      "tsrange(($2)::timestamp, ($3)::timestamp, '[)') && tsrange(rh.fecha + rh.hora_inicio, rh.fecha + rh.hora_fin, '[)')"
+    ];
     const values = [id_admin_esp_dep, startISO, endISO];
     let idx = 4;
-    if (id_cancha) { filtros.push(`ca.id_cancha = $${idx}`); values.push(parseInt(id_cancha)); idx++; }
-    if (id_espacio) { filtros.push(`e.id_espacio = $${idx}`); values.push(parseInt(id_espacio)); idx++; }
+    if (id_cancha) {
+      filtros.push(`ca.id_cancha = $${idx}`);
+      values.push(parseInt(id_cancha));
+      idx++;
+    }
+    if (id_espacio) {
+      filtros.push(`e.id_espacio = $${idx}`);
+      values.push(parseInt(id_espacio));
+      idx++;
+    }
 
     const query = `
       SELECT
@@ -453,10 +436,6 @@ const obtenerCalendario = async (id_admin_esp_dep, startISO, endISO, id_cancha, 
   }
 };
 
-// =====================================================
-// CONTROLADORES
-// =====================================================
-
 const obtenerDatosEspecificosController = async (req, res) => {
   try {
     const id_admin_esp_dep = parseInt(req.query.id_admin_esp_dep);
@@ -465,14 +444,16 @@ const obtenerDatosEspecificosController = async (req, res) => {
     const id_cancha = req.query.id_cancha ? parseInt(req.query.id_cancha) : null;
 
     if (isNaN(id_admin_esp_dep)) {
-      return res.status(400).json(respuesta(false, 'id_admin_esp_dep es requerido y debe ser numérico'));
+      return res.status(400).json(respuesta(false, 'id_admin_esp_dep es requerido y debe ser numerico'));
     }
 
     const { reservas, total } = await obtenerDatosEspecificos(id_admin_esp_dep, limite, offset, id_cancha);
-    res.json(respuesta(true, 'Reservas obtenidas correctamente', {
-      reservas,
-      paginacion: { limite, offset, total }
-    }));
+    res.json(
+      respuesta(true, 'Reservas obtenidas correctamente', {
+        reservas,
+        paginacion: { limite, offset, total }
+      })
+    );
   } catch (e) {
     console.error('Error en obtenerDatosEspecificosController:', e);
     res.status(500).json(respuesta(false, e.message));
@@ -488,14 +469,16 @@ const obtenerReservasFiltradasController = async (req, res) => {
     const id_cancha = req.query.id_cancha ? parseInt(req.query.id_cancha) : null;
 
     if (isNaN(id_admin_esp_dep)) {
-      return res.status(400).json(respuesta(false, 'id_admin_esp_dep es requerido y debe ser numérico'));
+      return res.status(400).json(respuesta(false, 'id_admin_esp_dep es requerido y debe ser numerico'));
     }
 
     const { reservas, total } = await obtenerReservasFiltradas(id_admin_esp_dep, tipo, limite, offset, id_cancha);
-    res.json(respuesta(true, 'Reservas filtradas correctamente', {
-      reservas,
-      paginacion: { limite, offset, total }
-    }));
+    res.json(
+      respuesta(true, 'Reservas filtradas correctamente', {
+        reservas,
+        paginacion: { limite, offset, total }
+      })
+    );
   } catch (e) {
     res.status(500).json(respuesta(false, e.message));
   }
@@ -508,8 +491,23 @@ const buscarReservasController = async (req, res) => {
     const offset = parseInt(req.query.offset) || 0;
     const id_cancha = req.query.id_cancha ? parseInt(req.query.id_cancha) : null;
 
-    const { reservas, total } = await buscarReservas(id_admin_esp_dep, q, limite, offset, id_cancha);
-    res.json(respuesta(true, 'Búsqueda realizada correctamente', { reservas, paginacion: { limite, offset, total } }));
+    const idAdmin = parseInt(id_admin_esp_dep);
+
+    if (isNaN(idAdmin)) {
+      return res.status(400).json(respuesta(false, 'id_admin_esp_dep es requerido y debe ser numerico'));
+    }
+
+    if (!q || q.trim() === '') {
+      return res.status(400).json(respuesta(false, 'Parametro q requerido'));
+    }
+
+    const { reservas, total } = await buscarReservas(idAdmin, q, limite, offset, id_cancha);
+    res.json(
+      respuesta(true, 'Busqueda realizada correctamente', {
+        reservas,
+        paginacion: { limite, offset, total }
+      })
+    );
   } catch (e) {
     res.status(500).json(respuesta(false, e.message));
   }
@@ -520,11 +518,15 @@ const obtenerReservaPorIdController = async (req, res) => {
     const { id } = req.params;
     const id_admin_esp_dep = parseInt(req.query.id_admin_esp_dep);
 
-    if (isNaN(id) || isNaN(id_admin_esp_dep)) {
-      return res.status(400).json(respuesta(false, 'Parámetros inválidos: id o id_admin_esp_dep no numéricos'));
+    const idNum = parseInt(id);
+
+    if (isNaN(idNum) || isNaN(id_admin_esp_dep)) {
+      return res
+        .status(400)
+        .json(respuesta(false, 'Parametros invalidos: id o id_admin_esp_dep no numericos'));
     }
 
-    const reserva = await obtenerReservaPorId(parseInt(id), id_admin_esp_dep);
+    const reserva = await obtenerReservaPorId(idNum, id_admin_esp_dep);
     if (!reserva) return res.status(404).json(respuesta(false, 'Reserva no encontrada'));
     res.json(respuesta(true, 'Reserva obtenida correctamente', { reserva }));
   } catch (e) {
@@ -536,11 +538,14 @@ const obtenerReservaPorIdController = async (req, res) => {
 const crearReservaController = async (req, res) => {
   try {
     const id_admin_esp_dep = parseInt(req.query.id_admin_esp_dep || req.body.id_admin_esp_dep);
-    if (isNaN(id_admin_esp_dep))
+    if (isNaN(id_admin_esp_dep)) {
       return res.status(400).json(respuesta(false, 'id_admin_esp_dep requerido'));
+    }
 
     const nuevaReserva = await crearReserva({ ...req.body, id_admin_esp_dep });
-    res.status(201).json(respuesta(true, 'Reserva creada correctamente', { reserva: nuevaReserva }));
+    res
+      .status(201)
+      .json(respuesta(true, 'Reserva creada correctamente', { reserva: nuevaReserva }));
   } catch (e) {
     console.error('Error en crearReservaController:', e);
     res.status(500).json(respuesta(false, e.message));
@@ -551,8 +556,20 @@ const actualizarReservaController = async (req, res) => {
   try {
     const { id } = req.params;
     const { id_admin_esp_dep } = req.query;
-    const reservaAct = await actualizarReserva(parseInt(id), parseInt(id_admin_esp_dep), req.body);
-    if (!reservaAct) return res.status(404).json(respuesta(false, 'No se pudo actualizar la reserva'));
+
+    const idNum = parseInt(id);
+    const idAdmin = parseInt(id_admin_esp_dep);
+
+    if (isNaN(idNum) || isNaN(idAdmin)) {
+      return res
+        .status(400)
+        .json(respuesta(false, 'Parametros invalidos: id o id_admin_esp_dep no numericos'));
+    }
+
+    const reservaAct = await actualizarReserva(idNum, idAdmin, req.body);
+    if (!reservaAct) {
+      return res.status(404).json(respuesta(false, 'No se pudo actualizar la reserva'));
+    }
     res.json(respuesta(true, 'Reserva actualizada correctamente', { reserva: reservaAct }));
   } catch (e) {
     res.status(500).json(respuesta(false, e.message));
@@ -563,8 +580,20 @@ const eliminarReservaController = async (req, res) => {
   try {
     const { id } = req.params;
     const { id_admin_esp_dep } = req.query;
-    const eliminada = await eliminarReserva(parseInt(id), parseInt(id_admin_esp_dep));
-    if (!eliminada) return res.status(404).json(respuesta(false, 'No se pudo eliminar la reserva'));
+
+    const idNum = parseInt(id);
+    const idAdmin = parseInt(id_admin_esp_dep);
+
+    if (isNaN(idNum) || isNaN(idAdmin)) {
+      return res
+        .status(400)
+        .json(respuesta(false, 'Parametros invalidos: id o id_admin_esp_dep no numericos'));
+    }
+
+    const eliminada = await eliminarReserva(idNum, idAdmin);
+    if (!eliminada) {
+      return res.status(404).json(respuesta(false, 'No se pudo eliminar la reserva'));
+    }
     res.json(respuesta(true, 'Reserva eliminada correctamente'));
   } catch (e) {
     res.status(500).json(respuesta(false, e.message));
@@ -578,8 +607,11 @@ const obtenerCalendarioController = async (req, res) => {
     const end = req.query.end;
     const id_cancha = req.query.id_cancha || null;
     const id_espacio = req.query.id_espacio || null;
+
     if (isNaN(id_admin_esp_dep) || !start || !end) {
-      return res.status(400).json(respuesta(false, 'id_admin_esp_dep, start y end son requeridos'));
+      return res
+        .status(400)
+        .json(respuesta(false, 'id_admin_esp_dep, start y end son requeridos'));
     }
     const eventos = await obtenerCalendario(id_admin_esp_dep, start, end, id_cancha, id_espacio);
     res.json(respuesta(true, 'OK', { eventos }));
@@ -587,10 +619,6 @@ const obtenerCalendarioController = async (req, res) => {
     res.status(500).json(respuesta(false, e.message));
   }
 };
-
-// =====================================================
-// RUTAS
-// =====================================================
 
 router.get('/datos-especificos', obtenerDatosEspecificosController);
 router.get('/filtro', obtenerReservasFiltradasController);

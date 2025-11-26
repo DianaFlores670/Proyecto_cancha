@@ -10,6 +10,8 @@ const respuesta = (exito, mensaje, datos = null) => ({
 });
 
 const obtenerReservaDesdeCodigo = async (code) => {
+  const cleanCode = (code || "").trim();
+
   const queryQr = `
     SELECT 
       qr.id_qr,
@@ -36,8 +38,10 @@ const obtenerReservaDesdeCodigo = async (code) => {
     WHERE qr.codigo_qr = $1
     LIMIT 1
   `;
-  const resultQr = await pool.query(queryQr, [code]);
+
+  const resultQr = await pool.query(queryQr, [cleanCode]);
   const row = resultQr.rows[0];
+
   if (!row) {
     return null;
   }
@@ -49,6 +53,7 @@ const obtenerReservaDesdeCodigo = async (code) => {
   if (row.fecha_expira) {
     const ahora = new Date();
     const expira = new Date(row.fecha_expira);
+
     if (!isNaN(expira.getTime()) && expira.getTime() <= ahora.getTime()) {
       throw new Error("El codigo ya expiro");
     }
@@ -94,10 +99,6 @@ const obtenerParticipanteEnReserva = async (idReserva, idPersona) => {
   return result.rows[0] || null;
 };
 
-/**
- * NUEVO: listar deportistas de una reserva con paginacion
- * GET /unirse-reserva/deportistas?id_reserva=...&limit=...&offset=...
- */
 const listarDeportistasReservaController = async (req, res) => {
   try {
     const idReservaRaw = req.query.id_reserva;
@@ -200,7 +201,15 @@ const infoUnirseReservaController = async (req, res) => {
         .json(respuesta(false, "Codigo no valido o no proporcionado"));
     }
 
-    const data = await obtenerReservaDesdeCodigo(code);
+    try {
+      Buffer.from(code.trim(), "base64").toString();
+    } catch {
+      return res
+        .status(400)
+        .json(respuesta(false, "Codigo QR invalido (no es Base64 valido)"));
+    }
+
+    const data = await obtenerReservaDesdeCodigo(code.trim());
     if (!data) {
       return res
         .status(404)
@@ -273,21 +282,28 @@ const unirseReservaController = async (req, res) => {
   try {
     const { code, id_persona } = req.body;
 
-    // Validación de parámetros
     if (!code || typeof code !== "string" || code.trim() === "") {
       return res
         .status(400)
         .json(respuesta(false, "Codigo no valido o no proporcionado"));
     }
+
     if (!id_persona || isNaN(parseInt(id_persona, 10))) {
       return res
         .status(400)
         .json(respuesta(false, "id_persona no valido o no proporcionado"));
     }
 
+    try {
+      Buffer.from(code.trim(), "base64").toString();
+    } catch {
+      return res
+        .status(400)
+        .json(respuesta(false, "Codigo QR invalido (no es Base64 valido)"));
+    }
+
     const idPersona = parseInt(id_persona, 10);
 
-    // Verificar existencia del usuario
     const usuarioQuery = `
       SELECT id_persona
       FROM usuario
@@ -301,8 +317,7 @@ const unirseReservaController = async (req, res) => {
         .json(respuesta(false, "El usuario no existe en el sistema"));
     }
 
-    // Obtener la reserva mediante el código QR
-    const data = await obtenerReservaDesdeCodigo(code);
+    const data = await obtenerReservaDesdeCodigo(code.trim());
     if (!data) {
       return res
         .status(404)
@@ -311,7 +326,6 @@ const unirseReservaController = async (req, res) => {
 
     const reserva = data.reserva;
 
-    // El cliente responsable NO puede unirse como deportista
     if (Number(reserva.id_cliente) === idPersona) {
       return res
         .status(400)
@@ -323,14 +337,12 @@ const unirseReservaController = async (req, res) => {
         );
     }
 
-    // Si la reserva está cancelada, no puede unirse
     if (reserva.estado === "cancelada") {
       return res
         .status(400)
         .json(respuesta(false, "La reserva esta cancelada"));
     }
 
-    // Verificar si ya estaba en la reserva
     const participanteExistente = await obtenerParticipanteEnReserva(
       reserva.id_reserva,
       idPersona
@@ -342,7 +354,6 @@ const unirseReservaController = async (req, res) => {
         .json(respuesta(false, "Ya se encuentra inscrito en esta reserva"));
     }
 
-    // Cálculo de cupos
     const cupoTotalRaw = Number(reserva.cupo);
     const cupoMaxDeportistas =
       !Number.isNaN(cupoTotalRaw) && cupoTotalRaw > 1
@@ -364,7 +375,6 @@ const unirseReservaController = async (req, res) => {
         .json(respuesta(false, "No hay cupos disponibles para esta reserva"));
     }
 
-    // Inserción o reactivación en reserva_deportista
     let participante;
     if (participanteExistente) {
       const updateQuery = `
@@ -396,9 +406,6 @@ const unirseReservaController = async (req, res) => {
       participante = insertResult.rows[0];
     }
 
-    /* ============================================================
-       🔥 NUEVO 1: creación automática del deportista (si no existe)
-       ============================================================ */
     const insertDeportistaQuery = `
       INSERT INTO deportista (id_deportista)
       VALUES ($1)
@@ -410,9 +417,6 @@ const unirseReservaController = async (req, res) => {
       console.error("Error al insertar en deportista:", e.message);
     }
 
-    /* ============================================================
-       🔥 NUEVO 2: registrar participación en participa_en
-       ============================================================ */
     const insertParticipaQuery = `
       INSERT INTO participa_en (id_deportista, id_reserva, fecha_reserva)
       VALUES ($1, $2, CURRENT_DATE)
@@ -424,7 +428,6 @@ const unirseReservaController = async (req, res) => {
       console.error("Error al insertar en participa_en:", e.message);
     }
 
-    // Cupo actualizado
     const resultCupoFinal = await pool.query(queryCupo, [reserva.id_reserva]);
     const cupoFinal = parseInt(resultCupoFinal.rows[0].total, 10) || 0;
 
@@ -434,7 +437,6 @@ const unirseReservaController = async (req, res) => {
       cupo_max_deportistas: cupoMaxDeportistas
     };
 
-    // Respuesta final
     return res.json(
       respuesta(true, "Inscripcion a la reserva completada", {
         reserva: reservaFinal,
@@ -449,9 +451,8 @@ const unirseReservaController = async (req, res) => {
   }
 };
 
-
 router.get("/info", infoUnirseReservaController);
-router.get("/deportistas", listarDeportistasReservaController); // nuevo
+router.get("/deportistas", listarDeportistasReservaController);
 router.post("/", unirseReservaController);
 
 module.exports = router;

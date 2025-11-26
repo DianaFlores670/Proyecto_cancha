@@ -5,6 +5,8 @@ const { verifyToken, checkRole } = require('../../../middleware/auth');
 const router = express.Router();
 const respuesta = (exito, mensaje, datos = null) => ({ exito, mensaje, datos });
 
+const sanitizeInput = (input) => input.replace(/[%_\\]/g, '\\$&');
+
 /* ============================================================
    =========================== MODELOS =========================
    ============================================================ */
@@ -110,7 +112,7 @@ const filtrarReservas = async (id_usuario, tipo, limite, offset) => {
  * Buscar reservas por cancha, cliente, estado
  */
 const buscarReservas = async (id_usuario, q, limite, offset) => {
-  const like = `%${q}%`;
+  const termino = `%${sanitizeInput(q)}%`;
 
   const sql = `
     SELECT 
@@ -156,8 +158,8 @@ const buscarReservas = async (id_usuario, q, limite, offset) => {
   `;
 
   const [rows, count] = await Promise.all([
-    pool.query(sql, [id_usuario, like, limite, offset]),
-    pool.query(countSql, [id_usuario, like])
+    pool.query(sql, [id_usuario, termino, limite, offset]),
+    pool.query(countSql, [id_usuario, termino])
   ]);
 
   return {
@@ -170,7 +172,6 @@ const buscarReservas = async (id_usuario, q, limite, offset) => {
  * Detalle individual, incluye horarios
  */
 const obtenerReservaPorId = async (id_usuario, id_reserva) => {
-
   const infoSql = `
     SELECT 
       r.id_reserva,
@@ -210,7 +211,6 @@ const obtenerReservaPorId = async (id_usuario, id_reserva) => {
   };
 };
 
-
 /* ============================================================
    ======================== CONTROLADORES ======================
    ============================================================ */
@@ -229,7 +229,6 @@ const datosEspecificosController = async (req, res) => {
   }
 };
 
-
 const filtroController = async (req, res) => {
   try {
     const id_usuario = req.user.id_persona;
@@ -245,7 +244,6 @@ const filtroController = async (req, res) => {
   }
 };
 
-
 const buscarController = async (req, res) => {
   try {
     const id_usuario = req.user.id_persona;
@@ -255,17 +253,20 @@ const buscarController = async (req, res) => {
 
     const data = await buscarReservas(id_usuario, q, limite, offset);
 
-    res.json(respuesta(true, "Resultados de búsqueda", data));
+    res.json(respuesta(true, "Resultados de busqueda", data));
   } catch (e) {
     res.status(500).json(respuesta(false, e.message));
   }
 };
 
-
 const detalleController = async (req, res) => {
   try {
     const id_usuario = req.user.id_persona;
     const id_reserva = Number(req.params.id);
+
+    if (Number.isNaN(id_reserva)) {
+      return res.status(400).json(respuesta(false, "ID de reserva invalido"));
+    }
 
     const data = await obtenerReservaPorId(id_usuario, id_reserva);
 
@@ -277,14 +278,33 @@ const detalleController = async (req, res) => {
   }
 };
 
-
 /* ============================================================
    ============================ RUTAS ==========================
    ============================================================ */
 
-router.get('/datos-especificos', verifyToken, checkRole(['ENCARGADO']), datosEspecificosController);
-router.get('/filtro', verifyToken, checkRole(['ENCARGADO']), filtroController);
-router.get('/buscar', verifyToken, checkRole(['ENCARGADO']), buscarController);
-router.get('/dato-individual/:id', verifyToken, checkRole(['ENCARGADO']), detalleController);
+router.get(
+  '/datos-especificos',
+  verifyToken,
+  checkRole(['ENCARGADO']),
+  datosEspecificosController
+);
+router.get(
+  '/filtro',
+  verifyToken,
+  checkRole(['ENCARGADO']),
+  filtroController
+);
+router.get(
+  '/buscar',
+  verifyToken,
+  checkRole(['ENCARGADO']),
+  buscarController
+);
+router.get(
+  '/dato-individual/:id',
+  verifyToken,
+  checkRole(['ENCARGADO']),
+  detalleController
+);
 
 module.exports = router;

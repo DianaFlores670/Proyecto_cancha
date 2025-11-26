@@ -1,6 +1,7 @@
 /* eslint-disable no-unused-vars */
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import QRCode from "react-qr-code";
 import api from "../../services/api";
 import Header from "../../Header";
 
@@ -34,6 +35,17 @@ const pickRoleForThisPage = (u) => {
   const roles = getUserRoles(u);
   if (roles.includes("CLIENTE")) return "CLIENTE";
   return "DEFAULT";
+};
+
+const parseDateInput = (value) => {
+  if (!value) return null;
+  const parts = value.split("-");
+  if (parts.length !== 3) return null;
+  const y = Number(parts[0]);
+  const m = Number(parts[1]);
+  const d = Number(parts[2]);
+  if (!y || !m || !d) return null;
+  return new Date(y, m - 1, d);
 };
 
 const ReservarCliente = () => {
@@ -220,14 +232,15 @@ const ReservarCliente = () => {
       setError("La fecha es obligatoria");
       return;
     }
-    const d = new Date(fechaReserva);
-    if (d.toString() === "Invalid Date") {
+
+    const selectedDate = parseDateInput(fechaReserva);
+    if (!selectedDate || Number.isNaN(selectedDate.getTime())) {
       setError("La fecha no es valida");
       return;
     }
+
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const selectedDate = new Date(fechaReserva);
     selectedDate.setHours(0, 0, 0, 0);
 
     if (selectedDate < today) {
@@ -242,12 +255,26 @@ const ReservarCliente = () => {
     }
     const capacidadCancha = cancha.capacidad != null ? Number(cancha.capacidad) : null;
     if (capacidadCancha != null && cupoNum > capacidadCancha) {
-      setError(`El cupo no puede ser mayor a la capacidad de la cancha (${capacidadCancha})`);
+      setError("El cupo no puede ser mayor a la capacidad de la cancha (" + capacidadCancha + ")");
       return;
     }
     if (selectedSlots.length === 0) {
       setError("Debe seleccionar al menos un horario");
       return;
+    }
+
+    const isSameDate = selectedDate.getTime() === today.getTime();
+    if (isSameDate) {
+      const nowTime = new Date().toTimeString().slice(0, 8);
+      const invalidSlots = selectedSlots.filter((idSlot) => {
+        const slot = BASE_SLOTS.find((s) => s.id === idSlot);
+        if (!slot) return false;
+        return slot.end <= nowTime;
+      });
+      if (invalidSlots.length > 0) {
+        setError("No puede reservar horarios en el pasado para la fecha seleccionada");
+        return;
+      }
     }
 
     const montoTotal = computeMontoTotal();
@@ -298,8 +325,11 @@ const ReservarCliente = () => {
       setSuccess("Reserva creada correctamente");
 
       try {
-        const reservaDate = new Date(fechaReserva);
-        const expira = new Date(reservaDate.getTime() + 24 * 60 * 60 * 1000);
+        const reservaDate = parseDateInput(fechaReserva);
+        const baseDate = reservaDate && !Number.isNaN(reservaDate.getTime())
+          ? reservaDate
+          : new Date();
+        const expira = new Date(baseDate.getTime() + 24 * 60 * 60 * 1000);
         const bodyQr = {
           id_reserva: idReserva,
           fecha_generado: new Date().toISOString(),
@@ -312,12 +342,12 @@ const ReservarCliente = () => {
           setQrInfo(qr);
           const origin =
             typeof window !== "undefined" &&
-              window.location &&
-              window.location.origin
+            window.location &&
+            window.location.origin
               ? window.location.origin
               : "";
           if (origin && qr.codigo_qr) {
-            const link = `${origin}/unirse-reserva?code=${encodeURIComponent(qr.codigo_qr)}`;
+            const link = origin + "/unirse-reserva?code=" + encodeURIComponent(qr.codigo_qr);
             setLinkUnirse(link);
           }
           setShowQrModal(true);
@@ -342,7 +372,7 @@ const ReservarCliente = () => {
 
   const handleCloseModal = () => {
     setShowQrModal(false);
-    navigate(`/mis-reservas`);
+    navigate("/mis-reservas");
   };
 
   const todayString = (() => {
@@ -351,9 +381,8 @@ const ReservarCliente = () => {
     const y = t.getFullYear();
     const m = String(t.getMonth() + 1).padStart(2, "0");
     const d = String(t.getDate()).padStart(2, "0");
-    return `${y}-${m}-${d}`;
+    return y + "-" + m + "-" + d;
   })();
-
 
   if (role !== "CLIENTE") {
     return (
@@ -371,10 +400,8 @@ const ReservarCliente = () => {
   }
 
   const allowedSlots = getAllowedSlots();
-
-  const baseUrl = api.defaults.baseURL ? api.defaults.baseURL.replace(/\/$/, "") : "";
-
-  const qrImageUrl = qrInfo ? `${baseUrl}${qrInfo.qr_url_imagen}` : "";
+  const isTodaySelected = fechaReserva === todayString;
+  const nowTimeForUi = new Date().toTimeString().slice(0, 8);
 
   return (
     <>
@@ -455,7 +482,7 @@ const ReservarCliente = () => {
                     </label>
                     <input
                       type="text"
-                      value={cancha.monto_por_hora ? `Bs. ${cancha.monto_por_hora}` : ""}
+                      value={cancha.monto_por_hora ? "Bs. " + cancha.monto_por_hora : ""}
                       disabled
                       className="w-full border border-[#CBD5E1] rounded-md px-3 py-2 bg-gray-100 text-[#23475F] font-semibold"
                     />
@@ -506,7 +533,6 @@ const ReservarCliente = () => {
                       required
                       min={todayString}
                     />
-
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-[#23475F] mb-1">
@@ -536,19 +562,28 @@ const ReservarCliente = () => {
                   {allowedSlots.map((slot) => {
                     const active = selectedSlots.includes(slot.id);
                     const busy = busySlots.includes(slot.id);
+                    let disabledSlot = busy;
+
+                    if (isTodaySelected) {
+                      if (slot.end <= nowTimeForUi) {
+                        disabledSlot = true;
+                      }
+                    }
+
                     const classes =
                       "px-3 py-2 rounded-md text-sm border transition-all " +
-                      (busy
+                      (disabledSlot
                         ? "bg-gray-200 border-gray-300 text-gray-500 cursor-not-allowed"
                         : active
-                          ? "bg-[#01CD6C] border-[#01CD6C] text-white shadow"
-                          : "bg-white border-[#CBD5E1] text-[#23475F] hover:border-[#01CD6C]");
+                        ? "bg-[#01CD6C] border-[#01CD6C] text-white shadow"
+                        : "bg-white border-[#CBD5E1] text-[#23475F] hover:border-[#01CD6C]");
+
                     return (
                       <button
                         key={slot.id}
                         type="button"
-                        onClick={() => handleSlotClick(slot.id, busy)}
-                        disabled={busy}
+                        onClick={() => handleSlotClick(slot.id, disabledSlot)}
+                        disabled={disabledSlot}
                         className={classes}
                       >
                         {slot.label}
@@ -619,12 +654,18 @@ const ReservarCliente = () => {
             </p>
 
             <div className="flex justify-center mb-4">
-              {qrInfo && (
-                <img
-                  src={qrImageUrl}
-                  alt="Codigo QR de la reserva"
-                  className="mx-auto mb-6 w-48 h-48 object-contain"
-                />
+              {qrInfo?.codigo_qr ? (
+                <div className="bg-white p-3 rounded shadow">
+                  <QRCode
+                    value={qrInfo.codigo_qr}
+                    size={192}
+                    style={{ height: "auto", maxWidth: "100%", width: "192px" }}
+                  />
+                </div>
+              ) : (
+                <p className="text-sm text-[#64748B]">
+                  No se encontro el codigo QR
+                </p>
               )}
             </div>
 

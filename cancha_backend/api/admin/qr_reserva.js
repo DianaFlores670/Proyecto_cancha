@@ -1,9 +1,6 @@
 const express = require("express");
 const pool = require("../../config/database");
-const QRCode = require("qrcode");
-const path = require("path");
-const fs = require("fs").promises;
-const { unlinkFile } = require("../../middleware/multer");
+const generarCodigoQR = require("../../utils/generarCodigoQR");
 
 const router = express.Router();
 
@@ -15,12 +12,16 @@ const respuesta = (exito, mensaje, datos = null) => ({
 
 const FRONTEND_BASE_URL = process.env.FRONTEND_BASE_URL || "http://localhost:5173";
 
-const isValidTimestamp = (ts) => !isNaN(Date.parse(ts));
+const isValidTimestamp = (ts) => {
+  if (!ts) return false;
+  const d = new Date(ts);
+  return d instanceof Date && !isNaN(d.getTime());
+};
 
 const obtenerDatosEspecificos = async (limite = 10, offset = 0) => {
   try {
     const queryDatos = `
-      SELECT qr.id_qr, qr.fecha_generado, qr.fecha_expira, qr.qr_url_imagen, qr.codigo_qr, qr.estado, qr.verificado,
+      SELECT qr.id_qr, qr.fecha_generado, qr.fecha_expira, qr.codigo_qr, qr.estado, qr.verificado,
              r.id_reserva, c.id_cliente, p.nombre AS cliente_nombre, p.apellido AS cliente_apellido,
              ca.id_cancha, ca.nombre AS cancha_nombre
       FROM qr_reserva qr
@@ -70,7 +71,7 @@ const obtenerQRsFiltrados = async (tipoFiltro, limite = 10, offset = 0) => {
     }
 
     const queryDatos = `
-      SELECT qr.id_qr, qr.fecha_generado, qr.fecha_expira, qr.qr_url_imagen, qr.codigo_qr, qr.estado, qr.verificado,
+      SELECT qr.id_qr, qr.fecha_generado, qr.fecha_expira, qr.codigo_qr, qr.estado, qr.verificado,
              r.id_reserva, c.id_cliente, p.nombre AS cliente_nombre, p.apellido AS cliente_apellido,
              ca.id_cancha, ca.nombre AS cancha_nombre
       FROM qr_reserva qr
@@ -106,7 +107,7 @@ const obtenerQRsFiltrados = async (tipoFiltro, limite = 10, offset = 0) => {
 const buscarQRs = async (texto, limite = 10, offset = 0) => {
   try {
     const queryDatos = `
-      SELECT qr.id_qr, qr.fecha_generado, qr.fecha_expira, qr.qr_url_imagen, qr.codigo_qr, qr.estado, qr.verificado,
+      SELECT qr.id_qr, qr.fecha_generado, qr.fecha_expira, qr.codigo_qr, qr.estado, qr.verificado,
              r.id_reserva, c.id_cliente, p.nombre AS cliente_nombre, p.apellido AS cliente_apellido,
              ca.id_cancha, ca.nombre AS cancha_nombre
       FROM qr_reserva qr
@@ -118,7 +119,6 @@ const buscarQRs = async (texto, limite = 10, offset = 0) => {
         p.nombre ILIKE $1 OR 
         p.apellido ILIKE $1 OR 
         ca.nombre ILIKE $1 OR 
-        qr.codigo_qr ILIKE $1 OR
         CAST(r.id_reserva AS TEXT) ILIKE $1
       ORDER BY qr.fecha_generado DESC
       LIMIT $2 OFFSET $3
@@ -135,7 +135,6 @@ const buscarQRs = async (texto, limite = 10, offset = 0) => {
         p.nombre ILIKE $1 OR 
         p.apellido ILIKE $1 OR 
         ca.nombre ILIKE $1 OR 
-        qr.codigo_qr ILIKE $1 OR
         CAST(r.id_reserva AS TEXT) ILIKE $1
     `;
 
@@ -223,9 +222,8 @@ const crearQR = async (datosQR) => {
     }
 
     const qrExistenteResult = await pool.query(
-      "SELECT id_qr FROM qr_reserva WHERE id_reserva = $1",
-      [datosQR.id_reserva]
-    );
+      "SELECT id_qr FROM qr_reserva WHERE id_reserva = $1"
+    , [datosQR.id_reserva]);
 
     if (qrExistenteResult.rows[0]) {
       throw new Error("Ya existe un QR asociado a esta reserva");
@@ -245,21 +243,19 @@ const crearQR = async (datosQR) => {
       INSERT INTO qr_reserva (
         fecha_generado, 
         fecha_expira, 
-        qr_url_imagen, 
         codigo_qr, 
         estado, 
         id_reserva, 
         id_control, 
         verificado
       ) 
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      VALUES ($1, $2, $3, $4, $5, $6, $7)
       RETURNING *
     `;
 
     const values = [
       datosQR.fecha_generado,
       datosQR.fecha_expira || null,
-      datosQR.qr_url_imagen || null,
       datosQR.codigo_qr || null,
       datosQR.estado || "activo",
       datosQR.id_reserva,
@@ -280,7 +276,6 @@ const actualizarQR = async (id, camposActualizar) => {
     const camposPermitidos = [
       "fecha_generado",
       "fecha_expira",
-      "qr_url_imagen",
       "codigo_qr",
       "estado",
       "id_reserva",
@@ -312,9 +307,6 @@ const actualizarQR = async (id, camposActualizar) => {
       }
     }
 
-    if (camposActualizar.qr_url_imagen && camposActualizar.qr_url_imagen.length > 255) {
-      throw new Error("La URL de la imagen del QR no debe exceder los 255 caracteres");
-    }
     if (camposActualizar.codigo_qr && camposActualizar.codigo_qr.length > 255) {
       throw new Error("El codigo QR no debe exceder los 255 caracteres");
     }
@@ -367,7 +359,7 @@ const actualizarQR = async (id, camposActualizar) => {
       if (campo === "verificado") {
         return value;
       }
-      if (["qr_url_imagen", "codigo_qr"].includes(campo)) {
+      if (campo === "codigo_qr") {
         return value || null;
       }
       return value !== undefined && value !== null ? value : null;
@@ -498,7 +490,6 @@ const obtenerQRPorIdController = async (req, res) => {
 };
 
 const crearQRController = async (req, res) => {
-  let qrPath = null;
   try {
     const datos = { ...req.body };
 
@@ -538,23 +529,8 @@ const crearQRController = async (req, res) => {
         .json(respuesta(false, "La fecha de expiracion no es valida"));
     }
 
-    const uploadPath = path.join(__dirname, "..", "..", "Uploads", "qr");
-    await fs.mkdir(uploadPath, { recursive: true });
+    const codigo = generarCodigoQR(datos.id_reserva);
 
-    const now = new Date().toISOString().replace(/T/, "_").replace(/:/g, "-").split(".")[0];
-    const randomToken = Math.floor(Math.random() * 90000 + 10000);
-    const codigo = `RESERVA:${datos.id_reserva}:${randomToken}`;
-    const qrFileName = `qr_reserva_${datos.id_reserva}_${now}_${randomToken}.png`;
-    qrPath = path.join(uploadPath, qrFileName);
-
-    await QRCode.toFile(qrPath, codigo, {
-      errorCorrectionLevel: "H",
-      type: "png",
-      width: 300,
-      margin: 1
-    });
-
-    datos.qr_url_imagen = `/Uploads/qr/${qrFileName}`;
     datos.codigo_qr = codigo;
     datos.verificado = datos.verificado || false;
 
@@ -572,12 +548,6 @@ const crearQRController = async (req, res) => {
       );
   } catch (error) {
     console.error("Error en crearQRController:", error.message);
-
-    if (qrPath) {
-      await unlinkFile(qrPath).catch((err) => {
-        console.warn("No se pudo eliminar el archivo QR:", err.message);
-      });
-    }
 
     if (error.code === "23505") {
       return res
@@ -645,29 +615,10 @@ const actualizarQRController = async (req, res) => {
 
     if (camposActualizar.regenerar_qr || camposActualizar.id_reserva) {
       const idReservaFinal = camposActualizar.id_reserva || qrActual.id_reserva;
-      const uploadPath = path.join(__dirname, "..", "..", "Uploads", "qr");
-      await fs.mkdir(uploadPath, { recursive: true });
-
-      const now = new Date().toISOString().replace(/T/, "_").replace(/:/g, "-").split(".")[0];
-
       let codigo = qrActual.codigo_qr;
-      if (!codigo || !codigo.startsWith("RESERVA:")) {
-        const randomToken = Math.floor(Math.random() * 90000 + 10000);
-        codigo = `RESERVA:${idReservaFinal}:${randomToken}`;
+      if (!codigo || camposActualizar.regenerar_qr) {
+        codigo = generarCodigoQR(idReservaFinal);
       }
-
-      const randomFile = Math.floor(Math.random() * 90000 + 10000);
-      const qrFileName = `qr_reserva_${idReservaFinal}_${now}_${randomFile}.png`;
-      const qrPath = path.join(uploadPath, qrFileName);
-
-      await QRCode.toFile(qrPath, codigo, {
-        errorCorrectionLevel: "H",
-        type: "png",
-        width: 300,
-        margin: 1
-      });
-
-      camposActualizar.qr_url_imagen = `/Uploads/qr/${qrFileName}`;
       camposActualizar.codigo_qr = codigo;
       delete camposActualizar.regenerar_qr;
     }
@@ -739,36 +690,16 @@ const regenerarQRPorReservaController = async (req, res) => {
     const fechaGenerado = ahora.toISOString();
     const fechaExpira = new Date(ahora.getTime() + 24 * 60 * 60 * 1000).toISOString();
 
-    const uploadPath = path.join(__dirname, "..", "..", "Uploads", "qr");
-    await fs.mkdir(uploadPath, { recursive: true });
-
     let codigo;
-    if (qrActual && qrActual.codigo_qr && qrActual.codigo_qr.startsWith("RESERVA:")) {
+    if (qrActual && qrActual.codigo_qr && !req.body?.forzar_nuevo_codigo) {
       codigo = qrActual.codigo_qr;
     } else {
-      const tokenNuevo = Math.floor(Math.random() * 90000 + 10000);
-      codigo = `RESERVA:${idReservaNum}:${tokenNuevo}`;
+      codigo = generarCodigoQR(idReservaNum);
     }
-
-    const stamp = fechaGenerado
-      .replace(/T/, "_")
-      .replace(/:/g, "-")
-      .split(".")[0];
-    const randomFile = Math.floor(Math.random() * 90000 + 10000);
-    const fileName = `qr_reserva_${idReservaNum}_${stamp}_${randomFile}.png`;
-    const filePath = path.join(uploadPath, fileName);
-
-    await QRCode.toFile(filePath, codigo, {
-      errorCorrectionLevel: "H",
-      type: "png",
-      width: 300,
-      margin: 1
-    });
 
     const payload = {
       fecha_generado: fechaGenerado,
       fecha_expira: fechaExpira,
-      qr_url_imagen: `/Uploads/qr/${fileName}`,
       codigo_qr: codigo,
       estado: "activo",
       verificado: false

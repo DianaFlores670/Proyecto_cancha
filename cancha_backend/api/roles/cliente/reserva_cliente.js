@@ -6,55 +6,80 @@ const router = express.Router();
 const respuesta = (exito, mensaje, datos = null) => ({
   exito,
   mensaje,
-  datos,
+  datos
 });
 
 const obtenerDatosEspecificos = async (id_cliente, limite = 10, offset = 0) => {
   try {
     const queryDatos = `
-      SELECT 
-        r.id_reserva,
-        r.fecha_reserva,
-        r.cupo,
-        r.monto_total,
-        r.saldo_pendiente,
-        CASE 
-          WHEN r.estado <> 'pagada' AND r.fecha_reserva < NOW() THEN 'cancelada'
-          ELSE r.estado
-        END AS estado,
-        c.id_cliente,
-        p.nombre AS cliente_nombre,
-        p.apellido AS cliente_apellido,
-        ca.id_cancha,
-        ca.nombre AS cancha_nombre,
-        re.id_resena,
-        re.estrellas AS resena_estrellas,
-        re.comentario AS resena_comentario,
-        re.verificado AS resena_verificado
-      FROM reserva r
-      JOIN cliente c ON r.id_cliente = c.id_cliente
-      JOIN usuario p ON c.id_cliente = p.id_persona
-      JOIN cancha ca ON r.id_cancha = ca.id_cancha
-      LEFT JOIN resena re ON re.id_reserva = r.id_reserva
-      WHERE r.id_cliente = $1
-      ORDER BY r.id_reserva
-      LIMIT $2 OFFSET $3
-    `;
+SELECT 
+  r.id_reserva,
+  r.fecha_reserva,
+  r.cupo,
+  r.monto_total,
+  r.saldo_pendiente,
+  r.estado,
+  c.id_cliente,
+  p.nombre AS cliente_nombre,
+  p.apellido AS cliente_apellido,
+  ca.id_cancha,
+  ca.nombre AS cancha_nombre,
+  rh.hora_inicio,
+  rh.hora_fin,
+  qr.codigo_qr,
+  qr.estado AS qr_estado,
+  qr.verificado AS qr_verificado,
+  qr.fecha_generado AS qr_fecha_generado,
+  qr.fecha_expira AS qr_fecha_expira,
+  re.id_resena,
+  re.estrellas AS resena_estrellas,
+  re.comentario AS resena_comentario,
+  re.verificado AS resena_verificado
+FROM reserva r
+JOIN cliente c ON r.id_cliente = c.id_cliente
+JOIN usuario p ON c.id_cliente = p.id_persona
+JOIN cancha ca ON r.id_cancha = ca.id_cancha
+LEFT JOIN (
+  SELECT 
+    id_reserva,
+    MIN(hora_inicio) AS hora_inicio,
+    MAX(hora_fin) AS hora_fin
+  FROM reserva_horario
+  GROUP BY id_reserva
+) rh ON rh.id_reserva = r.id_reserva
+LEFT JOIN LATERAL (
+  SELECT codigo_qr, estado, verificado, fecha_generado, fecha_expira
+  FROM qr_reserva
+  WHERE id_reserva = r.id_reserva
+  ORDER BY fecha_generado DESC
+  LIMIT 1
+) qr ON true
+LEFT JOIN resena re ON re.id_reserva = r.id_reserva
+WHERE r.id_cliente = $1
+ORDER BY r.id_reserva
+LIMIT $2 OFFSET $3
+`;
+
     const queryTotal = `
       SELECT COUNT(*) 
       FROM reserva 
       WHERE id_cliente = $1
     `;
+
     const [resultDatos, resultTotal] = await Promise.all([
       pool.query(queryDatos, [id_cliente, limite, offset]),
-      pool.query(queryTotal, [id_cliente]),
+      pool.query(queryTotal, [id_cliente])
     ]);
+
     return {
       reservas: resultDatos.rows,
-      total: parseInt(resultTotal.rows[0].count),
+      total: parseInt(resultTotal.rows[0].count, 10)
     };
   } catch (error) {
-    console.log('Error en obtenerDatosEspecificos:', { error: error.message, stack: error.stack });
+    console.log('Error en obtenerDatosEspecificos:', {
+      error: error.message,
+      stack: error.stack
+    });
     throw error;
   }
 };
@@ -64,41 +89,61 @@ const obtenerReservasFiltradas = async (id_cliente, tipoFiltro, limite = 10, off
     const ordenesPermitidas = {
       fecha: 'r.fecha_reserva DESC',
       monto: 'r.monto_total ASC',
-      estado: 'r.estado ASC',
-      default: 'r.id_reserva ASC',
+      estado: 'estado ASC',
+      default: 'r.id_reserva ASC'
     };
 
     const orden = ordenesPermitidas[tipoFiltro] || ordenesPermitidas.default;
 
     const queryDatos = `
-      SELECT 
-        r.id_reserva,
-        r.fecha_reserva,
-        r.cupo,
-        r.monto_total,
-        r.saldo_pendiente,
-        CASE 
-          WHEN r.estado <> 'pagada' AND r.fecha_reserva < NOW() THEN 'cancelada'
-          ELSE r.estado
-        END AS estado,
-        c.id_cliente,
-        p.nombre AS cliente_nombre,
-        p.apellido AS cliente_apellido,
-        ca.id_cancha,
-        ca.nombre AS cancha_nombre,
-        re.id_resena,
-        re.estrellas AS resena_estrellas,
-        re.comentario AS resena_comentario,
-        re.verificado AS resena_verificado
-      FROM reserva r
-      JOIN cliente c ON r.id_cliente = c.id_cliente
-      JOIN usuario p ON c.id_cliente = p.id_persona
-      JOIN cancha ca ON r.id_cancha = ca.id_cancha
-      LEFT JOIN resena re ON re.id_reserva = r.id_reserva
-      WHERE r.id_cliente = $1
-      ORDER BY ${orden}
-      LIMIT $2 OFFSET $3
-    `;
+SELECT 
+  r.id_reserva,
+  r.fecha_reserva,
+  r.cupo,
+  r.monto_total,
+  r.saldo_pendiente,
+  r.estado,
+  c.id_cliente,
+  p.nombre AS cliente_nombre,
+  p.apellido AS cliente_apellido,
+  ca.id_cancha,
+  ca.nombre AS cancha_nombre,
+  rh.hora_inicio,
+  rh.hora_fin,
+  qr.codigo_qr,
+  qr.estado AS qr_estado,
+  qr.verificado AS qr_verificado,
+  qr.fecha_generado AS qr_fecha_generado,
+  qr.fecha_expira AS qr_fecha_expira,
+  re.id_resena,
+  re.estrellas AS resena_estrellas,
+  re.comentario AS resena_comentario,
+  re.verificado AS resena_verificado
+FROM reserva r
+JOIN cliente c ON r.id_cliente = c.id_cliente
+JOIN usuario p ON c.id_cliente = p.id_persona
+JOIN cancha ca ON r.id_cancha = ca.id_cancha
+LEFT JOIN (
+  SELECT 
+    id_reserva,
+    MIN(hora_inicio) AS hora_inicio,
+    MAX(hora_fin) AS hora_fin
+  FROM reserva_horario
+  GROUP BY id_reserva
+) rh ON rh.id_reserva = r.id_reserva
+LEFT JOIN LATERAL (
+  SELECT codigo_qr, estado, verificado, fecha_generado, fecha_expira
+  FROM qr_reserva
+  WHERE id_reserva = r.id_reserva
+  ORDER BY fecha_generado DESC
+  LIMIT 1
+) qr ON true
+LEFT JOIN resena re ON re.id_reserva = r.id_reserva
+WHERE r.id_cliente = $1
+ORDER BY ${orden}
+LIMIT $2 OFFSET $3
+`;
+
     const queryTotal = `
       SELECT COUNT(*) 
       FROM reserva 
@@ -107,55 +152,80 @@ const obtenerReservasFiltradas = async (id_cliente, tipoFiltro, limite = 10, off
 
     const [resultDatos, resultTotal] = await Promise.all([
       pool.query(queryDatos, [id_cliente, limite, offset]),
-      pool.query(queryTotal, [id_cliente]),
+      pool.query(queryTotal, [id_cliente])
     ]);
 
     return {
       reservas: resultDatos.rows,
-      total: parseInt(resultTotal.rows[0].count),
+      total: parseInt(resultTotal.rows[0].count, 10)
     };
   } catch (error) {
-    console.log('Error en obtenerReservasFiltradas:', { error: error.message, stack: error.stack });
+    console.log('Error en obtenerReservasFiltradas:', {
+      error: error.message,
+      stack: error.stack
+    });
     throw new Error(`Error al obtener reservas filtradas: ${error.message}`);
   }
 };
 
 const buscarReservas = async (id_cliente, texto, limite = 10, offset = 0) => {
   try {
+    const sanitizeInput = (input) => input.replace(/[%_\\]/g, '\\$&');
+    const terminoBusqueda = `%${sanitizeInput(texto)}%`;
+
     const queryDatos = `
-      SELECT 
-        r.id_reserva,
-        r.fecha_reserva,
-        r.cupo,
-        r.monto_total,
-        r.saldo_pendiente,
-        CASE 
-          WHEN r.estado <> 'pagada' AND r.fecha_reserva < NOW() THEN 'cancelada'
-          ELSE r.estado
-        END AS estado,
-        c.id_cliente,
-        p.nombre AS cliente_nombre,
-        p.apellido AS cliente_apellido,
-        ca.id_cancha,
-        ca.nombre AS cancha_nombre,
-        re.id_resena,
-        re.estrellas AS resena_estrellas,
-        re.comentario AS resena_comentario,
-        re.verificado AS resena_verificado
-      FROM reserva r
-      JOIN cliente c ON r.id_cliente = c.id_cliente
-      JOIN usuario p ON c.id_cliente = p.id_persona
-      JOIN cancha ca ON r.id_cancha = ca.id_cancha
-      LEFT JOIN resena re ON re.id_reserva = r.id_reserva
-      WHERE r.id_cliente = $1 AND (
-        p.nombre ILIKE $2 OR 
-        p.apellido ILIKE $2 OR 
-        ca.nombre ILIKE $2 OR 
-        r.estado ILIKE $2
-      )
-      ORDER BY r.fecha_reserva DESC
-      LIMIT $3 OFFSET $4
-    `;
+SELECT 
+  r.id_reserva,
+  r.fecha_reserva,
+  r.cupo,
+  r.monto_total,
+  r.saldo_pendiente,
+  r.estado,
+  c.id_cliente,
+  p.nombre AS cliente_nombre,
+  p.apellido AS cliente_apellido,
+  ca.id_cancha,
+  ca.nombre AS cancha_nombre,
+  rh.hora_inicio,
+  rh.hora_fin,
+  qr.codigo_qr,
+  qr.estado AS qr_estado,
+  qr.verificado AS qr_verificado,
+  qr.fecha_generado AS qr_fecha_generado,
+  qr.fecha_expira AS qr_fecha_expira,
+  re.id_resena,
+  re.estrellas AS resena_estrellas,
+  re.comentario AS resena_comentario,
+  re.verificado AS resena_verificado
+FROM reserva r
+JOIN cliente c ON r.id_cliente = c.id_cliente
+JOIN usuario p ON c.id_cliente = p.id_persona
+JOIN cancha ca ON r.id_cancha = ca.id_cancha
+LEFT JOIN (
+  SELECT 
+    id_reserva,
+    MIN(hora_inicio) AS hora_inicio,
+    MAX(hora_fin) AS hora_fin
+  FROM reserva_horario
+  GROUP BY id_reserva
+) rh ON rh.id_reserva = r.id_reserva
+LEFT JOIN LATERAL (
+  SELECT codigo_qr, estado, verificado, fecha_generado, fecha_expira
+  FROM qr_reserva
+  WHERE id_reserva = r.id_reserva
+  ORDER BY fecha_generado DESC
+  LIMIT 1
+) qr ON true
+LEFT JOIN resena re ON re.id_reserva = r.id_reserva
+WHERE r.id_cliente = $1 AND (
+  p.nombre ILIKE $2 OR 
+  p.apellido ILIKE $2 OR 
+  ca.nombre ILIKE $2 OR 
+  r.estado::text ILIKE $2
+)
+ORDER BY r.fecha_reserva DESC
+LIMIT $3 OFFSET $4
+`;
 
     const queryTotal = `
       SELECT COUNT(*) 
@@ -167,24 +237,24 @@ const buscarReservas = async (id_cliente, texto, limite = 10, offset = 0) => {
         p.nombre ILIKE $2 OR 
         p.apellido ILIKE $2 OR 
         ca.nombre ILIKE $2 OR 
-        r.estado ILIKE $2
+        r.estado::text ILIKE $2
       )
     `;
 
-    const sanitizeInput = (input) => input.replace(/[%_\\]/g, '\\$&');
-    const terminoBusqueda = `%${sanitizeInput(texto)}%`;
-
     const [resultDatos, resultTotal] = await Promise.all([
       pool.query(queryDatos, [id_cliente, terminoBusqueda, limite, offset]),
-      pool.query(queryTotal, [id_cliente, terminoBusqueda]),
+      pool.query(queryTotal, [id_cliente, terminoBusqueda])
     ]);
 
     return {
       reservas: resultDatos.rows,
-      total: parseInt(resultTotal.rows[0].count),
+      total: parseInt(resultTotal.rows[0].count, 10)
     };
   } catch (error) {
-    console.log('Error en buscarReservas:', { error: error.message, stack: error.stack });
+    console.log('Error en buscarReservas:', {
+      error: error.message,
+      stack: error.stack
+    });
     throw error;
   }
 };
@@ -192,40 +262,62 @@ const buscarReservas = async (id_cliente, texto, limite = 10, offset = 0) => {
 const obtenerReservaPorId = async (id, id_cliente) => {
   try {
     const query = `
-      SELECT 
-        r.*,
-        CASE 
-          WHEN r.estado <> 'pagada' AND r.fecha_reserva < NOW() THEN 'cancelada'
-          ELSE r.estado
-        END AS estado,
-        c.id_cliente,
-        p.nombre AS cliente_nombre,
-        p.apellido AS cliente_apellido,
-        p.correo AS cliente_correo,
-        ca.id_cancha,
-        ca.nombre AS cancha_nombre,
-        re.id_resena,
-        re.estrellas AS resena_estrellas,
-        re.comentario AS resena_comentario,
-        re.verificado AS resena_verificado
-      FROM reserva r
-      JOIN cliente c ON r.id_cliente = c.id_cliente
-      JOIN usuario p ON c.id_cliente = p.id_persona
-      JOIN cancha ca ON r.id_cancha = ca.id_cancha
-      LEFT JOIN resena re ON re.id_reserva = r.id_reserva
-      WHERE r.id_reserva = $1 AND r.id_cliente = $2
-    `;
+SELECT 
+  r.*,
+  c.id_cliente,
+  p.nombre AS cliente_nombre,
+  p.apellido AS cliente_apellido,
+  p.correo AS cliente_correo,
+  ca.id_cancha,
+  ca.nombre AS cancha_nombre,
+  rh.hora_inicio,
+  rh.hora_fin,
+  qr.codigo_qr,
+  qr.estado AS qr_estado,
+  qr.verificado AS qr_verificado,
+  qr.fecha_generado AS qr_fecha_generado,
+  qr.fecha_expira AS qr_fecha_expira,
+  re.id_resena,
+  re.estrellas AS resena_estrellas,
+  re.comentario AS resena_comentario,
+  re.verificado AS resena_verificado
+FROM reserva r
+JOIN cliente c ON r.id_cliente = c.id_cliente
+JOIN usuario p ON c.id_cliente = p.id_persona
+JOIN cancha ca ON r.id_cancha = ca.id_cancha
+LEFT JOIN (
+  SELECT 
+    id_reserva,
+    MIN(hora_inicio) AS hora_inicio,
+    MAX(hora_fin) AS hora_fin
+  FROM reserva_horario
+  GROUP BY id_reserva
+) rh ON rh.id_reserva = r.id_reserva
+LEFT JOIN LATERAL (
+  SELECT codigo_qr, estado, verificado, fecha_generado, fecha_expira
+  FROM qr_reserva
+  WHERE id_reserva = r.id_reserva
+  ORDER BY fecha_generado DESC
+  LIMIT 1
+) qr ON true
+LEFT JOIN resena re ON re.id_reserva = r.id_reserva
+WHERE r.id_reserva = $1 AND r.id_cliente = $2
+`;
+
+
     const result = await pool.query(query, [id, id_cliente]);
     return result.rows[0] || null;
   } catch (error) {
-    console.log('Error en obtenerReservaPorId:', { error: error.message, stack: error.stack });
+    console.log('Error en obtenerReservaPorId:', {
+      error: error.message,
+      stack: error.stack
+    });
     throw error;
   }
 };
 
 const crearReserva = async (datosReserva) => {
   try {
-    console.log('Datos recibidos para crear reserva:', datosReserva);
     if (!datosReserva.id_cliente || isNaN(datosReserva.id_cliente)) {
       throw new Error('El ID del cliente es obligatorio y debe ser un numero');
     }
@@ -244,19 +336,23 @@ const crearReserva = async (datosReserva) => {
       throw new Error('La fecha de reserva no es valida');
     }
 
-    if (datosReserva.cupo && (isNaN(datosReserva.cupo) || datosReserva.cupo <= 0)) {
+    if (datosReserva.cupo && (isNaN(datosReserva.cupo) || Number(datosReserva.cupo) <= 0)) {
       throw new Error('El cupo debe ser un numero positivo');
     }
 
-    if (datosReserva.monto_total && (isNaN(datosReserva.monto_total) || datosReserva.monto_total < 0)) {
+    if (datosReserva.monto_total && (isNaN(datosReserva.monto_total) || Number(datosReserva.monto_total) < 0)) {
       throw new Error('El monto total debe ser un numero no negativo');
     }
 
-    if (datosReserva.saldo_pendiente && (isNaN(datosReserva.saldo_pendiente) || datosReserva.saldo_pendiente < 0)) {
+    if (datosReserva.saldo_pendiente && (isNaN(datosReserva.saldo_pendiente) || Number(datosReserva.saldo_pendiente) < 0)) {
       throw new Error('El saldo pendiente debe ser un numero no negativo');
     }
 
-    if (datosReserva.monto_total && datosReserva.saldo_pendiente && Number(datosReserva.saldo_pendiente) > Number(datosReserva.monto_total)) {
+    if (
+      datosReserva.monto_total &&
+      datosReserva.saldo_pendiente &&
+      Number(datosReserva.saldo_pendiente) > Number(datosReserva.monto_total)
+    ) {
       throw new Error('El saldo pendiente no puede ser mayor al monto total');
     }
 
@@ -284,7 +380,11 @@ const crearReserva = async (datosReserva) => {
       throw new Error('La cancha asociada no existe');
     }
 
-    if (datosReserva.cupo && canchaRow.capacidad != null && Number(datosReserva.cupo) > Number(canchaRow.capacidad)) {
+    if (
+      datosReserva.cupo &&
+      canchaRow.capacidad != null &&
+      Number(datosReserva.cupo) > Number(canchaRow.capacidad)
+    ) {
       throw new Error('El cupo no puede superar la capacidad de la cancha');
     }
 
@@ -303,25 +403,36 @@ const crearReserva = async (datosReserva) => {
       datosReserva.saldo_pendiente || null,
       datosReserva.estado,
       datosReserva.id_cliente,
-      datosReserva.id_cancha,
+      datosReserva.id_cancha
     ];
 
-    console.log('Ejecutando query de creacion con valores:', values);
     const { rows } = await pool.query(query, values);
-    console.log('Reserva creada:', rows[0]);
     return rows[0];
   } catch (error) {
-    console.log('Error en crearReserva:', { error: error.message, stack: error.stack, datosReserva });
+    console.log('Error en crearReserva:', {
+      error: error.message,
+      stack: error.stack,
+      datosReserva
+    });
     throw new Error(error.message);
   }
 };
 
 const actualizarReserva = async (id, id_cliente, camposActualizar) => {
   try {
-    console.log('Datos recibidos para actualizar reserva:', { id, camposActualizar });
-    const camposPermitidos = ['fecha_reserva', 'cupo', 'monto_total', 'saldo_pendiente', 'estado', 'id_cliente', 'id_cancha'];
+    const camposPermitidos = [
+      'fecha_reserva',
+      'cupo',
+      'monto_total',
+      'saldo_pendiente',
+      'estado',
+      'id_cliente',
+      'id_cancha'
+    ];
 
-    const campos = Object.keys(camposActualizar).filter((key) => camposPermitidos.includes(key));
+    const campos = Object.keys(camposActualizar).filter((key) =>
+      camposPermitidos.includes(key)
+    );
 
     if (campos.length === 0) {
       throw new Error('No hay campos validos para actualizar');
@@ -342,8 +453,15 @@ const actualizarReserva = async (id, id_cliente, camposActualizar) => {
       throw new Error('Reserva no encontrada o no pertenece al cliente');
     }
 
-    const cupoFinal = camposActualizar.cupo != null ? Number(camposActualizar.cupo) : Number(reservaBase.cupo);
-    const canchaFinal = camposActualizar.id_cancha != null ? Number(camposActualizar.id_cancha) : Number(reservaBase.id_cancha);
+    const cupoFinal =
+      camposActualizar.cupo != null
+        ? Number(camposActualizar.cupo)
+        : Number(reservaBase.cupo);
+
+    const canchaFinal =
+      camposActualizar.id_cancha != null
+        ? Number(camposActualizar.id_cancha)
+        : Number(reservaBase.id_cancha);
 
     if (cupoFinal && canchaFinal) {
       const canchaQuery = `
@@ -353,7 +471,11 @@ const actualizarReserva = async (id, id_cliente, camposActualizar) => {
       `;
       const canchaResult = await pool.query(canchaQuery, [canchaFinal]);
       const canchaRow = canchaResult.rows[0];
-      if (canchaRow && canchaRow.capacidad != null && cupoFinal > Number(canchaRow.capacidad)) {
+      if (
+        canchaRow &&
+        canchaRow.capacidad != null &&
+        cupoFinal > Number(canchaRow.capacidad)
+      ) {
         throw new Error('El cupo no puede superar la capacidad de la cancha');
       }
     }
@@ -365,20 +487,39 @@ const actualizarReserva = async (id, id_cliente, camposActualizar) => {
       }
     }
 
-    if (camposActualizar.cupo && (isNaN(camposActualizar.cupo) || camposActualizar.cupo <= 0)) {
+    if (
+      camposActualizar.cupo &&
+      (isNaN(camposActualizar.cupo) || Number(camposActualizar.cupo) <= 0)
+    ) {
       throw new Error('El cupo debe ser un numero positivo');
     }
 
-    if (camposActualizar.monto_total && (isNaN(camposActualizar.monto_total) || camposActualizar.monto_total < 0)) {
+    if (
+      camposActualizar.monto_total &&
+      (isNaN(camposActualizar.monto_total) || Number(camposActualizar.monto_total) < 0)
+    ) {
       throw new Error('El monto total debe ser un numero no negativo');
     }
 
-    if (camposActualizar.saldo_pendiente && (isNaN(camposActualizar.saldo_pendiente) || camposActualizar.saldo_pendiente < 0)) {
+    if (
+      camposActualizar.saldo_pendiente &&
+      (isNaN(camposActualizar.saldo_pendiente) || Number(camposActualizar.saldo_pendiente) < 0)
+    ) {
       throw new Error('El saldo pendiente debe ser un numero no negativo');
     }
 
-    const montoTotal = camposActualizar.monto_total || (await obtenerReservaPorId(id, id_cliente))?.monto_total;
-    if (montoTotal && camposActualizar.saldo_pendiente && Number(camposActualizar.saldo_pendiente) > Number(montoTotal)) {
+    const montoTotalBase = reservaBase.monto_total;
+    const montoTotal =
+      camposActualizar.monto_total !== undefined &&
+        camposActualizar.monto_total !== null
+        ? camposActualizar.monto_total
+        : montoTotalBase;
+
+    if (
+      montoTotal &&
+      camposActualizar.saldo_pendiente &&
+      Number(camposActualizar.saldo_pendiente) > Number(montoTotal)
+    ) {
       throw new Error('El saldo pendiente no puede ser mayor al monto total');
     }
 
@@ -409,8 +550,14 @@ const actualizarReserva = async (id, id_cliente, camposActualizar) => {
       }
     }
 
-    const setClause = campos.map((campo, index) => `${campo} = $${index + 2}`).join(', ');
-    const values = campos.map((campo) => camposActualizar[campo] || null);
+    const setClause = campos
+      .map((campo, index) => `${campo} = $${index + 2}`)
+      .join(', ');
+
+    const values = campos.map((campo) => {
+      const value = camposActualizar[campo];
+      return value !== undefined && value !== null ? value : null;
+    });
 
     const query = `
       UPDATE reserva 
@@ -419,12 +566,15 @@ const actualizarReserva = async (id, id_cliente, camposActualizar) => {
       RETURNING *
     `;
 
-    console.log('Ejecutando query de actualizacion con valores:', [id, ...values]);
     const result = await pool.query(query, [id, ...values]);
-    console.log('Reserva actualizada:', result.rows[0]);
     return result.rows[0] || null;
   } catch (error) {
-    console.log('Error en actualizarReserva:', { error: error.message, stack: error.stack, id, camposActualizar });
+    console.log('Error en actualizarReserva:', {
+      error: error.message,
+      stack: error.stack,
+      id,
+      camposActualizar
+    });
     throw error;
   }
 };
@@ -437,10 +587,13 @@ const eliminarReserva = async (id, id_cliente) => {
       RETURNING id_reserva
     `;
     const result = await pool.query(query, [id, id_cliente]);
-    console.log('Reserva eliminada:', result.rows[0]);
     return result.rows[0] || null;
   } catch (error) {
-    console.log('Error en eliminarReserva:', { error: error.message, stack: error.stack, id });
+    console.log('Error en eliminarReserva:', {
+      error: error.message,
+      stack: error.stack,
+      id
+    });
     throw error;
   }
 };
@@ -487,123 +640,174 @@ const cancelarReserva = async (id, id_cliente) => {
 
     return reservaActualizada;
   } catch (error) {
-    console.log('Error en cancelarReserva:', { error: error.message, stack: error.stack, id, id_cliente });
+    console.log('Error en cancelarReserva:', {
+      error: error.message,
+      stack: error.stack,
+      id,
+      id_cliente
+    });
     throw error;
   }
 };
 
 const obtenerDatosEspecificosController = async (req, res) => {
   try {
-    const id_cliente = parseInt(req.query.id_cliente);
-    const limite = parseInt(req.query.limit) || 10;
-    const offset = parseInt(req.query.offset) || 0;
+    const id_cliente = parseInt(req.query.id_cliente, 10);
+    const limite = parseInt(req.query.limit, 10) || 10;
+    const offset = parseInt(req.query.offset, 10) || 0;
 
     if (!id_cliente || isNaN(id_cliente)) {
-      console.log('ID de cliente no valido:', req.query.id_cliente);
-      return res.status(400).json(respuesta(false, 'ID de cliente no valido o no proporcionado'));
+      return res
+        .status(400)
+        .json(respuesta(false, 'ID de cliente no valido o no proporcionado'));
     }
 
-    const { reservas, total } = await obtenerDatosEspecificos(id_cliente, limite, offset);
+    const { reservas, total } = await obtenerDatosEspecificos(
+      id_cliente,
+      limite,
+      offset
+    );
 
     res.json(
       respuesta(true, 'Reservas obtenidas correctamente', {
         reservas,
-        paginacion: { limite, offset, total },
-      }),
+        paginacion: { limite, offset, total }
+      })
     );
   } catch (error) {
-    console.log('Error en obtenerDatosEspecificosController:', { error: error.message, stack: error.stack });
-    res.status(500).json(respuesta(false, error.message || 'Error al obtener reservas'));
+    console.log('Error en obtenerDatosEspecificosController:', {
+      error: error.message,
+      stack: error.stack
+    });
+    res
+      .status(500)
+      .json(respuesta(false, error.message || 'Error al obtener reservas'));
   }
 };
 
 const obtenerReservasFiltradasController = async (req, res) => {
   try {
-    const { tipo, id_cliente } = req.query;
-    const limite = parseInt(req.query.limit) || 10;
-    const offset = parseInt(req.query.offset) || 0;
+    const tipo = req.query.tipo;
+    const id_cliente = parseInt(req.query.id_cliente, 10);
+    const limite = parseInt(req.query.limit, 10) || 10;
+    const offset = parseInt(req.query.offset, 10) || 0;
 
     if (!id_cliente || isNaN(id_cliente)) {
-      console.log('ID de cliente no valido:', req.query.id_cliente);
-      return res.status(400).json(respuesta(false, 'ID de cliente no valido o no proporcionado'));
+      return res
+        .status(400)
+        .json(respuesta(false, 'ID de cliente no valido o no proporcionado'));
     }
 
     const tiposValidos = ['fecha', 'monto', 'estado'];
     if (!tipo || !tiposValidos.includes(tipo)) {
-      console.log('Parametro tipo invalido:', tipo);
-      return res.status(400).json(respuesta(false, 'El parametro "tipo" es invalido o no proporcionado'));
+      return res
+        .status(400)
+        .json(respuesta(false, 'El parametro "tipo" es invalido o no proporcionado'));
     }
 
-    const { reservas, total } = await obtenerReservasFiltradas(id_cliente, tipo, limite, offset);
+    const { reservas, total } = await obtenerReservasFiltradas(
+      id_cliente,
+      tipo,
+      limite,
+      offset
+    );
 
     res.json(
       respuesta(true, `Reservas filtradas por ${tipo} obtenidas correctamente`, {
         reservas,
         filtro: tipo,
-        paginacion: { limite, offset, total },
-      }),
+        paginacion: { limite, offset, total }
+      })
     );
   } catch (error) {
-    console.log('Error en obtenerReservasFiltradasController:', { error: error.message, stack: error.stack });
-    res.status(500).json(respuesta(false, error.message || 'Error al obtener reservas filtradas'));
+    console.log('Error en obtenerReservasFiltradasController:', {
+      error: error.message,
+      stack: error.stack
+    });
+    res
+      .status(500)
+      .json(
+        respuesta(false, error.message || 'Error al obtener reservas filtradas')
+      );
   }
 };
 
 const buscarReservasController = async (req, res) => {
   try {
-    const { q, id_cliente } = req.query;
-    const limite = parseInt(req.query.limit) || 10;
-    const offset = parseInt(req.query.offset) || 0;
+    const q = req.query.q;
+    const id_cliente = parseInt(req.query.id_cliente, 10);
+    const limite = parseInt(req.query.limit, 10) || 10;
+    const offset = parseInt(req.query.offset, 10) || 0;
 
     if (!id_cliente || isNaN(id_cliente)) {
-      console.log('ID de cliente no valido:', req.query.id_cliente);
-      return res.status(400).json(respuesta(false, 'ID de cliente no valido o no proporcionado'));
+      return res
+        .status(400)
+        .json(respuesta(false, 'ID de cliente no valido o no proporcionado'));
     }
 
     if (!q) {
-      console.log('Parametro de busqueda "q" no proporcionado');
-      return res.status(400).json(respuesta(false, 'El parametro de busqueda "q" es requerido'));
+      return res
+        .status(400)
+        .json(respuesta(false, 'El parametro de busqueda "q" es requerido'));
     }
 
-    const { reservas, total } = await buscarReservas(id_cliente, q, limite, offset);
+    const { reservas, total } = await buscarReservas(
+      id_cliente,
+      q,
+      limite,
+      offset
+    );
 
     res.json(
       respuesta(true, 'Reservas obtenidas correctamente', {
         reservas,
-        paginacion: { limite, offset, total },
-      }),
+        paginacion: { limite, offset, total }
+      })
     );
   } catch (error) {
-    console.log('Error en buscarReservasController:', { error: error.message, stack: error.stack });
-    res.status(500).json(respuesta(false, error.message || 'Error en la busqueda'));
+    console.log('Error en buscarReservasController:', {
+      error: error.message,
+      stack: error.stack
+    });
+    res
+      .status(500)
+      .json(respuesta(false, error.message || 'Error en la busqueda'));
   }
 };
 
 const obtenerReservaPorIdController = async (req, res) => {
   try {
-    const { id } = req.params;
-    const { id_cliente } = req.query;
+    const id = parseInt(req.params.id, 10);
+    const id_cliente = parseInt(req.query.id_cliente, 10);
 
     if (!id || isNaN(id)) {
-      console.log('ID de reserva no valido:', id);
       return res.status(400).json(respuesta(false, 'ID de reserva no valido'));
     }
     if (!id_cliente || isNaN(id_cliente)) {
-      console.log('ID de cliente no valido:', id_cliente);
-      return res.status(400).json(respuesta(false, 'ID de cliente no valido o no proporcionado'));
+      return res
+        .status(400)
+        .json(respuesta(false, 'ID de cliente no valido o no proporcionado'));
     }
 
-    const reserva = await obtenerReservaPorId(parseInt(id), parseInt(id_cliente));
+    const reserva = await obtenerReservaPorId(id, id_cliente);
 
     if (!reserva) {
-      console.log('Reserva no encontrada para ID:', id, 'y cliente:', id_cliente);
-      return res.status(404).json(respuesta(false, 'Reserva no encontrada o no pertenece al cliente'));
+      return res
+        .status(404)
+        .json(
+          respuesta(false, 'Reserva no encontrada o no pertenece al cliente')
+        );
     }
 
     res.json(respuesta(true, 'Reserva obtenida correctamente', { reserva }));
   } catch (error) {
-    console.log('Error en obtenerReservaPorIdController:', { error: error.message, stack: error.stack });
-    res.status(500).json(respuesta(false, error.message || 'Error al obtener la reserva'));
+    console.log('Error en obtenerReservaPorIdController:', {
+      error: error.message,
+      stack: error.stack
+    });
+    res
+      .status(500)
+      .json(respuesta(false, error.message || 'Error al obtener la reserva'));
   }
 };
 
@@ -613,13 +817,19 @@ const crearReservaController = async (req, res) => {
 
     const camposObligatorios = ['fecha_reserva', 'id_cliente', 'id_cancha'];
     const faltantes = camposObligatorios.filter(
-      (campo) => !datos[campo] || datos[campo].toString().trim() === '',
+      (campo) =>
+        !datos[campo] || datos[campo].toString().trim() === ''
     );
 
     if (faltantes.length > 0) {
       return res
         .status(400)
-        .json(respuesta(false, `Faltan campos obligatorios: ${faltantes.join(', ')}`));
+        .json(
+          respuesta(
+            false,
+            `Faltan campos obligatorios: ${faltantes.join(', ')}`
+          )
+        );
     }
 
     datos.estado = datos.estado || 'pendiente';
@@ -628,96 +838,119 @@ const crearReservaController = async (req, res) => {
 
     res
       .status(201)
-      .json(respuesta(true, 'Reserva creada correctamente', { reserva: nuevaReserva }));
+      .json(
+        respuesta(true, 'Reserva creada correctamente', {
+          reserva: nuevaReserva
+        })
+      );
   } catch (error) {
     if (error.code === '23505') {
       return res.status(400).json(respuesta(false, 'La reserva ya existe'));
     }
-    res.status(500).json(respuesta(false, error.message || 'Error al crear la reserva'));
+    res
+      .status(500)
+      .json(respuesta(false, error.message || 'Error al crear la reserva'));
   }
 };
 
 const actualizarReservaController = async (req, res) => {
   try {
-    const { id } = req.params;
-    const id_cliente = parseInt(req.body.id_cliente || req.query.id_cliente);
-    const camposActualizar = req.body;
-    console.log('Datos recibidos en actualizarReservaController:', { id, camposActualizar });
-
-    if (!id || isNaN(id)) {
-      console.log('ID de reserva no valido:', id);
-      return res.status(400).json(respuesta(false, 'ID de reserva no valido'));
-    }
-    if (!id_cliente || isNaN(id_cliente)) {
-      console.log('ID de cliente no valido:', id_cliente);
-      return res.status(400).json(respuesta(false, 'ID de cliente no valido o no proporcionado'));
-    }
-
-    if (Object.keys(camposActualizar).length === 0) {
-      console.log('No se proporcionaron campos para actualizar');
-      return res.status(400).json(respuesta(false, 'No se proporcionaron campos para actualizar'));
-    }
-
-    const reservaActualizada = await actualizarReserva(parseInt(id), id_cliente, camposActualizar);
-
-    if (!reservaActualizada) {
-      console.log('Reserva no encontrada para ID:', id, 'y cliente:', id_cliente);
-      return res
-        .status(404)
-        .json(respuesta(false, 'Reserva no encontrada o no pertenece al cliente'));
-    }
-
-    res.json(
-      respuesta(true, 'Reserva actualizada correctamente', { reserva: reservaActualizada }),
+    const id = parseInt(req.params.id, 10);
+    const id_cliente = parseInt(
+      req.body.id_cliente || req.query.id_cliente,
+      10
     );
-  } catch (error) {
-    console.log('Error en actualizarReservaController:', {
-      error: error.message,
-      stack: error.stack,
-      id,
-      camposActualizar,
-    });
-    res.status(500).json(respuesta(false, error.message || 'Error al actualizar la reserva'));
-  }
-};
-
-const eliminarReservaController = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { id_cliente } = req.query;
+    const camposActualizar = req.body;
 
     if (!id || isNaN(id)) {
-      console.log('ID de reserva no valido:', id);
       return res.status(400).json(respuesta(false, 'ID de reserva no valido'));
     }
     if (!id_cliente || isNaN(id_cliente)) {
-      console.log('ID de cliente no valido:', id_cliente);
       return res
         .status(400)
         .json(respuesta(false, 'ID de cliente no valido o no proporcionado'));
     }
 
-    const reservaCancelada = await cancelarReserva(parseInt(id), parseInt(id_cliente));
+    if (Object.keys(camposActualizar).length === 0) {
+      return res
+        .status(400)
+        .json(respuesta(false, 'No se proporcionaron campos para actualizar'));
+    }
 
-    if (!reservaCancelada) {
-      console.log('Reserva no encontrada para ID:', id, 'y cliente:', id_cliente);
+    const reservaActualizada = await actualizarReserva(
+      id,
+      id_cliente,
+      camposActualizar
+    );
+
+    if (!reservaActualizada) {
       return res
         .status(404)
-        .json(respuesta(false, 'Reserva no encontrada o no pertenece al cliente'));
+        .json(
+          respuesta(false, 'Reserva no encontrada o no pertenece al cliente')
+        );
+    }
+
+    res.json(
+      respuesta(true, 'Reserva actualizada correctamente', {
+        reserva: reservaActualizada
+      })
+    );
+  } catch (error) {
+    console.log('Error en actualizarReservaController:', {
+      error: error.message,
+      stack: error.stack,
+      id: req.params.id,
+      camposActualizar: req.body
+    });
+    res
+      .status(500)
+      .json(
+        respuesta(false, error.message || 'Error al actualizar la reserva')
+      );
+  }
+};
+
+const eliminarReservaController = async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const id_cliente = parseInt(req.query.id_cliente, 10);
+
+    if (!id || isNaN(id)) {
+      return res.status(400).json(respuesta(false, 'ID de reserva no valido'));
+    }
+    if (!id_cliente || isNaN(id_cliente)) {
+      return res
+        .status(400)
+        .json(respuesta(false, 'ID de cliente no valido o no proporcionado'));
+    }
+
+    const reservaCancelada = await cancelarReserva(id, id_cliente);
+
+    if (!reservaCancelada) {
+      return res
+        .status(404)
+        .json(
+          respuesta(false, 'Reserva no encontrada o no pertenece al cliente')
+        );
     }
 
     res.json(
       respuesta(true, 'Reserva cancelada correctamente', {
-        reserva: reservaCancelada,
-      }),
+        reserva: reservaCancelada
+      })
     );
   } catch (error) {
     console.log('Error en eliminarReservaController:', {
       error: error.message,
       stack: error.stack,
-      id,
+      id: req.params.id
     });
-    res.status(500).json(respuesta(false, error.message || 'Error al cancelar la reserva'));
+    res
+      .status(500)
+      .json(
+        respuesta(false, error.message || 'Error al cancelar la reserva')
+      );
   }
 };
 
