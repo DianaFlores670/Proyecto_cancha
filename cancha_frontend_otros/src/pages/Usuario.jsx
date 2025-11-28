@@ -2,26 +2,27 @@
 /* eslint-disable no-unused-vars */
 import React, { useState, useEffect } from "react";
 import api from "../services/api";
-import { getImageUrl } from "../utils";
+import { FiMoreVertical, FiX } from "react-icons/fi";
+
 const permissionsConfig = {
   ADMINISTRADOR: {
     canView: true,
     canCreate: true,
     canEdit: true,
-    canDelete: true,
+    canDelete: true
   },
   ADMIN_ESP_DEP: {
     canView: false,
     canCreate: false,
     canEdit: false,
-    canDelete: false,
+    canDelete: false
   },
   DEFAULT: {
     canView: false,
     canCreate: false,
     canEdit: false,
-    canDelete: false,
-  },
+    canDelete: false
+  }
 };
 
 const getEffectiveRole = () => {
@@ -39,7 +40,7 @@ const getEffectiveRole = () => {
       }
     }
     if (bag.size === 0 && u?.role) bag.add(u.role);
-  } catch {}
+  } catch { }
   const tok = localStorage.getItem("token");
   if (bag.size === 0 && tok && tok.split(".").length === 3) {
     try {
@@ -49,10 +50,10 @@ const getEffectiveRole = () => {
       const t = Array.isArray(payload?.roles)
         ? payload.roles
         : payload?.rol
-        ? [payload.rol]
-        : [];
+          ? [payload.rol]
+          : [];
       t.forEach((v) => bag.add(v));
-    } catch {}
+    } catch { }
   }
   const norm = Array.from(bag).map((v) =>
     String(v || "")
@@ -87,7 +88,7 @@ const Usuario = () => {
     { valor: "admin_esp_dep", etiqueta: "Administrador Espacio Deportivo" },
     { valor: "deportista", etiqueta: "Deportista" },
     { valor: "control", etiqueta: "Control" },
-    { valor: "encargado", etiqueta: "Encargado" },
+    { valor: "encargado", etiqueta: "Encargado" }
   ];
   const [formData, setFormData] = useState({
     nombre: "",
@@ -104,7 +105,7 @@ const Usuario = () => {
     rol: "",
     rol_agregar: "",
     rol_eliminar: "",
-    datos_especificos: {},
+    datos_especificos: {}
   });
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
@@ -112,6 +113,10 @@ const Usuario = () => {
   const sexosPermitidos = ["masculino", "femenino"];
   const [selectedFile, setSelectedFile] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteUser, setDeleteUser] = useState(null);
+  const [modalError, setModalError] = useState(null);
+  const [mobileModal, setMobileModal] = useState(null);
 
   useEffect(() => {
     const sync = () => setRole(getEffectiveRole());
@@ -158,7 +163,7 @@ const Usuario = () => {
         response = await api.get("/usuario/filtro", { params: fullParams });
       } else {
         response = await api.get("/usuario/datos-especificos", {
-          params: fullParams,
+          params: fullParams
         });
       }
       if (response.data.exito) {
@@ -200,20 +205,21 @@ const Usuario = () => {
     else fetchUsuarios();
   };
 
-  const handleDelete = async (id) => {
-    if (!permissions.canDelete) return;
-    if (!window.confirm("Estas seguro de eliminar este usuario?")) return;
+  const confirmDelete = async () => {
+    if (!permissions.canDelete || !deleteUser) return;
+
     try {
-      const response = await api.delete(`/usuario/${id}`);
+      const response = await api.delete(`/usuario/${deleteUser.id_persona}`);
       if (response.data.exito) {
+        setDeleteOpen(false);
+        setDeleteUser(null);
         fetchUsuarios();
       } else {
         setError(response.data.mensaje || "No se pudo eliminar");
       }
     } catch (err) {
-      const errorMessage =
-        err.response?.data?.mensaje || "Error de conexion al servidor";
-      setError(errorMessage);
+      const mensaje = err.response?.data?.mensaje || "Error de conexion al servidor";
+      setError(mensaje);
     }
   };
 
@@ -236,7 +242,7 @@ const Usuario = () => {
       rol: "",
       rol_agregar: "",
       rol_eliminar: "",
-      datos_especificos: {},
+      datos_especificos: {}
     });
     setSelectedFile(null);
     setImagePreview(null);
@@ -267,7 +273,7 @@ const Usuario = () => {
           rol: user.rol || "",
           rol_agregar: "",
           rol_eliminar: "",
-          datos_especificos: user.datos_rol || {},
+          datos_especificos: user.datos_rol || {}
         });
         setImagePreview(
           user.imagen_perfil ? getImageUrl(user.imagen_perfil) : null
@@ -278,12 +284,12 @@ const Usuario = () => {
         setViewMode(false);
         setModalOpen(true);
       } else {
-        setError(response.data.mensaje || "No se pudo cargar el usuario");
+        setError(response.data.mensaje || "No se pudo cargar usuario");
       }
     } catch (err) {
-      const errorMessage =
+      const mensaje =
         err.response?.data?.mensaje || "Error de conexion al servidor";
-      setError(errorMessage);
+      setError(mensaje);
     }
   };
 
@@ -310,7 +316,7 @@ const Usuario = () => {
           rol: user.rol || "",
           rol_agregar: "",
           rol_eliminar: "",
-          datos_especificos: user.datos_rol || {},
+          datos_especificos: user.datos_rol || {}
         });
         setImagePreview(
           user.imagen_perfil ? getImageUrl(user.imagen_perfil) : null
@@ -321,12 +327,12 @@ const Usuario = () => {
         setViewMode(true);
         setModalOpen(true);
       } else {
-        setError(response.data.mensaje || "No se pudo cargar el usuario");
+        setError(response.data.mensaje || "No se pudo cargar usuario");
       }
     } catch (err) {
-      const errorMessage =
+      const mensaje =
         err.response?.data?.mensaje || "Error de conexion al servidor";
-      setError(errorMessage);
+      setError(mensaje);
     }
   };
 
@@ -337,6 +343,7 @@ const Usuario = () => {
     setViewMode(false);
     setSelectedFile(null);
     setImagePreview(null);
+    setModalError(null);
   };
 
   const handleInputChange = (e) => {
@@ -348,7 +355,7 @@ const Usuario = () => {
     const { name, value } = e.target;
     setFormData((prev) => ({
       ...prev,
-      datos_especificos: { ...prev.datos_especificos, [name]: value },
+      datos_especificos: { ...prev.datos_especificos, [name]: value }
     }));
   };
 
@@ -368,110 +375,85 @@ const Usuario = () => {
       (!permissions.canEdit && editMode)
     )
       return;
-    try {
-      const data = new FormData();
-      const campos = {
-        nombre: formData.nombre,
-        apellido: formData.apellido,
-        correo: formData.correo,
-        usuario: formData.usuario,
-        telefono: formData.telefono || "",
-        sexo: formData.sexo || "",
-        latitud: formData.latitud || "",
-        longitud: formData.longitud || "",
-      };
-      Object.entries(campos).forEach(([key, value]) => {
-        if (value !== "" && value !== null && value !== undefined)
-          data.append(key, value);
-      });
-      if (
-        formData.datos_especificos &&
-        Object.keys(formData.datos_especificos).length > 0
-      ) {
-        data.append(
-          "datos_especificos",
-          JSON.stringify(formData.datos_especificos)
-        );
-      }
-      if (selectedFile) data.append("imagen_perfil", selectedFile);
-      const config = { headers: { "Content-Type": "multipart/form-data" } };
 
-      if (!editMode) {
-        if (formData.contrasena) data.append("contrasena", formData.contrasena);
-        if (formData.rol_agregar)
-          data.append("rol_agregar", formData.rol_agregar);
-        const response = await api.post("/usuario/", data, config);
-        if (response.data.exito) {
-          closeModal();
-          fetchUsuarios();
-        } else {
-          setError(response.data.mensaje || "No se pudo crear");
-        }
+    try {
+      let response;
+      const filteredData = Object.fromEntries(
+        Object.entries(formData).filter(([key, value]) => {
+          const requiredFields = ['nombre', 'apellido', 'correo', 'usuario', 'contrasena'];
+          if (editMode && ['usuario', 'contrasena'].includes(key)) return false;
+          if (requiredFields.includes(key)) return true;
+          return value !== '' && value !== null && value !== undefined;
+        })
+      );
+      if (editMode) {
+        response = await api.patch(`/usuario/${currentUser.id_persona}`, filteredData);
       } else {
-        if (formData.rol_agregar)
-          data.append("rol_agregar", formData.rol_agregar);
-        if (formData.rol_eliminar)
-          data.append("rol_eliminar", formData.rol_eliminar);
-        const response = await api.patch(
-          `/usuario/${currentUser.id_persona}`,
-          data,
-          config
-        );
-        if (response.data.exito) {
-          closeModal();
-          fetchUsuarios();
-        } else {
-          setError(response.data.mensaje || "No se pudo actualizar");
-        }
+        response = await api.post('/usuario/', filteredData);
+      }
+
+      if (response.data.exito) {
+        closeModal();
+        fetchUsuarios();
+      } else {
+        setModalError(response.data.mensaje || "No se pudo guardar");
+        setTimeout(() => {
+          setModalError(null);
+        }, 5000); // Resetear el mensaje de error después de 5 segundos
       }
     } catch (err) {
-      const errorMessage =
-        err.response?.data?.mensaje ||
-        err.message ||
-        "Error de conexion al servidor";
-      setError(errorMessage);
-    }
-  };
+      const errorMessage = err.response?.data?.mensaje || 'Error de conexión al servidor';
+      if (errorMessage === 'El correo electrónico ya está en uso.') {
+        setModalError('Este correo ya está registrado. Por favor, use otro correo.'); // Error amigable para el usuario
+      } else {
+        setModalError(errorMessage); // Mostrar otros errores
+      }
 
-  const handlePageChange = (newPage) => {
-    if (newPage >= 1 && newPage <= Math.ceil(total / limit)) setPage(newPage);
+      // Resetear el error después de 5 segundos
+      setTimeout(() => {
+        setModalError(null);
+      }, 5000); // Resetear el mensaje de error después de 5 segundos
+    }
   };
 
   if (!role) return <p>Cargando permisos...</p>;
 
   return (
-    <div className="bg-white rounded-lg shadow p-6">
-      <h2 className="text-xl font-semibold mb-4">Gestion de Usuarios</h2>
+    <div className="bg-white rounded-lg shadow px-4 py-6 md:p-6">
+      <h2 className="text-2xl font-bold mb-6 text-[#23475F] border-l-4 border-[#01CD6C] pl-3">
+        Gestion de Usuarios
+      </h2>
 
-      <div className="flex flex-col xl:flex-row gap-4 mb-6 items-stretch">
-        <div className="flex-1">
-          <form onSubmit={handleSearch} className="flex h-full">
+      <div className="sticky top-0 bg-white z-40 pb-4 pt-2 border-b md:border-0 md:static md:top-auto">
+        <div className="flex flex-col md:flex-row gap-3">
+          <form
+            onSubmit={handleSearch}
+            className="flex flex-1 bg-[#F1F5F9] rounded-full shadow-sm overflow-hidden"
+          >
             <input
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Buscar por nombre, apellido, correo, usuario o telefono"
-              className="border rounded-l px-4 py-2 w-full"
+              className="bg-transparent flex-1 px-4 py-2 focus:outline-none text-md"
+              placeholder="Buscar usuario..."
               disabled={!permissions.canView}
             />
             <button
               type="submit"
-              className="bg-blue-500 text-white px-4 py-2 rounded-r hover:bg-blue-600 whitespace-nowrap"
+              className="bg-[#23475F] text-white px-6 text-md font-medium rounded-full"
               disabled={!permissions.canView}
             >
               Buscar
             </button>
           </form>
-        </div>
 
-        <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
           <select
             value={filtro}
             onChange={handleFiltroChange}
-            className="border rounded px-3 py-2 flex-1 sm:min-w-[180px]"
+            className="bg-[#F1F5F9] rounded-full px-4 py-2 shadow-sm text-md"
             disabled={!permissions.canView}
           >
-            <option value="">Todos</option>
+            <option value="">Sin filtro</option>
             <option value="nombre">Ordenar por nombre</option>
             <option value="fecha">Ordenar por fecha</option>
             <option value="correo">Ordenar por correo</option>
@@ -480,63 +462,68 @@ const Usuario = () => {
           {permissions.canCreate && (
             <button
               onClick={openCreateModal}
-              className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 whitespace-nowrap sm:w-auto w-full flex items-center justify-center gap-2"
+              className="bg-[#01CD6C] text-white rounded-full px-5 text-md shadow-sm disabled:opacity-40 py-2"
             >
-              <span>+</span>
-              <span>Crear Usuario</span>
+              Crear usuario
             </button>
           )}
         </div>
       </div>
 
-      {loading ? (
-        <p>Cargando usuarios...</p>
-      ) : error ? (
-        <p className="text-red-500">{error}</p>
-      ) : (
+      {loading && <p>Cargando usuarios...</p>}
+      {error && <p className="text-red-500 mt-3">{error}</p>}
+
+      {!loading && !error && (
         <>
-          <div className="overflow-x-auto">
-            <table className="min-w-full table-auto border-collapse">
-              <thead>
-                <tr className="bg-gray-50">
-                  <th className="px-4 py-2 text-left">#</th>
-                  <th className="px-4 py-2 text-left">Nombre</th>
-                  <th className="px-4 py-2 text-left">Apellido</th>
-                  <th className="px-4 py-2 text-left">Correo</th>
-                  <th className="px-4 py-2 text-left">Usuario</th>
-                  <th className="px-4 py-2 text-left">Acciones</th>
+          {/* TABLA DESKTOP */}
+          <div className="hidden md:block mt-6 overflow-x-auto">
+            <table className="min-w-full border-collapse rounded-lg overflow-hidden shadow-sm">
+              <thead className="bg-[#23475F] text-white text-md">
+                <tr>
+                  <th className="px-4 py-3 text-left">#</th>
+                  <th className="px-4 py-3 text-left">Nombre</th>
+                  <th className="px-4 py-3 text-left">Apellido</th>
+                  <th className="px-4 py-3 text-left">Correo</th>
+                  <th className="px-4 py-3 text-left">Usuario</th>
+                  <th className="px-4 py-3 text-left">Acciones</th>
                 </tr>
               </thead>
-              <tbody>
-                {usuarios.map((usuario, index) => (
-                  <tr key={usuario.id_persona} className="border-t">
-                    <td className="px-4 py-2">
-                      {(page - 1) * limit + index + 1}
+              <tbody className="text-md">
+                {usuarios.map((u, i) => (
+                  <tr
+                    key={u.id_persona}
+                    className="border-t hover:bg-gray-50 transition"
+                  >
+                    <td className="px-4 py-3">
+                      {(page - 1) * limit + i + 1}
                     </td>
-                    <td className="px-4 py-2">{usuario.nombre}</td>
-                    <td className="px-4 py-2">{usuario.apellido}</td>
-                    <td className="px-4 py-2">{usuario.correo}</td>
-                    <td className="px-4 py-2">{usuario.usuario}</td>
-                    <td className="px-4 py-2 flex gap-2">
+                    <td className="px-4 py-3">{u.nombre}</td>
+                    <td className="px-4 py-3">{u.apellido}</td>
+                    <td className="px-4 py-3">{u.correo}</td>
+                    <td className="px-4 py-3">{u.usuario}</td>
+                    <td className="px-4 py-3 flex gap-3">
                       {permissions.canView && (
                         <button
-                          onClick={() => openViewModal(usuario.id_persona)}
-                          className="text-green-500 hover:text-green-700 mr-2"
+                          onClick={() => openViewModal(u.id_persona)}
+                          className="text-green-500 hover:text-green-700"
                         >
                           Ver
                         </button>
                       )}
                       {permissions.canEdit && (
                         <button
-                          onClick={() => openEditModal(usuario.id_persona)}
-                          className="text-blue-500 hover:text-blue-700 mr-2"
+                          onClick={() => openEditModal(u.id_persona)}
+                          className="text-blue-500 hover:text-blue-700"
                         >
                           Editar
                         </button>
                       )}
                       {permissions.canDelete && (
                         <button
-                          onClick={() => handleDelete(usuario.id_persona)}
+                          onClick={() => {
+                            setDeleteOpen(true);
+                            setDeleteUser(u);
+                          }}
                           className="text-red-500 hover:text-red-700"
                         >
                           Eliminar
@@ -547,23 +534,89 @@ const Usuario = () => {
                 ))}
               </tbody>
             </table>
-          </div>
 
-          <div className="flex justify-center mt-4">
+            {usuarios.length === 0 && (
+              <div className="text-center py-6 text-gray-500 text-md">
+                Sin datos
+              </div>
+            )}
+          </div>
+          {/*CARDS MOBILE */}
+          <div className="md:hidden mt-6 space-y-4 pb-32">
+            {usuarios.map((u, i) => (
+              <div key={u.id_persona} className="border bg-white rounded-lg p-4 shadow-sm">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <div className="font-bold text-[#23475F]">
+                      {u.nombre} {u.apellido}
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      Usuario #{(page - 1) * limit + i + 1}
+                    </div>
+                  </div>
+                  <div className="flex items-center">
+                    <button onClick={() => setMobileModal(u)}>
+                      <FiMoreVertical size={22} />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="mt-2 text-sm space-y-1">
+                  <div>
+                    <span className="font-semibold">Correo: </span>
+                    {u.correo}
+                  </div>
+                  <div>
+                    <span className="font-semibold">Usuario: </span>
+                    {u.usuario}
+                  </div>
+                  {u.telefono && (
+                    <div>
+                      <span className="font-semibold">Telefono: </span>
+                      {u.telefono}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+            {/* PAGINACIÓN SOLO MOVIL */}
+            <div className="md:hidden w-full flex justify-center items-center gap-3 py-4">
+              <button
+                onClick={() => setPage(page - 1)}
+                disabled={page === 1}
+                className="px-4 py-2 bg-gray-200 rounded-full text-sm disabled:opacity-40"
+              >
+                Anterior
+              </button>
+
+              <div className="px-4 py-2 bg-gray-100 rounded-full text-sm">
+                Pag {page} de {Math.ceil(total / limit) || 1}
+              </div>
+
+              <button
+                onClick={() => setPage(page + 1)}
+                disabled={page === Math.ceil(total / limit)}
+                className="px-4 py-2 bg-gray-200 rounded-full text-sm disabled:opacity-40"
+              >
+                Siguiente
+              </button>
+            </div>
+          </div>
+          <div className="fixed md:static bottom-0 left-0 right-0 bg-white border-t shadow-lg py-3 flex justify-center gap-3 z-40 mt-6">
             <button
-              onClick={() => handlePageChange(page - 1)}
+              onClick={() => setPage(page - 1)}
               disabled={page === 1}
-              className="bg-gray-300 text-gray-800 px-4 py-2 rounded-l hover:bg-gray-400 disabled:opacity-50"
+              className="px-4 py-2 bg-gray-200 rounded-full disabled:opacity-40"
             >
               Anterior
             </button>
-            <span className="px-4 py-2 bg-gray-100">
-              Pagina {page} de {Math.ceil(total / limit)}
-            </span>
+            <div className="px-4 py-2 bg-gray-100 rounded-full text-md">
+              Pag {page} de {Math.ceil(total / limit) || 1}
+            </div>
             <button
-              onClick={() => handlePageChange(page + 1)}
-              disabled={page === Math.ceil(total / limit)}
-              className="bg-gray-300 text-gray-800 px-4 py-2 rounded-r hover:bg-gray-400 disabled:opacity-50"
+              onClick={() => setPage(page + 1)}
+              disabled={page === Math.ceil(total / limit) || total === 0}
+              className="px-4 py-2 bg-gray-200 rounded-full disabled:opacity-40"
             >
               Siguiente
             </button>
@@ -571,85 +624,147 @@ const Usuario = () => {
         </>
       )}
 
+      {mobileModal && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center">
+          <div className="bg-white rounded-2xl w-72 p-5 shadow-xl animate-scaleIn">
+
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="font-bold text-[#23475F] text-lg">Opciones</h3>
+              <button onClick={() => setMobileModal(null)}>
+                <FiX size={20} />
+              </button>
+            </div>
+
+            <div className="flex flex-col text-md">
+              <button
+                onClick={() => {
+                  setMobileModal(null);
+                  openViewModal(mobileModal.id_persona);  // Cambia openView por el que uses
+                }}
+                className="px-3 py-2 text-left hover:bg-gray-100"
+              >
+                Ver datos
+              </button>
+
+              <button
+                onClick={() => {
+                  setMobileModal(null);
+                  openEditModal(mobileModal.id_persona);  // Cambia openEdit por el que uses
+                }}
+                className="px-3 py-2 text-left hover:bg-gray-100"
+              >
+                Editar
+              </button>
+
+              <button
+                onClick={() => {
+                  setMobileModal(null);
+                  setDeleteOpen(true);
+                  setDeleteUser(mobileModal);
+                }}
+                className="px-3 py-2 text-left text-red-600 hover:bg-red-50 mt-1 rounded"
+              >
+                Eliminar
+              </button>
+
+              <button
+                onClick={() => setMobileModal(null)}
+                className="px-3 py-2 text-left text-gray-700 hover:bg-gray-100 mt-1 rounded"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {modalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-8 max-w-2xl w-full max-h-[80vh] overflow-y-auto">
-            <h3 className="text-xl font-semibold mb-4">
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl p-5 max-w-2xl w-full max-h-[80vh] overflow-y-auto border border-gray-200 shadow-2xl">
+            <h3 className="text-xl font-semibold mb-4 text-gray-900">
               {viewMode
-                ? "Ver Datos de Usuario"
+                ? "Ver datos de usuario"
                 : editMode
-                ? "Editar Usuario"
-                : "Crear Usuario"}
+                  ? "Editar usuario"
+                  : "Crear usuario"}
             </h3>
-            <form onSubmit={handleSubmit} className="grid grid-cols-2 gap-4">
+            <form
+              onSubmit={handleSubmit}
+              className="grid grid-cols-1 md:grid-cols-2 gap-4 text-md"
+            >
               <div>
-                <label className="block text-sm font-medium mb-1">Nombre</label>
+                <label className="block text-sm font-semibold mb-1">
+                  Nombre
+                </label>
                 <input
                   name="nombre"
                   value={formData.nombre}
                   onChange={handleInputChange}
-                  className="w-full border rounded px-3 py-2 bg-gray-100"
+                  className="w-full border rounded-xl px-3 py-2 bg-gray-50"
                   required
                   disabled={viewMode}
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">
+                <label className="block text-sm font-semibold mb-1">
                   Apellido
                 </label>
                 <input
                   name="apellido"
                   value={formData.apellido}
                   onChange={handleInputChange}
-                  className="w-full border rounded px-3 py-2 bg-gray-100"
+                  className="w-full border rounded-xl px-3 py-2 bg-gray-50"
                   required
                   disabled={viewMode}
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Correo</label>
+                <label className="block text-sm font-semibold mb-1">
+                  Correo
+                </label>
                 <input
                   name="correo"
                   value={formData.correo}
                   onChange={handleInputChange}
-                  className="w-full border rounded px-3 py-2 bg-gray-100"
+                  className="w-full border rounded-xl px-3 py-2 bg-gray-50"
                   type="email"
                   required
                   disabled={viewMode}
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">
+                <label className="block text-sm font-semibold mb-1">
                   Usuario
                 </label>
                 <input
                   name="usuario"
                   value={formData.usuario}
                   onChange={handleInputChange}
-                  className="w-full border rounded px-3 py-2 bg-gray-100"
+                  className="w-full border rounded-xl px-3 py-2 bg-gray-50"
                   required={!editMode && !viewMode}
                   disabled={editMode || viewMode}
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">
+                <label className="block text-sm font-semibold mb-1">
                   Telefono
                 </label>
                 <input
                   name="telefono"
                   value={formData.telefono}
                   onChange={handleInputChange}
-                  className="w-full border rounded px-3 py-2 bg-gray-100"
+                  className="w-full border rounded-xl px-3 py-2 bg-gray-50"
                   disabled={viewMode}
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Sexo</label>
+                <label className="block text-sm font-semibold mb-1">
+                  Sexo
+                </label>
                 <select
                   name="sexo"
                   value={formData.sexo}
                   onChange={handleInputChange}
-                  className="w-full border rounded px-3 py-2 bg-gray-100"
+                  className="w-full border rounded-xl px-3 py-2 bg-gray-50"
                   disabled={viewMode}
                 >
                   <option value="">Seleccione</option>
@@ -660,70 +775,72 @@ const Usuario = () => {
                   ))}
                 </select>
               </div>
-              <div className="col-span-2">
-                <label className="block text-sm font-medium mb-1">
-                  Imagen de Perfil
+              <div className="md:col-span-2">
+                <label className="block text-sm font-semibold mb-1">
+                  Imagen de perfil
                 </label>
                 {imagePreview ? (
                   <img
-                    src={getImageUrl(imagePreview)}
+                    src={imagePreview}
                     alt="Perfil"
-                    className="w-32 h-32 object-cover rounded mb-2"
+                    className="w-32 h-32 object-cover rounded mb-2 border"
                     onError={(e) => {
-                      e.target.src = "/placeholder.png"; // opcional: imagen de respaldo si falla
+                      e.target.src = "/placeholder.png";
                     }}
                   />
                 ) : viewMode ? (
-                  <p className="text-gray-500">No hay imagen de perfil</p>
+                  <p className="text-gray-500 text-sm">
+                    No hay imagen de perfil
+                  </p>
                 ) : null}
                 {!viewMode && (
                   <input
                     type="file"
                     accept="image/*"
                     onChange={handleFileChange}
-                    className="w-full border rounded px-3 py-2 bg-gray-100"
+                    className="w-full border rounded-xl px-3 py-2 bg-gray-50 mt-1"
                     disabled={!permissions.canEdit && editMode}
                   />
                 )}
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">
+                <label className="block text-sm font-semibold mb-1">
                   Latitud
                 </label>
                 <input
                   name="latitud"
                   value={formData.latitud}
                   onChange={handleInputChange}
-                  className="w-full border rounded px-3 py-2 bg-gray-100"
+                  className="w-full border rounded-xl px-3 py-2 bg-gray-50"
                   type="number"
                   step="0.000001"
                   disabled={viewMode}
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">
+                <label className="block text-sm font-semibold mb-1">
                   Longitud
                 </label>
                 <input
                   name="longitud"
                   value={formData.longitud}
                   onChange={handleInputChange}
-                  className="w-full border rounded px-3 py-2 bg-gray-100"
+                  className="w-full border rounded-xl px-3 py-2 bg-gray-50"
                   type="number"
                   step="0.000001"
                   disabled={viewMode}
                 />
               </div>
               {!editMode && !viewMode && (
-                <div className="col-span-2">
-                  <label className="block text-sm font-medium mb-1">
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-semibold mb-1">
                     Contrasena
                   </label>
                   <input
                     name="contrasena"
                     value={formData.contrasena || ""}
                     onChange={handleInputChange}
-                    className="w-full border rounded px-3 py-2 bg-gray-100"
+                    className="w-full border rounded-xl px-3 py-2 bg-gray-50"
                     type="password"
                   />
                   <p className="text-xs text-gray-500 mt-1">Opcional</p>
@@ -731,32 +848,32 @@ const Usuario = () => {
               )}
               {(editMode || viewMode) && (
                 <div>
-                  <label className="block text-sm font-medium mb-1">
-                    Fecha de Creacion
+                  <label className="block text-sm font-semibold mb-1">
+                    Fecha de creacion
                   </label>
                   <input
                     name="fecha_creacion"
                     value={formData.fecha_creacion}
-                    className="w-full border rounded px-3 py-2 bg-gray-100"
+                    className="w-full border rounded-xl px-3 py-2 bg-gray-50"
                     type="date"
                     readOnly
                   />
                   <p className="text-xs text-gray-500 mt-1">Solo lectura</p>
                 </div>
               )}
-              <div className="col-span-2 border-t pt-4 mt-4">
-                <h4 className="text-lg font-medium mb-3">
+              <div className="md:col-span-2 border-t pt-4 mt-4">
+                <h4 className="text-lg font-semibold mb-3">
                   {editMode
-                    ? "Gestion de Roles"
+                    ? "Gestion de roles"
                     : viewMode
-                    ? "Roles Asignados"
-                    : "Asignar Rol Inicial"}
+                      ? "Roles asignados"
+                      : "Asignar rol inicial"}
                 </h4>
                 {editMode ? (
                   <>
                     <div className="mb-4">
-                      <label className="block text-sm font-medium mb-2">
-                        Roles Actuales
+                      <label className="block text-sm font-semibold mb-2">
+                        Roles actuales
                       </label>
                       <div className="flex flex-wrap gap-2">
                         {currentUser?.roles?.map((rolObj, index) => (
@@ -772,7 +889,7 @@ const Usuario = () => {
                               onClick={() => {
                                 setFormData((prev) => ({
                                   ...prev,
-                                  rol_eliminar: rolObj.rol,
+                                  rol_eliminar: rolObj.rol
                                 }));
                               }}
                               className="ml-2 text-red-500 hover:text-red-700"
@@ -784,22 +901,22 @@ const Usuario = () => {
                         ))}
                         {(!currentUser?.roles ||
                           currentUser.roles.length === 0) && (
-                          <span className="text-gray-500">
-                            Sin roles asignados
-                          </span>
-                        )}
+                            <span className="text-gray-500 text-sm">
+                              Sin roles asignados
+                            </span>
+                          )}
                       </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-sm font-medium mb-1">
-                          Agregar Nuevo Rol
+                        <label className="block text-sm font-semibold mb-1">
+                          Agregar nuevo rol
                         </label>
                         <select
                           name="rol_agregar"
                           value={formData.rol_agregar || ""}
                           onChange={handleInputChange}
-                          className="w-full border rounded px-3 py-2 bg-gray-100"
+                          className="w-full border rounded-xl px-3 py-2 bg-gray-50"
                           disabled={viewMode || !permissions.canEdit}
                         >
                           <option value="">Seleccionar rol</option>
@@ -818,14 +935,14 @@ const Usuario = () => {
                         </select>
                       </div>
                       <div>
-                        <label className="block text-sm font-medium mb-1">
-                          Eliminar Rol
+                        <label className="block text-sm font-semibold mb-1">
+                          Eliminar rol
                         </label>
                         <select
                           name="rol_eliminar"
                           value={formData.rol_eliminar || ""}
                           onChange={handleInputChange}
-                          className="w-full border rounded px-3 py-2 bg-gray-100"
+                          className="w-full border rounded-xl px-3 py-2 bg-gray-50"
                           disabled={viewMode || !permissions.canEdit}
                         >
                           <option value="">Seleccionar rol</option>
@@ -842,8 +959,8 @@ const Usuario = () => {
                   </>
                 ) : viewMode ? (
                   <div className="mb-4">
-                    <label className="block text-sm font-medium mb-2">
-                      Roles Actuales
+                    <label className="block text-sm font-semibold mb-2">
+                      Roles actuales
                     </label>
                     <div className="flex flex-wrap gap-2">
                       {currentUser?.roles?.map((rolObj, index) => (
@@ -851,28 +968,29 @@ const Usuario = () => {
                           key={index}
                           className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-blue-100 text-blue-800"
                         >
-                          {rolesDisponibles.find((r) => r.valor === rolObj.rol)
-                            ?.etiqueta || rolObj.rol}
+                          {rolesDisponibles.find(
+                            (r) => r.valor === rolObj.rol
+                          )?.etiqueta || rolObj.rol}
                         </span>
                       ))}
                       {(!currentUser?.roles ||
                         currentUser.roles.length === 0) && (
-                        <span className="text-gray-500">
-                          Sin roles asignados
-                        </span>
-                      )}
+                          <span className="text-gray-500 text-sm">
+                            Sin roles asignados
+                          </span>
+                        )}
                     </div>
                   </div>
                 ) : (
                   <div>
-                    <label className="block text-sm font-medium mb-1">
-                      Asignar Rol Inicial
+                    <label className="block text-sm font-semibold mb-1">
+                      Asignar rol inicial
                     </label>
                     <select
                       name="rol_agregar"
                       value={formData.rol_agregar || ""}
                       onChange={handleInputChange}
-                      className="w-full border rounded px-3 py-2 bg-gray-100"
+                      className="w-full border rounded-xl px-3 py-2 bg-gray-50"
                     >
                       <option value="">Seleccionar rol inicial</option>
                       {rolesDisponibles.map((rol) => (
@@ -882,35 +1000,30 @@ const Usuario = () => {
                       ))}
                     </select>
                     <p className="text-xs text-gray-500 mt-1">
-                      Puedes agregar mas roles despues
+                      Puedes agregar mas roles despues y agregar datos en su respectiva ruta
                     </p>
                   </div>
                 )}
-                {formData.rol_agregar && (
-                  <div className="mt-4 p-4 bg-gray-50 rounded">
-                    <h5 className="font-medium mb-3">
-                      Datos especificos para{" "}
-                      {
-                        rolesDisponibles.find(
-                          (r) => r.valor === formData.rol_agregar
-                        )?.etiqueta
-                      }
-                    </h5>
+              </div>
+              <div className="md:col-span-2 border-t pt-4 mt-4">
+                {modalError && (
+                  <div className="bg-red-100 text-red-600 p-3 mb-4 rounded-md text-sm">
+                    {modalError}
                   </div>
                 )}
               </div>
-              <div className="col-span-2 flex justify-end mt-4">
+              <div className="md:col-span-2 flex justify-end mt-1 gap-3">
                 <button
                   type="button"
                   onClick={closeModal}
-                  className="bg-gray-500 text-white px-4 py-2 rounded mr-2 hover:bg-gray-600"
+                  className="px-5 py-2 bg-gray-200 rounded-full text-md font-medium text-gray-700 hover:bg-gray-300"
                 >
                   Cerrar
                 </button>
                 {!viewMode && (
                   <button
                     type="submit"
-                    className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+                    className="px-5 py-2 bg-[#23475F] text-white rounded-full text-md font-medium hover:bg-[#1d3a4e]"
                     disabled={
                       (!permissions.canCreate && !editMode) ||
                       (!permissions.canEdit && editMode)
@@ -924,6 +1037,40 @@ const Usuario = () => {
           </div>
         </div>
       )}
+      {deleteOpen && deleteUser && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white p-6 rounded-2xl shadow-2xl max-w-md w-full border border-gray-200">
+
+            <h3 className="text-xl font-semibold text-red-600 mb-2">
+              Eliminar usuario
+            </h3>
+            <p className="text-gray-700 text-md">
+              ¿Estas seguro de eliminar a <span className="font-bold">{deleteUser.nombre} {deleteUser.apellido}</span>?
+            </p>
+
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                onClick={() => {
+                  setDeleteOpen(false);
+                  setDeleteUser(null);
+                }}
+                className="px-5 py-2 bg-gray-200 rounded-full text-md font-medium text-gray-700 hover:bg-gray-300"
+              >
+                Cancelar
+              </button>
+
+              <button
+                onClick={confirmDelete}
+                className="px-5 py-2 bg-red-600 text-white rounded-full text-md font-medium hover:bg-red-700"
+              >
+                Eliminar
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };

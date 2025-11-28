@@ -878,9 +878,7 @@ const obtenerUsuarioPorIdController = async (req, res) => {
 
 
 
-/**
- * Controlador para POST - Crear usuario (con Multer para form-data)
- */
+//Controlador para POST - Crear usuario (con Multer para form-data)
 const crearUsuarioController = async (req, res) => {
   let uploadedFile = null;
   const nombreFolder = "usuario";
@@ -905,6 +903,16 @@ const crearUsuarioController = async (req, res) => {
       );
     }
 
+    // Verificar si el correo ya existe en la base de datos
+    const existingUser = await pool.query('SELECT * FROM usuario WHERE correo = $1', [datos.correo]);
+    if (existingUser.rowCount > 0) {
+      // Si el correo ya existe, devolver un mensaje de error claro
+      if (processedFiles.imagen_perfil) {
+        await unlinkFile(processedFiles.imagen_perfil);
+      }
+      return res.status(400).json(respuesta(false, 'El correo electrónico ya está en uso.'));
+    }
+
     // Agregar ruta de archivo subido al objeto datos, si existe
     if (processedFiles.imagen_perfil) {
       datos.imagen_perfil = processedFiles.imagen_perfil;
@@ -927,16 +935,16 @@ const crearUsuarioController = async (req, res) => {
       await unlinkFile(uploadedFile);
     }
 
-    if (error.code === '23505') {
-      return res.status(400).json(respuesta(false, 'El correo o usuario ya existe'));
+    // Verificar si el error es de duplicidad de correo
+    if (error.code === '23505' && error.constraint === 'persona_correo_key') {
+      return res.status(400).json(respuesta(false, 'El correo electrónico ya está en uso.'));
     }
+
     res.status(500).json(respuesta(false, error.message));
   }
 };
 
-/**
- * Controlador para PATCH - Actualizar usuario (MULTI-ROL con Multer para form-data)
- */
+// Controlador para PATCH - Actualizar usuario (MULTI-ROL con Multer para form-data)
 const actualizarUsuarioController = async (req, res) => {
   let uploadedFile = null;
   let oldFileToDelete = null;
@@ -971,6 +979,17 @@ const actualizarUsuarioController = async (req, res) => {
         await unlinkFile(uploadedFile);
       }
       return res.status(400).json(respuesta(false, 'No se proporcionaron campos para actualizar'));
+    }
+
+    // Verificar si el correo ya existe en la base de datos
+    if (camposActualizar.correo) {
+      const existingUser = await pool.query('SELECT * FROM usuario WHERE correo = $1 AND id_persona != $2', [camposActualizar.correo, id]);
+      if (existingUser.rowCount > 0) {
+        if (uploadedFile) {
+          await unlinkFile(uploadedFile);
+        }
+        return res.status(400).json(respuesta(false, 'El correo electrónico ya está en uso.'));
+      }
     }
 
     const usuarioActualizado = await actualizarUsuario(parseInt(id), camposActualizar);
@@ -1010,12 +1029,14 @@ const actualizarUsuarioController = async (req, res) => {
       await unlinkFile(uploadedFile);
     }
 
+    // Verificar si el error es de duplicidad de correo
+    if (error.code === '23505' && error.constraint === 'persona_correo_key') {
+      return res.status(400).json(respuesta(false, 'El correo electrónico ya está en uso.'));
+    }
+
     res.status(500).json(respuesta(false, error.message));
   }
 };
-
-
-
 
 /**
  * Controlador para DELETE - Eliminar usuario

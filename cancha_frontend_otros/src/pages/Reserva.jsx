@@ -56,7 +56,8 @@ const Reserva = () => {
     saldo_pendiente: '',
     estado: 'pendiente',
     id_cliente: '',
-    id_cancha: ''
+    id_cancha: '',
+    horarios: []  // Traer solo hora_inicio y hora_fin de los horarios
   });
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
@@ -176,7 +177,8 @@ const Reserva = () => {
       saldo_pendiente: '',
       estado: 'pendiente',
       id_cliente: '',
-      id_cancha: ''
+      id_cancha: '',
+      horarios: []  // Inicializar sin horarios
     });
     setCurrentReserva(null);
     setModalOpen(true);
@@ -195,7 +197,9 @@ const Reserva = () => {
           saldo_pendiente: r.saldo_pendiente || '',
           estado: r.estado || 'pendiente',
           id_cliente: r.id_cliente ? String(r.id_cliente) : '',
-          id_cancha: r.id_cancha ? String(r.id_cancha) : ''
+          id_cancha: r.id_cancha ? String(r.id_cancha) : '',
+          hora_inicio: r.hora_inicio || '',
+          hora_fin: r.hora_fin || '',
         });
         setCurrentReserva(r);
         setEditMode(true);
@@ -222,7 +226,9 @@ const Reserva = () => {
           saldo_pendiente: r.saldo_pendiente || '',
           estado: r.estado || 'pendiente',
           id_cliente: r.id_cliente ? String(r.id_cliente) : '',
-          id_cancha: r.id_cancha ? String(r.id_cancha) : ''
+          id_cancha: r.id_cancha ? String(r.id_cancha) : '',
+          hora_inicio: r.hora_inicio || '',
+          hora_fin: r.hora_fin || '',
         });
         setCurrentReserva(r);
         setEditMode(false);
@@ -250,37 +256,83 @@ const Reserva = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (viewMode || (!permissions.canCreate && !editMode) || (!permissions.canEdit && editMode)) return;
+
+    // Validaciones de campos obligatorios y valores
+    const filtered = {
+      fecha_reserva: formData.fecha_reserva,
+      estado: formData.estado,
+      id_cliente: parseInt(formData.id_cliente),
+      id_cancha: parseInt(formData.id_cancha),
+      cupo: formData.cupo,
+      monto_total: parseFloat(formData.monto_total),
+      saldo_pendiente: parseFloat(formData.saldo_pendiente),
+      // Solo enviar hora_inicio y hora_fin
+      horarios: formData.horarios || []
+    };
+
+    // Validaciones
+    if (!filtered.fecha_reserva) {
+      setError('La fecha de reserva es obligatoria');
+      return;
+    }
+    const f = new Date(filtered.fecha_reserva);
+    if (isNaN(f.getTime())) {
+      setError('La fecha de reserva no es válida');
+      return;
+    }
+
+    if (filtered.cupo && (isNaN(filtered.cupo) || filtered.cupo <= 0)) {
+      setError('El cupo debe ser número positivo');
+      return;
+    }
+
+    if (filtered.monto_total && (isNaN(filtered.monto_total) || filtered.monto_total < 0)) {
+      setError('El monto total debe ser número no negativo');
+      return;
+    }
+
+    if (filtered.saldo_pendiente && (isNaN(filtered.saldo_pendiente) || filtered.saldo_pendiente < 0)) {
+      setError('El saldo pendiente debe ser número no negativo');
+      return;
+    }
+
+    if (filtered.monto_total && filtered.saldo_pendiente && filtered.saldo_pendiente > filtered.monto_total) {
+      setError('El saldo pendiente no puede ser mayor al monto total');
+      return;
+    }
+
+    const estadosValidos = ['pendiente', 'pagada', 'en_cuotas', 'cancelada'];
+    if (!estadosValidos.includes(filtered.estado)) {
+      setError('Estado inválido');
+      return;
+    }
+
+    if (!filtered.id_cliente || !clientes.some(c => c.id_cliente === filtered.id_cliente)) {
+      setError('Cliente inválido');
+      return;
+    }
+
+    if (!filtered.id_cancha || !canchas.some(ca => ca.id_cancha === filtered.id_cancha)) {
+      setError('Cancha inválida');
+      return;
+    }
+
     try {
-      const filtered = {
-        fecha_reserva: formData.fecha_reserva,
-        estado: formData.estado,
-        id_cliente: formData.id_cliente ? parseInt(formData.id_cliente) : undefined,
-        id_cancha: formData.id_cancha ? parseInt(formData.id_cancha) : undefined,
-        cupo: formData.cupo ? parseInt(formData.cupo) : undefined,
-        monto_total: formData.monto_total ? parseFloat(formData.monto_total) : undefined,
-        saldo_pendiente: formData.saldo_pendiente ? parseFloat(formData.saldo_pendiente) : undefined
-      };
-      if (!filtered.fecha_reserva) { setError('La fecha de reserva es obligatoria'); return; }
-      const f = new Date(filtered.fecha_reserva);
-      if (isNaN(f.getTime())) { setError('La fecha de reserva no es valida'); return; }
-      if (filtered.cupo && (isNaN(filtered.cupo) || filtered.cupo <= 0)) { setError('El cupo debe ser numero positivo'); return; }
-      if (filtered.monto_total && (isNaN(filtered.monto_total) || filtered.monto_total < 0)) { setError('El monto total debe ser numero no negativo'); return; }
-      if (filtered.saldo_pendiente && (isNaN(filtered.saldo_pendiente) || filtered.saldo_pendiente < 0)) { setError('El saldo pendiente debe ser numero no negativo'); return; }
-      if (filtered.monto_total && filtered.saldo_pendiente && filtered.saldo_pendiente > filtered.monto_total) { setError('El saldo pendiente no puede ser mayor al monto total'); return; }
-      const estadosValidos = ['pendiente', 'pagada', 'en_cuotas', 'cancelada'];
-      if (!estadosValidos.includes(filtered.estado)) { setError('Estado invalido'); return; }
-      if (!filtered.id_cliente || !clientes.some(c => c.id_cliente === filtered.id_cliente)) { setError('Cliente invalido'); return; }
-      if (!filtered.id_cancha || !canchas.some(ca => ca.id_cancha === filtered.id_cancha)) { setError('Cancha invalida'); return; }
-
       let response;
-      if (editMode) response = await api.patch(`/reserva/${currentReserva.id_reserva}`, filtered);
-      else response = await api.post('/reserva/', filtered);
+      if (editMode) {
+        response = await api.patch(`/reserva/${currentReserva.id_reserva}`, filtered);
+      } else {
+        response = await api.post('/reserva/', filtered);
+      }
 
-      if (response.data?.exito) { closeModal(); fetchReservas(); }
-      else setError(response.data?.mensaje || 'No se pudo guardar');
+      if (response.data?.exito) {
+        closeModal();
+        fetchReservas();
+      } else {
+        setError(response.data?.mensaje || 'No se pudo guardar');
+      }
     } catch (err) {
-      setError(err.response?.data?.mensaje || 'Error de conexion al servidor');
+      setError(err.response?.data?.mensaje || 'Error de conexión al servidor');
     }
   };
 
@@ -354,7 +406,8 @@ const Reserva = () => {
                   <th className="px-4 py-2 text-left">Cancha</th>
                   <th className="px-4 py-2 text-left">Fecha Reserva</th>
                   <th className="px-4 py-2 text-left">Monto Total</th>
-                  <th className="px-4 py-2 text-left">Saldo Pendiente</th>
+                  <th className="px-4 py-2 text-left">Saldo</th>
+                  <th className="px-4 py-2 text-left">Estado</th>
                   <th className="px-4 py-2 text-left">Acciones</th>
                 </tr>
               </thead>
@@ -367,6 +420,7 @@ const Reserva = () => {
                     <td className="px-4 py-2">{new Date(reserva.fecha_reserva).toLocaleDateString()}</td>
                     <td className="px-4 py-2">{reserva.monto_total ? `$${reserva.monto_total}` : '-'}</td>
                     <td className="px-4 py-2">{reserva.saldo_pendiente ? `$${reserva.saldo_pendiente}` : '-'}</td>
+                    <td className="px-4 py-2">{reserva.estado}</td>
                     <td className="px-4 py-2 flex gap-2">
                       {permissions.canView && (
                         <button
@@ -428,7 +482,7 @@ const Reserva = () => {
               {viewMode ? 'Ver Datos de Reserva' : editMode ? 'Editar Reserva' : 'Crear Reserva'}
             </h3>
             <form onSubmit={handleSubmit} className="grid grid-cols-2 gap-4">
-              <div>
+              <div className="col-span-2">
                 <label className="block text-sm font-medium mb-1">Cliente</label>
                 <select
                   name="id_cliente"
@@ -446,7 +500,7 @@ const Reserva = () => {
                   ))}
                 </select>
               </div>
-              <div>
+              <div className="col-span-2">
                 <label className="block text-sm font-medium mb-1">Cancha</label>
                 <select
                   name="id_cancha"
@@ -464,7 +518,7 @@ const Reserva = () => {
                   ))}
                 </select>
               </div>
-              <div>
+              <div className="col-span-2">
                 <label className="block text-sm font-medium mb-1">Fecha de Reserva</label>
                 <input
                   name="fecha_reserva"
@@ -476,6 +530,31 @@ const Reserva = () => {
                   disabled={viewMode}
                 />
               </div>
+              <div className="col-span-2">
+  <label className="block text-sm font-medium mb-1">Hora de Inicio</label>
+  <input
+    name="hora_inicio"
+    value={formData.hora_inicio}
+    onChange={handleInputChange}
+    className="w-full border rounded px-3 py-2 bg-gray-100"
+    type="time"
+    required
+    disabled={viewMode}
+  />
+</div>
+
+<div className="col-span-2">
+  <label className="block text-sm font-medium mb-1">Hora de Fin</label>
+  <input
+    name="hora_fin"
+    value={formData.hora_fin}
+    onChange={handleInputChange}
+    className="w-full border rounded px-3 py-2 bg-gray-100"
+    type="time"
+    required
+    disabled={viewMode}
+  />
+</div>
               <div>
                 <label className="block text-sm font-medium mb-1">Cupo</label>
                 <input
@@ -514,6 +593,7 @@ const Reserva = () => {
                   disabled={viewMode}
                 />
               </div>
+              {/* Validaciones de estado */}
               <div className="col-span-2">
                 <label className="block text-sm font-medium mb-1">Estado</label>
                 <select
@@ -542,7 +622,6 @@ const Reserva = () => {
                   <button
                     type="submit"
                     className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
-                    disabled={(!permissions.canCreate && !editMode) || (!permissions.canEdit && editMode)}
                   >
                     {editMode ? 'Actualizar' : 'Crear'}
                   </button>

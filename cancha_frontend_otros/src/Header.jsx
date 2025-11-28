@@ -5,25 +5,8 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import api from "./services/api";
 import {
-  FaEnvelope,
-  FaLock,
-  FaUser,
-  FaUsersCog,
-  FaClipboardList,
-  FaCheckCircle,
-  FaPhone,
-  FaVenusMars,
-  FaIdBadge,
-  FaCalendarAlt,
-  FaInfoCircle,
-  FaUserTag,
-  FaMapMarkerAlt,
-  FaAlignLeft,
-  FaCamera,
-  FaKey,
-  FaTimes,
-  FaSave,
-  FaBars,
+  FaEnvelope, FaLock, FaUser, FaUsersCog, FaClipboardList, FaCheckCircle, FaPhone, FaVenusMars, FaIdBadge, FaCalendarAlt,
+  FaInfoCircle, FaUserTag, FaMapMarkerAlt, FaAlignLeft, FaCamera, FaKey, FaTimes, FaSave, FaBars,
 } from "react-icons/fa";
 import { getImageUrl } from "./utils";
 
@@ -337,9 +320,23 @@ const Header = () => {
           (normalized.roles ?? []).map((r) => (r.rol || "").toUpperCase())
         );
 
+        const isMobile = window.innerWidth < 768; // md breakpoint
+
         if (roleSet.has("ADMINISTRADOR")) {
-          navigate("/administrador");
-        } else {
+
+          if (isMobile) {
+            navigate("/administrador/inicio");   // móvil
+          } else {
+            navigate("/administrador");          // PC
+          }
+
+        } else if (roleSet.has("ADMIN_ESP_DEP")){
+          if (isMobile) {
+            navigate("/administrador/inicio");   // móvil
+          } else {
+            navigate("/administrador");          // PC
+          }
+        }else{
           navigate("/espacios-deportivos");
         }
       } else {
@@ -348,7 +345,7 @@ const Header = () => {
     } catch (err) {
       setLoginError(
         err.response?.data?.message ||
-          "Error al Iniciar sesión. Verifica tus credenciales."
+        "Error al Iniciar sesión. Verifica tus credenciales."
       );
     } finally {
       setLoginLoading(false);
@@ -865,7 +862,7 @@ const Header = () => {
           ...campos,
           imagen_perfil: selectedFile
             ? response.data.datos?.usuario?.imagen_perfil ||
-              formData.imagen_perfil
+            formData.imagen_perfil
             : formData.imagen_perfil,
           datos_rol: formData.datos_especificos,
         };
@@ -1384,9 +1381,8 @@ const Header = () => {
               <button
                 onClick={handleLogin}
                 disabled={loginLoading}
-                className={`w-full py-3 px-4 bg-[#01CD6C] text-white text-base rounded-full shadow-lg hover:bg-[#00b359] transition-all font-semibold hover:translate-y-[-2px] hover:shadow-xl ${
-                  loginLoading ? "opacity-50 cursor-not-allowed" : ""
-                }`}
+                className={`w-full py-3 px-4 bg-[#01CD6C] text-white text-base rounded-full shadow-lg hover:bg-[#00b359] transition-all font-semibold hover:translate-y-[-2px] hover:shadow-xl ${loginLoading ? "opacity-50 cursor-not-allowed" : ""
+                  }`}
                 aria-label="Iniciar sesión"
               >
                 {loginLoading ? (
@@ -1510,9 +1506,8 @@ const Header = () => {
                   <FaUsersCog className="text-lg" />
                   Quiero un rol en el sistema
                   <svg
-                    className={`w-4 h-4 transform transition-transform ${
-                      showRoleSection ? "rotate-180" : ""
-                    }`}
+                    className={`w-4 h-4 transform transition-transform ${showRoleSection ? "rotate-180" : ""
+                      }`}
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -1554,63 +1549,63 @@ const Header = () => {
                     {["admin_esp_dep", "encargado", "control"].includes(
                       registerData.rol_agregar
                     ) && (
-                      <div className="mt-4 space-y-3 animate-fadeIn">
-                        <label className="block text-xs sm:text-sm font-medium text-[#23475F]">
-                          Espacio deportivo
-                        </label>
+                        <div className="mt-4 space-y-3 animate-fadeIn">
+                          <label className="block text-xs sm:text-sm font-medium text-[#23475F]">
+                            Espacio deportivo
+                          </label>
 
-                        {espaciosLoading ? (
-                          <div className="text-sm text-[#23475F]">
-                            Cargando...
-                          </div>
-                        ) : espaciosError ? (
-                          <div className="text-sm text-[#A31621]">
-                            {espaciosError}
-                          </div>
-                        ) : (
-                          <select
-                            name="id_espacio"
-                            value={registerData.id_espacio}
+                          {espaciosLoading ? (
+                            <div className="text-sm text-[#23475F]">
+                              Cargando...
+                            </div>
+                          ) : espaciosError ? (
+                            <div className="text-sm text-[#A31621]">
+                              {espaciosError}
+                            </div>
+                          ) : (
+                            <select
+                              name="id_espacio"
+                              value={registerData.id_espacio}
+                              onChange={handleInputChange}
+                              className="w-full px-3 py-2 border border-[#23475F]/40 rounded-full focus:ring-[#01CD6C] focus:outline-none bg-white text-sm"
+                            >
+                              <option value="">Seleccione un espacio</option>
+
+                              {registerData.rol_agregar === "admin_esp_dep" &&
+                                espaciosLibres.map((e) => (
+                                  <option
+                                    key={e.id_espacio}
+                                    value={e.id_espacio}
+                                  >
+                                    {e.nombre}
+                                  </option>
+                                ))}
+
+                              {registerData.rol_agregar !== "admin_esp_dep" &&
+                                espaciosEncargado.map((e) => (
+                                  <option
+                                    key={e.id_espacio}
+                                    value={e.id_espacio}
+                                  >
+                                    {e.nombre}
+                                  </option>
+                                ))}
+                            </select>
+                          )}
+
+                          <label className="block text-xs sm:text-sm font-medium text-[#23475F]">
+                            Motivo (opcional)
+                          </label>
+                          <textarea
+                            name="motivo"
+                            value={registerData.motivo}
                             onChange={handleInputChange}
-                            className="w-full px-3 py-2 border border-[#23475F]/40 rounded-full focus:ring-[#01CD6C] focus:outline-none bg-white text-sm"
-                          >
-                            <option value="">Seleccione un espacio</option>
-
-                            {registerData.rol_agregar === "admin_esp_dep" &&
-                              espaciosLibres.map((e) => (
-                                <option
-                                  key={e.id_espacio}
-                                  value={e.id_espacio}
-                                >
-                                  {e.nombre}
-                                </option>
-                              ))}
-
-                            {registerData.rol_agregar !== "admin_esp_dep" &&
-                              espaciosEncargado.map((e) => (
-                                <option
-                                  key={e.id_espacio}
-                                  value={e.id_espacio}
-                                >
-                                  {e.nombre}
-                                </option>
-                              ))}
-                          </select>
-                        )}
-
-                        <label className="block text-xs sm:text-sm font-medium text-[#23475F]">
-                          Motivo (opcional)
-                        </label>
-                        <textarea
-                          name="motivo"
-                          value={registerData.motivo}
-                          onChange={handleInputChange}
-                          rows={3}
-                          placeholder="Explica por que deseas este rol"
-                          className="w-full px-3 py-2 border border-[#23475F]/40 rounded-xl bg-white focus:ring-[#01CD6C] focus:outline-none text-sm"
-                        />
-                      </div>
-                    )}
+                            rows={3}
+                            placeholder="Explica por que deseas este rol"
+                            className="w-full px-3 py-2 border border-[#23475F]/40 rounded-xl bg-white focus:ring-[#01CD6C] focus:outline-none text-sm"
+                          />
+                        </div>
+                      )}
                   </div>
                 )}
               </div>
@@ -1624,9 +1619,8 @@ const Header = () => {
               <button
                 onClick={handleRegister}
                 disabled={registerLoading}
-                className={`w-full py-3 px-4 bg-gradient-to-r from-[#01CD6C] to-[#00b359] text-white text-base rounded-full shadow-lg hover:shadow-xl hover:translate-y-[-2px] transition-all font-semibold ${
-                  registerLoading ? "opacity-50 cursor-not-allowed" : ""
-                }`}
+                className={`w-full py-3 px-4 bg-gradient-to-r from-[#01CD6C] to-[#00b359] text-white text-base rounded-full shadow-lg hover:shadow-xl hover:translate-y-[-2px] transition-all font-semibold ${registerLoading ? "opacity-50 cursor-not-allowed" : ""
+                  }`}
               >
                 {registerLoading ? (
                   <div className="flex justify-center items-center gap-3">
@@ -1766,7 +1760,7 @@ const Header = () => {
                       <FaVenusMars className="text-[#01CD6C]" />
                       {formData.sexo
                         ? formData.sexo.charAt(0).toUpperCase() +
-                          formData.sexo.slice(1)
+                        formData.sexo.slice(1)
                         : "No especificado"}
                     </p>
                   </div>
@@ -1925,30 +1919,30 @@ const Header = () => {
 
               {(roleRequest.rol === "encargado" ||
                 roleRequest.rol === "control") && (
-                <div>
-                  <label className="block text-xs sm:text-sm font-medium mb-1 text-[#23475F] flex items-center gap-2">
-                    <FaMapMarkerAlt className="text-[#01CD6C]" />
-                    Espacio deportivo
-                  </label>
-                  <select
-                    className="w-full border border-gray-300 rounded-full px-4 py-2.5 bg-white/80 focus:outline-none focus:ring-2 focus:ring-[#01CD6C] focus:border-[#01CD6C] text-xs sm:text-sm mb-1"
-                    value={roleRequest.id_espacio}
-                    onChange={(e) =>
-                      setRoleRequest((prev) => ({
-                        ...prev,
-                        id_espacio: e.target.value,
-                      }))
-                    }
-                  >
-                    <option value="">Seleccione</option>
-                    {espaciosEncargado.map((e) => (
-                      <option key={e.id_espacio} value={e.id_espacio}>
-                        {e.nombre}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
+                  <div>
+                    <label className="block text-xs sm:text-sm font-medium mb-1 text-[#23475F] flex items-center gap-2">
+                      <FaMapMarkerAlt className="text-[#01CD6C]" />
+                      Espacio deportivo
+                    </label>
+                    <select
+                      className="w-full border border-gray-300 rounded-full px-4 py-2.5 bg-white/80 focus:outline-none focus:ring-2 focus:ring-[#01CD6C] focus:border-[#01CD6C] text-xs sm:text-sm mb-1"
+                      value={roleRequest.id_espacio}
+                      onChange={(e) =>
+                        setRoleRequest((prev) => ({
+                          ...prev,
+                          id_espacio: e.target.value,
+                        }))
+                      }
+                    >
+                      <option value="">Seleccione</option>
+                      {espaciosEncargado.map((e) => (
+                        <option key={e.id_espacio} value={e.id_espacio}>
+                          {e.nombre}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
 
               <div>
                 <label className="block text-xs sm:text-sm font-medium mb-1 text-[#23475F] flex items-center gap-2">
@@ -1983,11 +1977,10 @@ const Header = () => {
               <button
                 onClick={() => handleSendRoleRequestFromModal()}
                 disabled={roleRequestLoading || !roleRequest.rol}
-                className={`w-full py-3 rounded-full text-white font-semibold transition-all shadow-md text-sm ${
-                  roleRequestLoading || !roleRequest.rol
+                className={`w-full py-3 rounded-full text-white font-semibold transition-all shadow-md text-sm ${roleRequestLoading || !roleRequest.rol
                     ? "bg-gray-400 cursor-not-allowed"
                     : "bg-gradient-to-r from-[#01CD6C] to-[#00b359] hover:shadow-lg hover:translate-y-[-1px]"
-                }`}
+                  }`}
               >
                 {roleRequestLoading ? "Enviando..." : "Enviar solicitud"}
               </button>

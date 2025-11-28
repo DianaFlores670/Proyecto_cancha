@@ -18,7 +18,7 @@ import {
 } from "react-icons/fa";
 import api from "./services/api";
 import Header from "./Header";
-import PaginaPrincipal from "./pagina_principal";
+import DashboardAdministradores from "./DashboardAdministradores";
 import EspaciosDeportivos from "./casual/EspaciosDeportivos";
 import CanchasEspacio from "./casual/CanchasEspacio";
 import Cancha from "./casual/Cancha";
@@ -354,7 +354,7 @@ const App = () => {
           path="/administrador/*"
           element={
             <ProtectedRoute>
-              <PaginaPrincipal />
+              <DashboardAdministradores/>
             </ProtectedRoute>
           }
         />

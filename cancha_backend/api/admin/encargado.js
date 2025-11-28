@@ -480,6 +480,17 @@ const actualizarEncargadoController = async (req, res) => {
     res.json(respuesta(true, 'Encargado actualizado correctamente', { encargado: encargadoActualizado }));
   } catch (error) {
     console.error('Error en actualizarEncargado:', error.message);
+    if (error.code === '23505') { // Violación de unique constraint
+      // Verificar si el error es por el correo duplicado
+      if (error.constraint === 'persona_correo_key') {
+        return res.status(400).json(respuesta(false, 'El correo electrónico ya está registrado. Por favor, use otro correo.'));
+      }
+
+      // O si el error es por el usuario duplicado
+      if (error.constraint === 'persona_usuario_key') {
+        return res.status(400).json(respuesta(false, 'El nombre de usuario ya está en uso. Por favor, elija otro nombre de usuario.'));
+      }
+    }
     res.status(500).json(respuesta(false, error.message));
   }
 };

@@ -216,10 +216,6 @@ const buscarReservas = async (texto, limite = 10, offset = 0) => {
   }
 };
 
-
-// -----------------------------------------------
-// 5. OBTENER RESERVA POR ID
-// -----------------------------------------------
 const obtenerReservaPorId = async (id) => {
   try {
     const query = `
@@ -231,12 +227,17 @@ const obtenerReservaPorId = async (id) => {
         p.apellido AS cliente_apellido,
         p.correo AS cliente_correo,
         ca.id_cancha,
-        ca.nombre AS cancha_nombre
+        ca.nombre AS cancha_nombre,
+        -- Obtener el minimo hora_inicio y el máximo hora_fin
+        MIN(rh.hora_inicio) AS hora_inicio,
+        MAX(rh.hora_fin) AS hora_fin
       FROM reserva r
       JOIN cliente c ON r.id_cliente = c.id_cliente
       JOIN usuario p ON c.id_cliente = p.id_persona
       JOIN cancha ca ON r.id_cancha = ca.id_cancha
+      LEFT JOIN reserva_horario rh ON r.id_reserva = rh.id_reserva
       WHERE r.id_reserva = $1
+      GROUP BY r.id_reserva, c.id_cliente, p.id_persona, ca.id_cancha
     `;
     const result = await pool.query(query, [id]);
     return result.rows[0] || null;
@@ -246,76 +247,127 @@ const obtenerReservaPorId = async (id) => {
   }
 };
 
-
-// -----------------------------------------------
-// 6. CREAR RESERVA
-// -----------------------------------------------
+// 6. CREAR RESERVA CON VALIDACIONES Y HORARIOS
 const crearReserva = async (datos) => {
   try {
-    const query = `
-      INSERT INTO reserva (
-        fecha_reserva, cupo, monto_total, saldo_pendiente, estado, id_cliente, id_cancha
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7)
-      RETURNING *
-    `;
+    // Validar saldo pendiente no mayor que el monto total
+    if (datos.saldo_pendiente > datos.monto_total) {
+      throw new Error("El saldo pendiente no puede ser mayor que el monto total");
+    }
 
+    // Establecer estado según el saldo pendiente
+    let estado = 'pendiente';
+    if (datos.saldo_pendiente > 0 && datos.saldo_pendiente < datos.monto_total) {
+      estado = 'en_cuotas';
+    } else if (datos.saldo_pendiente === datos.monto_total) {
+      estado = 'pagada';
+    }
+
+    // Crear la reserva
+    const query = `
+      INSERT INTO reserva (fecha_reserva, cupo, monto_total, saldo_pendiente, estado, id_cliente, id_cancha)
+      VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id_reserva, fecha_reserva, estado
+    `;
     const values = [
       datos.fecha_reserva,
       datos.cupo || null,
-      datos.monto_total || null,
-      datos.saldo_pendiente || null,
-      datos.estado,
+      datos.monto_total || 0,
+      datos.saldo_pendiente || 0,
+      estado,
       datos.id_cliente,
       datos.id_cancha
     ];
-
     const { rows } = await pool.query(query, values);
-    return rows[0];
+    const nuevaReserva = rows[0];
+
+    // Insertar horarios si existen
+    if (datos.hora_inicio && datos.hora_fin) {
+      const horarios = [];
+      let hora_inicio = new Date(`1970-01-01T${datos.hora_inicio}:00`);
+      let hora_fin = new Date(`1970-01-01T${datos.hora_fin}:00`);
+
+      // Generar bloques de 1 hora
+      while (hora_inicio < hora_fin) {
+        let hora_fin_bloque = new Date(hora_inicio);
+        hora_fin_bloque.setHours(hora_inicio.getHours() + 1); // Cada bloque de 1 hora
+
+        horarios.push({
+          fecha: datos.fecha_reserva,
+          hora_inicio: hora_inicio.toTimeString().slice(0, 5),
+          hora_fin: hora_fin_bloque.toTimeString().slice(0, 5),
+          monto: datos.monto_total / horarios.length  // Distribuir el monto total entre los bloques
+        });
+
+        // Mover la hora de inicio al siguiente bloque
+        hora_inicio = new Date(hora_fin_bloque);
+      }
+
+      // Insertar los horarios generados en la base de datos
+      const horariosPromises = horarios.map(horario => {
+        const horarioQuery = `
+          INSERT INTO reserva_horario (id_reserva, fecha, hora_inicio, hora_fin, monto)
+          VALUES ($1, $2, $3, $4, $5)
+        `;
+        return pool.query(horarioQuery, [nuevaReserva.id_reserva, horario.fecha, horario.hora_inicio, horario.hora_fin, horario.monto]);
+      });
+      await Promise.all(horariosPromises);
+    }
+
+    return nuevaReserva;
   } catch (err) {
     console.log("Error en crearReserva:", err);
     throw err;
   }
 };
 
-
-// -----------------------------------------------
 // 7. ACTUALIZAR RESERVA
-// -----------------------------------------------
 const actualizarReserva = async (id, datos) => {
   try {
-    const camposPermitidos = [
-      'fecha_reserva',
-      'cupo',
-      'monto_total',
-      'saldo_pendiente',
-      'estado',
-      'id_cliente',
-      'id_cancha'
-    ];
+    // Actualizar la reserva (mismo código que ya tienes)
+    const camposPermitidos = ['fecha_reserva', 'cupo', 'monto_total', 'saldo_pendiente', 'estado', 'id_cliente', 'id_cancha'];
+    const campos = Object.keys(datos).filter(k => camposPermitidos.includes(k));
+    const setClause = campos.map((campo, i) => `${campo} = $${i + 2}`).join(', ');
+    const values = campos.map(c => datos[c] || null);
+    const query = `UPDATE reserva SET ${setClause} WHERE id_reserva = $1 RETURNING *`;
+    const result = await pool.query(query, [id, ...values]);
 
-    const campos = Object.keys(datos).filter(k =>
-      camposPermitidos.includes(k)
-    );
+    // Eliminar horarios antiguos
+    await pool.query(`DELETE FROM reserva_horario WHERE id_reserva = $1`, [id]);
 
-    if (campos.length === 0) {
-      throw new Error("No hay campos válidos para actualizar");
+    // Insertar nuevos horarios si existe hora_inicio y hora_fin
+    if (datos.hora_inicio && datos.hora_fin) {
+      const horarios = [];
+      let hora_inicio = new Date(`1970-01-01T${datos.hora_inicio}:00`);
+      let hora_fin = new Date(`1970-01-01T${datos.hora_fin}:00`);
+
+      // Generar bloques de 1 hora
+      while (hora_inicio < hora_fin) {
+        let hora_fin_bloque = new Date(hora_inicio);
+        hora_fin_bloque.setHours(hora_inicio.getHours() + 1); // Cada bloque de 1 hora
+
+        horarios.push({
+          fecha: datos.fecha_reserva,
+          hora_inicio: hora_inicio.toTimeString().slice(0, 5),
+          hora_fin: hora_fin_bloque.toTimeString().slice(0, 5),
+          monto: datos.monto_total / horarios.length  // Distribuir el monto total entre los bloques
+        });
+
+        // Mover la hora de inicio al siguiente bloque
+        hora_inicio = new Date(hora_fin_bloque);
+      }
+
+      // Insertar los horarios generados en la base de datos
+      const horariosPromises = horarios.map(horario => {
+        const horarioQuery = `
+          INSERT INTO reserva_horario (id_reserva, fecha, hora_inicio, hora_fin, monto)
+          VALUES ($1, $2, $3, $4, $5)
+        `;
+        return pool.query(horarioQuery, [id, horario.fecha, horario.hora_inicio, horario.hora_fin, horario.monto]);
+      });
+      await Promise.all(horariosPromises);
     }
 
-    const setClause = campos
-      .map((campo, i) => `${campo} = $${i + 2}`)
-      .join(', ');
-
-    const values = campos.map(c => datos[c] || null);
-
-    const query = `
-      UPDATE reserva
-      SET ${setClause}
-      WHERE id_reserva = $1
-      RETURNING *
-    `;
-
-    const result = await pool.query(query, [id, ...values]);
-    return result.rows[0] || null;
+    return result.rows[0];
   } catch (error) {
     console.log("Error en actualizarReserva:", error);
     throw error;
@@ -323,17 +375,14 @@ const actualizarReserva = async (id, datos) => {
 };
 
 
-// -----------------------------------------------
 // 8. ELIMINAR RESERVA
-// -----------------------------------------------
 const eliminarReserva = async (id) => {
   try {
-    const query = `
-      DELETE FROM reserva
-      WHERE id_reserva = $1
-      RETURNING id_reserva
-    `;
+    // Eliminar horarios primero
+    await pool.query(`DELETE FROM reserva_horario WHERE id_reserva = $1`, [id]);
 
+    // Eliminar la reserva
+    const query = `DELETE FROM reserva WHERE id_reserva = $1 RETURNING id_reserva`;
     const result = await pool.query(query, [id]);
     return result.rows[0] || null;
   } catch (error) {
@@ -342,10 +391,7 @@ const eliminarReserva = async (id) => {
   }
 };
 
-
-// -----------------------------------------------
 // 9. CANCELAR RESERVAS VENCIDAS
-// -----------------------------------------------
 const cancelarReservasVencidas = async () => {
   try {
     const query = `
@@ -385,7 +431,6 @@ const cancelarReservasVencidas = async () => {
     throw error;
   }
 };
-
 
 // ===================================================
 // ================ CONTROLADORES ====================
@@ -472,19 +517,18 @@ const obtenerReservaPorIdController = async (req, res) => {
   }
 };
 
-
 const crearReservaController = async (req, res) => {
   try {
     const datos = req.body;
 
+    // Llamar a la función que crea la reserva y sus horarios
     const nueva = await crearReserva(datos);
 
-    res.json(respuesta(true, "Reserva creada", { reserva: nueva }));
+    res.json(respuesta(true, "Reserva creada correctamente", { reserva: nueva }));
   } catch (err) {
     res.status(500).json(respuesta(false, err.message));
   }
 };
-
 
 const actualizarReservaController = async (req, res) => {
   try {

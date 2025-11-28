@@ -22,7 +22,6 @@ import Espacio_Deportivo from "./pages/Espacio_Deportivo";
 import Cancha from "./pages/Cancha";
 import Disciplina from "./pages/Disciplina";
 import Reserva from "./pages/Reserva";
-import Reserva_Horario from "./pages/Reserva_Horario";
 import Pago from "./pages/Pago";
 import QR_Reserva from "./pages/QR_Reserva";
 import Reporte_Incidencia from "./pages/Reporte_Incidencia";
@@ -33,7 +32,6 @@ import Participa_En from "./pages/Participa_En";
 import EspacioDeportivoAdmin from "./roles/admin/EspacioDeportivoAdmin";
 import CanchaAdmin from "./roles/admin/CanchaAdmin";
 import ReservaAdmin from "./roles/admin/ReservaAdmin";
-import Reserva_HorarioAdmin from "./roles/admin/Reserva_HorarioAdmin";
 import ResenaAdmin from "./roles/admin/ResenaAdmin";
 import EspaciosView from "./roles/admin/EspaciosView";
 import CalendarioReservasAdmin from "./roles/admin/CalendarioReservasAdmin";
@@ -158,13 +156,6 @@ const roleRoutesConfig = {
       path: "reserva",
       component: Reserva,
     },
-    {
-      id: "reserva_horario",
-      label: "Reserva Horario",
-      icon: "⏰",
-      path: "reserva-horario",
-      component: Reserva_Horario,
-    },
     { id: "pago", label: "Pago", icon: "💳", path: "pago", component: Pago },
     {
       id: "qr_reserva",
@@ -237,13 +228,6 @@ const roleRoutesConfig = {
       icon: "📅",
       path: "reserva",
       component: ReservaAdmin,
-    },
-    {
-      id: "reserva_horario",
-      label: "Reserva Horario",
-      icon: "⏰",
-      path: "reserva-horario",
-      component: Reserva_HorarioAdmin,
     },
     {
       id: "pago",
@@ -368,32 +352,21 @@ const pickEffectiveRole = (u, preferredRole) => {
 
 const Header = ({ title, toggleSidebar, isSidebarOpen }) => {
   return (
-    <header className="bg-white shadow-sm border-b flex items-center justify-between px-6 py-4">
-      <div className="flex items-center">
-        <button
-          className="mr-4 text-[#23475F] hover:text-[#01CD6C] focus:outline-none"
-          onClick={toggleSidebar}
-        >
-          <svg
-            className="w-6 h-6"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d={
-                isSidebarOpen
-                  ? "M6 18L18 6M6 6l12 12"
-                  : "M4 6h16M4 12h16M4 18h16"
-              }
-            />
-          </svg>
-        </button>
-        <h1 className="text-2xl font-bold text-[#23475F]">{title}</h1>
-      </div>
+    <header className="bg-white/90 backdrop-blur-sm shadow-md border-b flex items-center justify-between px-4 md:px-6 py-3 sticky top-0 z-40">
+      <button
+        className="mr-2 text-[#23475F] hover:text-[#01CD6C] active:scale-95 transition-all"
+        onClick={toggleSidebar}
+      >
+        <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d={isSidebarOpen ? "M6 18L18 6M6 6l12 12" : "M4 6h16M4 12h16M4 18h16"}
+          />
+        </svg>
+      </button>
+      <h1 className="text-lg md:text-2xl font-bold text-[#23475F] truncate">{title}</h1>
     </header>
   );
 };
@@ -409,6 +382,7 @@ const getMainRole = (user) => {
     roles = [String(user.role).toUpperCase()];
   }
 
+  if (roles.includes("ADMINISTRADOR")) return "ADMINISTRADOR";
   if (roles.includes("ADMIN_ESP_DEP")) return "ADMIN_ESP_DEP";
   if (roles.includes("ENCARGADO")) return "ENCARGADO";
   if (roles.includes("CONTROL")) return "CONTROL";
@@ -424,28 +398,22 @@ const Sidebar = ({
   user,
   empresa,
   isSidebarOpen,
-  toggleSidebar,
+  toggleSidebar
 }) => {
   return (
     <div
-      className={`fixed inset-y-0 left-0 w-64 bg-white shadow-xl border-r 
-      flex flex-col transform 
-      ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"} 
-      transition-transform duration-300 ease-in-out z-50`}
+      className={`fixed inset-y-0 left-0 w-64 bg-white shadow-xl border-r flex flex-col transform
+      backdrop-blur-xl ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"}
+      transition-all duration-300 ease-in-out z-50 max-h-screen`}
     >
-      <div className="p-6 border-b bg-gradient-to-r from-[#E8F5EE] to-[#FFFFFF] flex justify-between items-start">
-        <div>
-          <div className="flex items-center gap-3 mb-3">
+      <div className="p-5 border-b bg-gradient-to-r from-[#E8F5EE] to-[#FFFFFF] flex justify-between">
+        <div className="flex-1">
+          <div className="flex items-center gap-3 mb-2">
             <img
-              src={
-                empresa?.logo_imagen
-                  ? getImageUrl(empresa.logo_imagen)
-                  : "/placeholder-logo.png"
-              }
-              alt="Logo Empresa"
-              className="w-12 h-12 rounded-xl object-cover shadow-sm border bg-[#0F2634]"
+              src={empresa?.logo_imagen ? getImageUrl(empresa.logo_imagen) : "/placeholder-logo.png"}
+              alt="logo"
+              className="w-12 h-12 rounded-xl object-cover shadow border bg-[#0F2634]"
             />
-
             <span className="text-lg font-extrabold text-[#23475F] leading-tight tracking-wide">
               {empresa?.nombre_sistema || "Cargando..."}
             </span>
@@ -453,76 +421,48 @@ const Sidebar = ({
 
           {user && (
             <p className="text-sm text-[#23475F]/80">
-              Hola, <span className="font-medium">{user.nombre}</span>
+              Hola, <span className="font-semibold">{user.nombre}</span>
             </p>
           )}
 
+          <p className="text-xs bg-[#01CD6C]/20 text-[#23475F] px-2 py-1 rounded-md mt-2 inline-block">
+            Rol: {getMainRole(user) || "N/A"}
+          </p>
+
           <button
             onClick={onLogout}
-            className="mt-4 w-full text-[#23475F] hover:text-[#01CD6C] text-sm font-medium flex items-center gap-2 transition-all"
+            className="mt-4 w-full text-[#23475F] hover:text-[#01CD6C] text-sm font-semibold flex items-center gap-2 transition-all active:scale-95"
           >
-            <svg
-              className="w-5 h-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
-              />
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
             </svg>
             Cerrar Sesion
           </button>
 
-          {(getMainRole(user) === "ADMIN_ESP_DEP" ||
-            getMainRole(user) === "ENCARGADO" ||
-            getMainRole(user) === "CONTROL") && (
-              <button
-                onClick={() => (window.location.href = "/")}
-                className="mt-3 w-full text-[#23475F] hover:text-[#01CD6C] text-sm font-medium flex items-center gap-2 transition-all"
-              >
-                <svg
-                  className="w-5 h-5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M5.121 17.804A9 9 0 0112 15a9 9 0 016.879 2.804M15 11a3 3 0 11-6 0 3 3 0 016 0z"
-                  />
-                </svg>
-                Vista Cliente
-              </button>
-            )}
+          {(getMainRole(user) === "ADMIN_ESP_DEP" || getMainRole(user) === "ENCARGADO" || getMainRole(user) === "CONTROL") && (
+            <button
+              onClick={() => (window.location.href = "/")}
+              className="mt-3 w-full text-[#23475F] hover:text-[#01CD6C] text-sm font-semibold flex items-center gap-2 transition-all active:scale-95"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.121 17.804A9 9 0 0112 15a9 9 0 016.879 2.804M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+              Vista Cliente
+            </button>
+          )}
         </div>
 
         <button
-          className="text-[#23475F] hover:text-[#01CD6C]"
+          className="text-[#23475F] hover:text-[#01CD6C] active:scale-95 transition-all"
           onClick={toggleSidebar}
         >
-          <svg
-            className="w-6 h-6"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M6 18L18 6M6 6l12 12"
-            />
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
           </svg>
         </button>
       </div>
 
-      <nav className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-[#23475F]/40 scrollbar-track-transparent">
+      <nav className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-[#23475F]/40 scrollbar-track-transparent p-2 space-y-1">
         {routes.map((item) => (
           <Link
             key={item.id}
@@ -531,10 +471,10 @@ const Sidebar = ({
               onPageChange(item.id, item.label);
               toggleSidebar();
             }}
-            className={`flex items-center px-6 py-3 text-left text-sm font-medium transition-all
+            className={`flex items-center px-4 py-4 rounded-lg text-[15px] font-semibold transition-all select-none active:scale-95
               ${currentPage === item.id
                 ? "bg-[#01CD6C] text-white shadow-inner border-l-4 border-[#0F2634]"
-                : "text-[#23475F] hover:bg-[#01CD6C]/15 hover:text-[#01CD6C]"
+                : "text-[#23475F] hover:bg-[#01CD6C]/10 hover:text-[#01CD6C]"
               }`}
           >
             <span className="text-lg mr-3">{item.icon}</span>
@@ -681,7 +621,7 @@ const PaginaPrincipal = () => {
   }
 
   return (
-    <div className="flex h-screen bg-[#FFFFFF] overflow-hidden">
+    <div className="flex h-screen bg-white overflow-hidden">
       {routes.length > 0 && (
         <Sidebar
           routes={routes}
@@ -695,7 +635,7 @@ const PaginaPrincipal = () => {
         />
       )}
       <div
-        className={`flex-1 flex flex-col min-w-0 ${isSidebarOpen && routes.length > 0 ? "ml-64" : "ml-0"
+        className={`flex-1 flex flex-col min-w-0  ${isSidebarOpen && routes.length > 0 ? "ml-52" : "ml-0"
           } transition-all duration-300`}
       >
         <Header
@@ -703,7 +643,7 @@ const PaginaPrincipal = () => {
           toggleSidebar={toggleSidebar}
           isSidebarOpen={isSidebarOpen}
         />
-        <main className="flex-1 p-6 overflow-auto">
+        <main className="flex-1 p-3 md:p-6 overflow-auto">
           <Routes>
             {routes.map((route) => (
               <Route
@@ -727,8 +667,9 @@ const PaginaPrincipal = () => {
       </div>
       {isSidebarOpen && routes.length > 0 && (
         <div
-          className="fixed inset-0 bg-black bg-opacity-50 z-40"
+          className="fixed inset-0 bg-black/40 bg-opacity-50 z-40"
           onClick={toggleSidebar}
+          //className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40 md:hidden transition-opacity"
         />
       )}
     </div>

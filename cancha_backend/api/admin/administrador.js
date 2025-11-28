@@ -395,23 +395,27 @@ const crearAdministradorController = async (req, res) => {
       );
     }
 
+    // Intentar crear el administrador
     const nuevoAdministrador = await crearAdministrador(datos);
 
     res.status(201).json(respuesta(true, 'Administrador creado correctamente', { administrador: nuevoAdministrador }));
   } catch (error) {
     console.error('Error en crearAdministrador:', error.message);
-    
-    if (error.code === '23505') { // Violación de unique constraint
-      return res.status(400).json(respuesta(false, 'El correo o usuario ya existe'));
+
+    // Manejar error de clave duplicada (violación de restricción de unicidad)
+    if (error.code === '23505') {  // Código de error para violación de clave única
+      return res.status(400).json(respuesta(false, 'El correo o usuario ya está registrado. Por favor, use otro.'));
     }
-    
-    res.status(500).json(respuesta(false, error.message));
+
+    // Otros errores
+    res.status(500).json(respuesta(false, 'Error al crear administrador: ' + error.message));
   }
 };
 
 /**
  * Controlador para PATCH - Actualizar administrador
  */
+// Controlador para actualizar el administrador
 const actualizarAdministradorController = async (req, res) => {
   try {
     const { id } = req.params;
@@ -425,6 +429,7 @@ const actualizarAdministradorController = async (req, res) => {
       return res.status(400).json(respuesta(false, 'No se proporcionaron campos para actualizar'));
     }
 
+    // Intentar actualizar el administrador
     const administradorActualizado = await actualizarAdministrador(parseInt(id), camposActualizar);
 
     if (!administradorActualizado) {
@@ -432,9 +437,24 @@ const actualizarAdministradorController = async (req, res) => {
     }
 
     res.json(respuesta(true, 'Administrador actualizado correctamente', { administrador: administradorActualizado }));
+
   } catch (error) {
-    console.error('Error en actualizarAdministrador:', error.message);
-    res.status(500).json(respuesta(false, error.message));
+    console.error('Error al actualizar administrador:', error.message);
+
+    // Captura del error de restricción de unicidad
+    if (error.code === '23505') {
+      // Detectamos si el error es por el correo duplicado
+      if (error.constraint === 'persona_correo_key') {
+        return res.status(400).json(respuesta(false, 'El correo electrónico ya está registrado. Por favor, use otro correo.'));
+      }
+
+      // O si el error es por el usuario duplicado
+      if (error.constraint === 'persona_usuario_key') {
+        return res.status(400).json(respuesta(false, 'El nombre de usuario ya está en uso. Por favor, elija otro nombre de usuario.'));
+      }
+    }
+
+    res.status(500).json(respuesta(false, 'Error al actualizar administrador: ' + error.message));
   }
 };
 
