@@ -5,28 +5,43 @@ const router = express.Router();
 
 const respuesta = (exito, mensaje, datos = null) => ({ exito, mensaje, datos });
 
-// ===================================================
-// MODELOS — PAGOS del ADMIN_ESP_DEP
-// ===================================================
+// =====================================================================================
+// FILTRO GENERAL DE PAGOS SEGUN LAS CANCHAS DEL ADMIN
+// =====================================================================================
 
-/**
- * Obtener pagos (opcionalmente filtrados por reserva, cancha o espacio)
- */
-const obtenerPagosAdmin = async (id_admin_esp_dep, limite = 10, offset = 0, id_reserva = null, id_cancha = null, id_espacio = null) => {
+const obtenerPagosAdmin = async (
+  id_admin_esp_dep,
+  limite = 10,
+  offset = 0,
+  id_reserva = null,
+  id_cancha = null,
+  id_espacio = null,
+  id_canchas = []
+) => {
   try {
     const params = [id_admin_esp_dep];
     let filtros = 'WHERE e.id_admin_esp_dep = $1';
 
+    // filtro por canchas del admin (ARRAY REAL)
+    if (Array.isArray(id_canchas) && id_canchas.length > 0) {
+      const pos = id_canchas.map((_, i) => `$${params.length + i + 1}`).join(',');
+      filtros += ` AND ca.id_cancha IN (${pos})`;
+      params.push(...id_canchas.map(Number));
+    }
+
+    // filtro por id_reserva exacto
     if (id_reserva) {
       params.push(id_reserva);
       filtros += ` AND p.id_reserva = $${params.length}`;
     }
 
+    // filtro por cancha especifica de la URL
     if (id_cancha) {
       params.push(id_cancha);
       filtros += ` AND ca.id_cancha = $${params.length}`;
     }
 
+    // filtro por espacio especifico
     if (id_espacio) {
       params.push(id_espacio);
       filtros += ` AND e.id_espacio = $${params.length}`;
@@ -49,7 +64,7 @@ const obtenerPagosAdmin = async (id_admin_esp_dep, limite = 10, offset = 0, id_r
       JOIN espacio_deportivo e ON ca.id_espacio = e.id_espacio
       ${filtros}
       ORDER BY p.fecha_pago DESC
-      LIMIT $${params.length - 1} OFFSET $${params.length}
+      LIMIT $${params.length - 1} OFFSET $${params.length};
     `;
 
     const queryTotal = `
@@ -58,7 +73,7 @@ const obtenerPagosAdmin = async (id_admin_esp_dep, limite = 10, offset = 0, id_r
       JOIN reserva r ON p.id_reserva = r.id_reserva
       JOIN cancha ca ON r.id_cancha = ca.id_cancha
       JOIN espacio_deportivo e ON ca.id_espacio = e.id_espacio
-      ${filtros}
+      ${filtros};
     `;
 
     const [resultDatos, resultTotal] = await Promise.all([
@@ -68,20 +83,31 @@ const obtenerPagosAdmin = async (id_admin_esp_dep, limite = 10, offset = 0, id_r
 
     return {
       pagos: resultDatos.rows,
-      total: parseInt(resultTotal.rows[0].count)
+      total: Number(resultTotal.rows[0].count)
     };
   } catch (error) {
-    console.error('Error en obtenerPagosAdmin:', error);
+    console.error("Error en obtenerPagosAdmin:", error);
     throw error;
   }
 };
 
-/**
- * Búsqueda general (nombre, apellido, cancha, método)
- */
-const buscarPagosAdmin = async (id_admin_esp_dep, texto, limite = 10, offset = 0) => {
+// =====================================================================================
+// BUSQUEDA GENERAL
+// =====================================================================================
+
+const buscarPagosAdmin = async (id_admin_esp_dep, texto, limite = 10, offset = 0, id_canchas = []) => {
   try {
     const termino = `%${texto.replace(/[%_\\]/g, '\\$&')}%`;
+    const params = [id_admin_esp_dep];
+    let filtros = `WHERE e.id_admin_esp_dep = $1`;
+
+    if (Array.isArray(id_canchas) && id_canchas.length > 0) {
+      const pos = id_canchas.map((_, i) => `$${params.length + i + 1}`).join(",");
+      filtros += ` AND ca.id_cancha IN (${pos})`;
+      params.push(...id_canchas.map(Number));
+    }
+
+    params.push(termino, limite, offset);
 
     const query = `
       SELECT 
@@ -96,53 +122,64 @@ const buscarPagosAdmin = async (id_admin_esp_dep, texto, limite = 10, offset = 0
       JOIN usuario u ON c.id_cliente = u.id_persona
       JOIN cancha ca ON r.id_cancha = ca.id_cancha
       JOIN espacio_deportivo e ON ca.id_espacio = e.id_espacio
-      WHERE e.id_admin_esp_dep = $1
-        AND (
-          u.nombre ILIKE $2 OR
-          u.apellido ILIKE $2 OR
-          ca.nombre ILIKE $2 OR
-          p.metodo_pago::text ILIKE $2
-        )
+      ${filtros}
+      AND (
+        u.nombre ILIKE $${params.length - 2} OR
+        u.apellido ILIKE $${params.length - 2} OR
+        ca.nombre ILIKE $${params.length - 2} OR
+        p.metodo_pago::text ILIKE $${params.length - 2}
+      )
       ORDER BY p.fecha_pago DESC
-      LIMIT $3 OFFSET $4
+      LIMIT $${params.length - 1} OFFSET $${params.length};
     `;
 
     const queryTotal = `
-      SELECT COUNT(*) 
+      SELECT COUNT(*)
       FROM pago p
       JOIN reserva r ON p.id_reserva = r.id_reserva
       JOIN cancha ca ON r.id_cancha = ca.id_cancha
       JOIN espacio_deportivo e ON ca.id_espacio = e.id_espacio
       JOIN cliente c ON r.id_cliente = c.id_cliente
       JOIN usuario u ON c.id_cliente = u.id_persona
-      WHERE e.id_admin_esp_dep = $1
-        AND (
-          u.nombre ILIKE $2 OR
-          u.apellido ILIKE $2 OR
-          ca.nombre ILIKE $2 OR
-          p.metodo_pago::text ILIKE $2
-        )
+      ${filtros}
+      AND (
+        u.nombre ILIKE $${params.length - 2} OR
+        u.apellido ILIKE $${params.length - 2} OR
+        ca.nombre ILIKE $${params.length - 2} OR
+        p.metodo_pago::text ILIKE $${params.length - 2}
+      );
     `;
 
+    const baseParamsTotal = params.slice(0, Array.isArray(id_canchas) && id_canchas.length > 0 ? 1 + id_canchas.length : 1);
+    const paramsTotal = [...baseParamsTotal, termino];
+
     const [resultDatos, resultTotal] = await Promise.all([
-      pool.query(query, [id_admin_esp_dep, termino, limite, offset]),
-      pool.query(queryTotal, [id_admin_esp_dep, termino])
+      pool.query(query, params),
+      pool.query(queryTotal, paramsTotal)
     ]);
 
     return {
       pagos: resultDatos.rows,
-      total: parseInt(resultTotal.rows[0].count)
+      total: Number(resultTotal.rows[0].count)
     };
-  } catch (error) {
-    console.error('Error en buscarPagosAdmin:', error);
-    throw error;
+
+  } catch (e) {
+    console.error("Error en buscarPagosAdmin:", e);
+    throw e;
   }
 };
 
-/**
- * Filtros específicos (por fecha, monto, método)
- */
-const obtenerPagosFiltradosAdmin = async (id_admin_esp_dep, tipoFiltro, limite = 10, offset = 0) => {
+// =====================================================================================
+// FILTROS (fecha, monto, metodo)
+// =====================================================================================
+
+const obtenerPagosFiltradosAdmin = async (
+  id_admin_esp_dep,
+  tipoFiltro,
+  limite = 10,
+  offset = 0,
+  id_canchas = []
+) => {
   try {
     const ordenes = {
       fecha: 'p.fecha_pago DESC',
@@ -150,7 +187,19 @@ const obtenerPagosFiltradosAdmin = async (id_admin_esp_dep, tipoFiltro, limite =
       metodo: 'p.metodo_pago ASC',
       default: 'p.id_pago ASC'
     };
+
     const orden = ordenes[tipoFiltro] || ordenes.default;
+
+    const params = [id_admin_esp_dep];
+    let filtros = `WHERE e.id_admin_esp_dep = $1`;
+
+    if (Array.isArray(id_canchas) && id_canchas.length > 0) {
+      const pos = id_canchas.map((_, i) => `$${params.length + i + 1}`).join(",");
+      filtros += ` AND ca.id_cancha IN (${pos})`;
+      params.push(...id_canchas.map(Number));
+    }
+
+    params.push(limite, offset);
 
     const query = `
       SELECT 
@@ -165,34 +214,41 @@ const obtenerPagosFiltradosAdmin = async (id_admin_esp_dep, tipoFiltro, limite =
       JOIN usuario u ON c.id_cliente = u.id_persona
       JOIN cancha ca ON r.id_cancha = ca.id_cancha
       JOIN espacio_deportivo e ON ca.id_espacio = e.id_espacio
-      WHERE e.id_admin_esp_dep = $1
+      ${filtros}
       ORDER BY ${orden}
-      LIMIT $2 OFFSET $3
+      LIMIT $${params.length - 1} OFFSET $${params.length};
     `;
 
     const queryTotal = `
-      SELECT COUNT(*) 
+      SELECT COUNT(*)
       FROM pago p
       JOIN reserva r ON p.id_reserva = r.id_reserva
       JOIN cancha ca ON r.id_cancha = ca.id_cancha
       JOIN espacio_deportivo e ON ca.id_espacio = e.id_espacio
-      WHERE e.id_admin_esp_dep = $1
+      ${filtros};
     `;
 
+    const baseParams = params.slice(0, params.length - 2);
+
     const [resultDatos, resultTotal] = await Promise.all([
-      pool.query(query, [id_admin_esp_dep, limite, offset]),
-      pool.query(queryTotal, [id_admin_esp_dep])
+      pool.query(query, params),
+      pool.query(queryTotal, baseParams)
     ]);
 
     return {
       pagos: resultDatos.rows,
-      total: parseInt(resultTotal.rows[0].count)
+      total: Number(resultTotal.rows[0].count)
     };
+
   } catch (error) {
-    console.error('Error en obtenerPagosFiltradosAdmin:', error);
+    console.error("Error en obtenerPagosFiltradosAdmin:", error);
     throw error;
   }
 };
+
+// =====================================================================================
+// CREAR PAGO
+// =====================================================================================
 
 const crearPago = async (input) => {
   const client = await pool.connect();
@@ -202,108 +258,94 @@ const crearPago = async (input) => {
     const metodoPago = String(input.metodo_pago || '').trim();
     const fechaPago = input.fecha_pago ? new Date(input.fecha_pago) : new Date();
 
-    if (!Number.isInteger(idReserva)) {
-      throw new Error('id_reserva invalido');
-    }
-    if (!Number.isFinite(montoNum) || montoNum <= 0) {
-      throw new Error('Monto invalido');
-    }
-    if (!metodoPago) {
-      throw new Error('metodo_pago requerido');
-    }
+    if (!Number.isInteger(idReserva)) throw new Error("id_reserva invalido");
+    if (!Number.isFinite(montoNum) || montoNum <= 0) throw new Error("Monto invalido");
+    if (!metodoPago) throw new Error("metodo_pago requerido");
 
-    await client.query('BEGIN');
+    await client.query("BEGIN");
 
     const resReserva = await client.query(
       `
-      select id_reserva, monto_total, saldo_pendiente, estado
-      from reserva
-      where id_reserva = $1
-      for update
+      SELECT id_reserva, monto_total, saldo_pendiente, estado
+      FROM reserva
+      WHERE id_reserva = $1
+      FOR UPDATE
       `,
       [idReserva]
     );
-    if (!resReserva.rows[0]) {
-      throw new Error('Reserva no encontrada');
-    }
+
+    if (!resReserva.rows[0]) throw new Error("Reserva no encontrada");
 
     const reserva = resReserva.rows[0];
 
-    if (reserva.estado === 'cancelada') {
-      throw new Error('No se puede registrar pago en reserva cancelada');
-    }
-    if (reserva.estado === 'pagada') {
-      throw new Error('La reserva ya esta pagada');
-    }
+    if (reserva.estado === "cancelada") throw new Error("Reserva cancelada");
+    if (reserva.estado === "pagada") throw new Error("Reserva ya pagada");
 
-    if (reserva.monto_total == null) {
-      throw new Error('La reserva no tiene monto_total definido');
-    }
+    if (reserva.monto_total == null) throw new Error("Reserva sin monto_total");
 
     const montoTotal = Number(reserva.monto_total || 0);
-    let saldoPendiente = reserva.saldo_pendiente != null ? Number(reserva.saldo_pendiente) : null;
+
+    let saldoPendiente =
+      reserva.saldo_pendiente != null ? Number(reserva.saldo_pendiente) : null;
 
     if (saldoPendiente === null) {
       const resSuma = await client.query(
-        'select coalesce(sum(monto),0) as total_pagado from pago where id_reserva = $1',
+        "SELECT COALESCE(SUM(monto),0) AS total_pagado FROM pago WHERE id_reserva = $1",
         [idReserva]
       );
       const totalPagado = Number(resSuma.rows[0].total_pagado || 0);
       saldoPendiente = montoTotal - totalPagado;
-      if (saldoPendiente < 0) {
-        saldoPendiente = 0;
-      }
+      if (saldoPendiente < 0) saldoPendiente = 0;
     }
 
-    if (montoNum > saldoPendiente) {
-      throw new Error('El monto supera el saldo pendiente');
-    }
+    if (montoNum > saldoPendiente)
+      throw new Error("El monto supera el saldo pendiente");
 
-    const saldoNuevoRaw = saldoPendiente - montoNum;
-    const saldoNuevo = saldoNuevoRaw < 0 ? 0 : saldoNuevoRaw;
-    const estadoNuevo = saldoNuevo <= 0 ? 'pagada' : 'en_cuotas';
+    const nuevoSaldo = Math.max(0, saldoPendiente - montoNum);
+    const nuevoEstado = nuevoSaldo <= 0 ? "pagada" : "en_cuotas";
 
     const resPago = await client.query(
       `
-      insert into pago (id_reserva, monto, metodo_pago, fecha_pago)
-      values ($1, $2, $3, $4)
-      returning *
+      INSERT INTO pago (id_reserva, monto, metodo_pago, fecha_pago)
+      VALUES ($1,$2,$3,$4)
+      RETURNING *
       `,
       [idReserva, montoNum, metodoPago, fechaPago]
     );
+
     const pago = resPago.rows[0];
 
     await client.query(
       `
-      update reserva
-      set saldo_pendiente = $2,
+      UPDATE reserva
+      SET saldo_pendiente = $2,
           estado = $3
-      where id_reserva = $1
+      WHERE id_reserva = $1
       `,
-      [idReserva, saldoNuevo, estadoNuevo]
+      [idReserva, nuevoSaldo, nuevoEstado]
     );
 
-    await client.query('COMMIT');
+    await client.query("COMMIT");
 
     return {
       pago,
       reserva_actualizada: {
         id_reserva: idReserva,
-        saldo_pendiente: saldoNuevo,
-        estado: estadoNuevo
+        saldo_pendiente: nuevoSaldo,
+        estado: nuevoEstado
       }
     };
   } catch (e) {
-    await client.query('ROLLBACK');
+    await client.query("ROLLBACK");
     throw e;
   } finally {
     client.release();
   }
 };
 
-// ===================================================
+// =====================================================================================
 // CONTROLADORES
-// ===================================================
+// =====================================================================================
 
 const obtenerPagosAdminController = async (req, res) => {
   try {
@@ -314,14 +356,30 @@ const obtenerPagosAdminController = async (req, res) => {
     const id_cancha = req.query.id_cancha ? parseInt(req.query.id_cancha) : null;
     const id_espacio = req.query.id_espacio ? parseInt(req.query.id_espacio) : null;
 
-    if (isNaN(id_admin_esp_dep)) {
-      return res.status(400).json(respuesta(false, 'id_admin_esp_dep es requerido y numérico'));
-    }
+    let id_canchas = [];
+    if (req.query.id_canchas) id_canchas = JSON.parse(req.query.id_canchas);
 
-    const { pagos, total } = await obtenerPagosAdmin(id_admin_esp_dep, limite, offset, id_reserva, id_cancha, id_espacio);
-    res.json(respuesta(true, 'Pagos obtenidos correctamente', { pagos, paginacion: { limite, offset, total } }));
-  } catch (error) {
-    res.status(500).json(respuesta(false, error.message));
+    if (isNaN(id_admin_esp_dep))
+      return res.status(400).json(respuesta(false, "id_admin_esp_dep requerido"));
+
+    const { pagos, total } = await obtenerPagosAdmin(
+      id_admin_esp_dep,
+      limite,
+      offset,
+      id_reserva,
+      id_cancha,
+      id_espacio,
+      id_canchas
+    );
+
+    res.json(
+      respuesta(true, "OK", {
+        pagos,
+        paginacion: { limite, offset, total }
+      })
+    );
+  } catch (e) {
+    res.status(500).json(respuesta(false, e.message));
   }
 };
 
@@ -330,11 +388,28 @@ const buscarPagosAdminController = async (req, res) => {
     const { q, id_admin_esp_dep } = req.query;
     const limite = parseInt(req.query.limit) || 10;
     const offset = parseInt(req.query.offset) || 0;
-    if (!q) return res.status(400).json(respuesta(false, 'Debe proporcionar un texto de búsqueda'));
-    const { pagos, total } = await buscarPagosAdmin(parseInt(id_admin_esp_dep), q, limite, offset);
-    res.json(respuesta(true, 'Búsqueda completada', { pagos, paginacion: { limite, offset, total } }));
-  } catch (error) {
-    res.status(500).json(respuesta(false, error.message));
+
+    let id_canchas = [];
+    if (req.query.id_canchas) id_canchas = JSON.parse(req.query.id_canchas);
+
+    if (!q) return res.status(400).json(respuesta(false, "Texto requerido"));
+
+    const { pagos, total } = await buscarPagosAdmin(
+      parseInt(id_admin_esp_dep),
+      q,
+      limite,
+      offset,
+      id_canchas
+    );
+
+    res.json(
+      respuesta(true, "OK", {
+        pagos,
+        paginacion: { limite, offset, total }
+      })
+    );
+  } catch (e) {
+    res.status(500).json(respuesta(false, e.message));
   }
 };
 
@@ -345,10 +420,25 @@ const obtenerPagosFiltradosAdminController = async (req, res) => {
     const limite = parseInt(req.query.limit) || 10;
     const offset = parseInt(req.query.offset) || 0;
 
-    const { pagos, total } = await obtenerPagosFiltradosAdmin(id_admin_esp_dep, tipo, limite, offset);
-    res.json(respuesta(true, 'Pagos filtrados correctamente', { pagos, paginacion: { limite, offset, total } }));
-  } catch (error) {
-    res.status(500).json(respuesta(false, error.message));
+    let id_canchas = [];
+    if (req.query.id_canchas) id_canchas = JSON.parse(req.query.id_canchas);
+
+    const { pagos, total } = await obtenerPagosFiltradosAdmin(
+      id_admin_esp_dep,
+      tipo,
+      limite,
+      offset,
+      id_canchas
+    );
+
+    res.json(
+      respuesta(true, "OK", {
+        pagos,
+        paginacion: { limite, offset, total }
+      })
+    );
+  } catch (e) {
+    res.status(500).json(respuesta(false, e.message));
   }
 };
 
@@ -356,20 +446,16 @@ const crearPagoController = async (req, res) => {
   try {
     const { id_reserva, monto, metodo_pago, fecha_pago } = req.body;
     const result = await crearPago({ id_reserva, monto, metodo_pago, fecha_pago });
-    res.status(201).json(
-      respuesta(true, 'Pago registrado correctamente', result)
-    );
+    res.status(201).json(respuesta(true, "OK", result));
   } catch (e) {
     res.status(400).json(respuesta(false, e.message));
   }
 };
 
-// ===================================================
-// RUTAS
-// ===================================================
-router.post('/', crearPagoController);
-router.get('/datos-especificos', obtenerPagosAdminController);
-router.get('/buscar', buscarPagosAdminController);
-router.get('/filtro', obtenerPagosFiltradosAdminController);
+//  RUTAS
+router.post("/", crearPagoController);
+router.get("/datos-especificos", obtenerPagosAdminController);
+router.get("/buscar", buscarPagosAdminController);
+router.get("/filtro", obtenerPagosFiltradosAdminController);
 
 module.exports = router;

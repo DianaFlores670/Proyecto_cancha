@@ -3,7 +3,7 @@
 /* eslint-disable no-unused-vars */
 import React, { useState, useEffect } from "react";
 import api from "../../services/api";
-// ajusta la ruta según tu estructura
+import { FiMoreVertical, FiX } from "react-icons/fi";
 
 const norm = (v) =>
   String(v || "")
@@ -116,6 +116,10 @@ const CanchaAdmin = () => {
   const [modalOpen, setModalOpen] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [viewMode, setViewMode] = useState(false);
+  const [modalError, setModalError] = useState(null);
+  const [mobileModal, setMobileModal] = useState(null);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteUser, setDeleteUser] = useState(null);
   const [currentCancha, setCurrentCancha] = useState(null);
 
   const [formData, setFormData] = useState({
@@ -162,7 +166,7 @@ const CanchaAdmin = () => {
           setEspacios(
             Array.isArray(r.data.datos?.espacios) ? r.data.datos.espacios : []
           );
-      } catch (e) {}
+      } catch (e) { }
     };
     fetchEspacios();
   }, [role, idAdminEspDep, permissions.canView]);
@@ -243,20 +247,48 @@ const CanchaAdmin = () => {
     else fetchCanchas();
   };
 
-  const handleDelete = async (id) => {
-    if (!permissions.canDelete) return;
-    if (!window.confirm("Estas seguro de eliminar esta cancha?")) return;
+  const handleDelete = (cancha) => {
+    setDeleteUser(cancha);
+    setDeleteOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteUser) return;
+
+    if (!permissions.canDelete) {
+      setError('No tienes permisos para eliminar canchas');
+      return;
+    }
+
     try {
       const extra =
         role === "ADMIN_ESP_DEP" && idAdminEspDep
           ? { id_admin_esp_dep: idAdminEspDep }
           : {};
-      const r = await api.delete(`/cancha-admin/${id}`, { params: extra });
-      if (r.data?.exito) fetchCanchas();
-      else setError(r.data?.mensaje || "No se pudo eliminar");
-    } catch (e) {
-      setError(e.response?.data?.mensaje || "Error de conexion");
+
+      const response = await api.delete(
+        `/cancha-admin/${deleteUser.id_cancha}`,
+        { params: extra }
+      );
+
+      if (response.data.exito) {
+        setDeleteOpen(false);
+        setDeleteUser(null);
+        fetchCanchas();
+      } else {
+        setError(response.data.mensaje || 'No se pudo eliminar');
+      }
+    } catch (err) {
+      const errorMessage =
+        err.response?.data?.mensaje || 'Error de conexión al servidor';
+      setError(errorMessage);
     }
+  };
+
+
+  const closeDeleteModal = () => {
+    setDeleteOpen(false);  // Cerrar el modal de eliminación
+    setDeleteUser(null);  // Limpiar el cancha a eliminar
   };
 
   const openCreateModal = () => {
@@ -308,10 +340,10 @@ const CanchaAdmin = () => {
       setDisciplinasSeleccionadas(
         c.disciplinas
           ? c.disciplinas.map((d) => ({
-              id_disciplina: d.id_disciplina,
-              nombre: d.nombre,
-              frecuencia_practica: d.frecuencia_practica || "Regular",
-            }))
+            id_disciplina: d.id_disciplina,
+            nombre: d.nombre,
+            frecuencia_practica: d.frecuencia_practica || "Regular",
+          }))
           : []
       );
       setCurrentCancha(c);
@@ -352,10 +384,10 @@ const CanchaAdmin = () => {
       setDisciplinasSeleccionadas(
         c.disciplinas
           ? c.disciplinas.map((d) => ({
-              id_disciplina: d.id_disciplina,
-              nombre: d.nombre,
-              frecuencia_practica: d.frecuencia_practica || "Regular",
-            }))
+            id_disciplina: d.id_disciplina,
+            nombre: d.nombre,
+            frecuencia_practica: d.frecuencia_practica || "Regular",
+          }))
           : []
       );
       setCurrentCancha(c);
@@ -372,6 +404,7 @@ const CanchaAdmin = () => {
     setCurrentCancha(null);
     setDisciplinasSeleccionadas([]);
     setError(null);
+    setModalError(null);
     setViewMode(false);
     setSelectedFile(null);
     setImagePreview(null);
@@ -530,33 +563,29 @@ const CanchaAdmin = () => {
     return <p>Cargando permisos...</p>;
 
   return (
-    <div className="bg-white rounded-lg shadow p-6">
-      <h2 className="text-xl font-semibold mb-4">Gestion de Canchas</h2>
-
-      <div className="flex flex-col xl:flex-row gap-4 mb-6 items-stretch">
-        <div className="flex-1">
-          <form onSubmit={handleSearch} className="flex h-full">
+    <div className="bg-white rounded-lg shadow px-4 py-6 md:p-6">
+      <h2 className="text-2xl font-bold mb-6 text-[#23475F] border-l-4 border-[#01CD6C] pl-3">Gestion de Canchas</h2>
+      <div className="sticky top-0 bg-white z-40 pb-4 pt-2 border-b md:border-0 md:static md:top-auto">
+        <div className="flex flex-col md:flex-row gap-3">
+          <form onSubmit={handleSearch} className="flex flex-1 bg-[#F1F5F9] rounded-full shadow-sm overflow-hidden">
             <input
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Buscar por nombre, ubicacion o espacio deportivo"
-              className="border rounded-l px-4 py-2 w-full"
+              className="bg-transparent flex-1 px-4 py-2 focus:outline-none text-md"
             />
             <button
               type="submit"
-              className="bg-blue-500 text-white px-4 py-2 rounded-r hover:bg-blue-600 whitespace-nowrap"
+              className="bg-[#23475F] text-white px-6 text-md font-medium rounded-full"
             >
               Buscar
             </button>
           </form>
-        </div>
-
-        <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
           <select
             value={filtro}
             onChange={handleFiltroChange}
-            className="border rounded px-3 py-2 flex-1 sm:min-w-[180px]"
+            className="bg-[#F1F5F9] rounded-full px-4 py-2 shadow-sm text-md"
           >
             <option value="">Todos - sin filtro</option>
             <option value="nombre">Por nombre</option>
@@ -567,7 +596,7 @@ const CanchaAdmin = () => {
           {permissions.canCreate && (
             <button
               onClick={openCreateModal}
-              className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 whitespace-nowrap sm:w-auto w-full"
+              className="bg-[#01CD6C] text-white rounded-full px-5 text-md shadow-sm disabled:opacity-40 py-2"
             >
               Crear cancha
             </button>
@@ -578,13 +607,13 @@ const CanchaAdmin = () => {
       {loading ? (
         <p>Cargando canchas...</p>
       ) : error ? (
-        <p className="text-red-500">{error}</p>
+        <p className="text-red-500 mt-3">{error}</p>
       ) : (
         <>
-          <div className="overflow-x-auto">
-            <table className="min-w-full table-auto border-collapse">
-              <thead>
-                <tr className="bg-gray-50">
+          <div className="hidden md:block mt-6 overflow-x-auto">
+            <table className="min-w-full border-collapse rounded-lg overflow-hidden shadow-sm">
+              <thead className="bg-[#23475F] text-white text-md">
+                <tr>
                   <th className="px-4 py-2 text-left">#</th>
                   <th className="px-4 py-2 text-left">Nombre</th>
                   <th className="px-4 py-2 text-left">Ubicacion</th>
@@ -594,24 +623,24 @@ const CanchaAdmin = () => {
                   <th className="px-4 py-2 text-left">Acciones</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="text-md">
                 {canchas.map((c, index) => (
-                  <tr key={c.id_cancha} className="border-t">
-                    <td className="px-4 py-2">
+                  <tr key={c.id_cancha} className="border-t hover:bg-gray-50 transition">
+                    <td className="px-4 py-3">
                       {(page - 1) * limit + index + 1}
                     </td>
-                    <td className="px-4 py-2">{c.nombre}</td>
-                    <td className="px-4 py-2">{c.ubicacion || "-"}</td>
-                    <td className="px-4 py-2">{c.capacidad || "-"}</td>
-                    <td className="px-4 py-2">{c.estado || "-"}</td>
-                    <td className="px-4 py-2">
+                    <td className="px-4 py-3">{c.nombre}</td>
+                    <td className="px-4 py-3">{c.ubicacion || "-"}</td>
+                    <td className="px-4 py-3">{c.capacidad || "-"}</td>
+                    <td className="px-4 py-3">{c.estado || "-"}</td>
+                    <td className="px-4 py-3">
                       {c.monto_por_hora ? `$${c.monto_por_hora}` : "-"}
                     </td>
-                    <td className="px-4 py-2 flex gap-2">
+                    <td className="px-4 py-3 flex gap-3">
                       {permissions.canView && (
                         <button
                           onClick={() => openViewModal(c.id_cancha)}
-                          className="text-green-500 hover:text-green-700 mr-2"
+                          className="text-green-500 hover:text-green-700"
                         >
                           Ver datos
                         </button>
@@ -619,14 +648,14 @@ const CanchaAdmin = () => {
                       {permissions.canEdit && (
                         <button
                           onClick={() => openEditModal(c.id_cancha)}
-                          className="text-blue-500 hover:text-blue-700 mr-2"
+                          className="text-blue-500 hover:text-blue-700"
                         >
                           Editar
                         </button>
                       )}
                       {permissions.canDelete && (
                         <button
-                          onClick={() => handleDelete(c.id_cancha)}
+                          onClick={() => handleDelete(c)}
                           className="text-red-500 hover:text-red-700"
                         >
                           Eliminar
@@ -638,22 +667,85 @@ const CanchaAdmin = () => {
               </tbody>
             </table>
           </div>
+          {/* CARDS MOBILE */}
+          <div className="md:hidden mt-6 space-y-4 pb-32">
+            {canchas.map((cancha, index) => (
+              <div key={cancha.id_cancha} className="border bg-white rounded-lg p-4 shadow-sm">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <div className="font-bold text-[#23475F]">
+                      {cancha.nombre}
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      Cancha #{(page - 1) * limit + index + 1}
+                    </div>
+                    <div className="mt-3 text-sm space-y-1">
+                      <div>
+                        <span className="font-semibold">Ubicación: </span>
+                        {cancha.ubicacion || '-'}
+                      </div>
+                      <div>
+                        <span className="font-semibold">Capacidad: </span>
+                        {cancha.capacidad || '-'}
+                      </div>
+                      <div>
+                        <span className="font-semibold">Estado: </span>
+                        {cancha.estado || '-'}
+                      </div>
+                      <div>
+                        <span className="font-semibold">Monto por hora: </span>
+                        {cancha.monto_por_hora ? `$${cancha.monto_por_hora}` : '-'}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center">
+                    <button onClick={() => setMobileModal(cancha)}>
+                      <FiMoreVertical size={22} />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
 
-          <div className="flex justify-center mt-4">
+            {/* PAGINACIÓN SOLO MOVIL */}
+            <div className="md:hidden w-full flex justify-center items-center gap-3 py-4">
+              <button
+                onClick={() => handlePageChange(page - 1)}
+                disabled={page === 1}
+                className="px-4 py-2 bg-gray-200 rounded-full text-sm disabled:opacity-40"
+              >
+                Anterior
+              </button>
+
+              <div className="px-4 py-2 bg-gray-100 rounded-full text-sm">
+                Pag {page} de {Math.ceil(total / limit) || 1}
+              </div>
+
+              <button
+                onClick={() => handlePageChange(page + 1)}
+                disabled={page === Math.ceil(total / limit)}
+                className="px-4 py-2 bg-gray-200 rounded-full text-sm disabled:opacity-40"
+              >
+                Siguiente
+              </button>
+            </div>
+          </div>
+          {/* PAGINACION STICKY */}
+          <div className="fixed md:static bottom-0 left-0 right-0 bg-white border-t shadow-lg py-3 flex justify-center gap-3 z-50 mt-6">
             <button
               onClick={() => handlePageChange(page - 1)}
               disabled={page === 1}
-              className="bg-gray-300 text-gray-800 px-4 py-2 rounded-l hover:bg-gray-400 disabled:opacity-50"
+              className="px-4 py-2 bg-gray-200 rounded-full disabled:opacity-40"
             >
               Anterior
             </button>
-            <span className="px-4 py-2 bg-gray-100">
-              Pagina {page} de {Math.ceil(total / limit)}
+            <span className="px-4 py-2 bg-gray-100 rounded-full text-md">
+              Pag {page} de {Math.ceil(total / limit)}
             </span>
             <button
               onClick={() => handlePageChange(page + 1)}
               disabled={page === Math.ceil(total / limit)}
-              className="bg-gray-300 text-gray-800 px-4 py-2 rounded-r hover:bg-gray-400 disabled:opacity-50"
+              className="px-4 py-2 bg-gray-200 rounded-full disabled:opacity-40"
             >
               Siguiente
             </button>
@@ -662,77 +754,77 @@ const CanchaAdmin = () => {
       )}
 
       {modalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-8 max-w-2xl w-full max-h-[80vh] overflow-y-auto">
-            <h3 className="text-xl font-semibold mb-4">
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl p-5 max-w-2xl w-full max-h-[80vh] overflow-y-auto border border-gray-200 shadow-2xl">
+            <h3 className="text-xl font-semibold mb-4 text-gray-900">
               {viewMode
-                ? "Ver datos de cancha"
+                ? "Ver Datos de Cancha"
                 : editMode
-                ? "Editar cancha"
-                : "Crear cancha"}
+                  ? "Editar Cancha"
+                  : "Crear Cancha"}
             </h3>
             <form onSubmit={handleSubmit} className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium mb-1">Nombre</label>
+                <label className="block text-sm font-semibold mb-1">Nombre</label>
                 <input
                   name="nombre"
                   value={formData.nombre}
                   onChange={handleInputChange}
-                  className="w-full border rounded px-3 py-2 bg-gray-100"
+                  className="w-full border rounded-xl px-3 py-2 bg-gray-50"
                   required
                   disabled={viewMode}
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">
+                <label className="block text-sm font-semibold mb-1">
                   Ubicacion
                 </label>
                 <input
                   name="ubicacion"
                   value={formData.ubicacion}
                   onChange={handleInputChange}
-                  className="w-full border rounded px-3 py-2 bg-gray-100"
+                  className="w-full border rounded-xl px-3 py-2 bg-gray-50"
                   disabled={viewMode}
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">
+                <label className="block text-sm font-semibold mb-1">
                   Capacidad
                 </label>
                 <input
                   name="capacidad"
                   value={formData.capacidad}
                   onChange={handleInputChange}
-                  className="w-full border rounded px-3 py-2 bg-gray-100"
+                  className="w-full border rounded-xl px-3 py-2 bg-gray-50"
                   type="number"
                   min="0"
                   disabled={viewMode}
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Estado</label>
+                <label className="block text-sm font-semibold mb-1">Estado</label>
                 <select
                   name="estado"
                   value={formData.estado}
                   onChange={handleInputChange}
-                  className="w-full border rounded px-3 py-2 bg-gray-100"
+                  className="w-full border rounded-xl px-3 py-2 bg-gray-50"
                   disabled={viewMode}
                 >
                   <option value="">Seleccione un estado</option>
-                  <option value="disponible">disponible</option>
-                  <option value="ocupada">ocupada</option>
-                  <option value="mantenimiento">mantenimiento</option>
+                  <option value="disponible">Disponible</option>
+                  <option value="ocupada">Ocupada</option>
+                  <option value="mantenimiento">Mantenimiento</option>
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">
+                <label className="block text-sm font-semibold mb-1">
                   Monto por hora
                 </label>
                 <input
                   name="monto_por_hora"
                   value={formData.monto_por_hora}
                   onChange={handleInputChange}
-                  className="w-full border rounded px-3 py-2 bg-gray-100"
+                  className="w-full border rounded-xl px-3 py-2 bg-gray-50"
                   type="number"
                   step="0.01"
                   min="0"
@@ -740,54 +832,51 @@ const CanchaAdmin = () => {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">
+                <label className="block text-sm font-semibold mb-1">
                   Imagen cancha
                 </label>
                 {imagePreview ? (
                   <img
-                    src={
-                      imagePreview.startsWith("blob:")
-                        ? imagePreview
-                        : getImageUrl(imagePreview)
-                    }
-                    alt="imagen_cancha"
+                    src={imagePreview}
+                    alt="Imagen Cancha"
                     className="w-32 h-32 object-cover rounded mb-2"
                   />
                 ) : viewMode ? (
-                  <p className="text-gray-500">Sin imagen</p>
+                  <p className="text-gray-500">No hay imagen</p>
                 ) : null}
+
                 {!viewMode && (
                   <input
                     type="file"
                     accept="image/*"
                     onChange={handleFileChange}
-                    className="w-full border rounded px-3 py-2 bg-gray-100"
+                    className="w-full border rounded-xl px-3 py-2 bg-gray-50"
                   />
                 )}
               </div>
               <div className="col-span-2">
-                <label className="block text-sm font-medium mb-1">
+                <label className="block text-sm font-semibold mb-1">
                   Espacio deportivo
                 </label>
                 <select
                   name="id_espacio"
                   value={formData.id_espacio}
                   onChange={handleInputChange}
-                  className="w-full border rounded px-3 py-2 bg-gray-100"
+                  className="w-full border rounded-xl px-3 py-2 bg-gray-50"
                   required
                   disabled={viewMode}
                 >
-                  <option value="">Seleccione un espacio</option>
-                  {espacios.map((e) => (
-                    <option key={e.id_espacio} value={e.id_espacio}>
-                      {e.nombre}
+                  <option value="">Seleccione un espacio deportivo</option>
+                  {espacios.map((espacio) => (
+                    <option key={espacio.id_espacio} value={espacio.id_espacio}>
+                      {espacio.nombre}
                     </option>
                   ))}
                 </select>
               </div>
 
               <div className="col-span-2">
-                <label className="block text-sm font-medium mb-1">
+                <label className="block text-sm font-semibold mb-1">
                   Disciplinas
                 </label>
                 {viewMode ? (
@@ -795,7 +884,7 @@ const CanchaAdmin = () => {
                     {disciplinasSeleccionadas.map((d) => (
                       <div
                         key={d.id_disciplina}
-                        className="flex items-center justify-between p-2 border rounded"
+                        className="flex items-center justify-between p-2 border rounded-xl"
                       >
                         <span className="flex-1">{d.nombre}</span>
                         <span>{d.frecuencia_practica}</span>
@@ -803,7 +892,7 @@ const CanchaAdmin = () => {
                     ))}
                     {disciplinasSeleccionadas.length === 0 && (
                       <p className="text-gray-500 text-sm text-center py-2">
-                        Sin disciplinas
+                        No hay disciplinas seleccionadas
                       </p>
                     )}
                   </div>
@@ -811,11 +900,13 @@ const CanchaAdmin = () => {
                   <div className="mb-3">
                     <select
                       onChange={handleDisciplinaChange}
-                      className="w-full border rounded px-3 py-2 bg-gray-100"
+                      className="w-full border rounded-xl px-3 py-2 bg-gray-50"
                       value=""
                       disabled={viewMode}
                     >
-                      <option value="">Agregar disciplina</option>
+                      <option value="">
+                        Seleccione una disciplina para agregar
+                      </option>
                       {disciplinas
                         .filter(
                           (d) =>
@@ -829,11 +920,11 @@ const CanchaAdmin = () => {
                           </option>
                         ))}
                     </select>
-                    <div className="space-y-2 max-h-40 overflow-y-auto">
+                    <div className="space-y-2 max-h-40 overflow-y-auto mt-3">
                       {disciplinasSeleccionadas.map((d) => (
                         <div
                           key={d.id_disciplina}
-                          className="flex items-center justify-between p-2 border rounded"
+                          className="flex items-center justify-between p-2 border rounded-xl"
                         >
                           <span className="flex-1">{d.nombre}</span>
                           <select
@@ -866,32 +957,126 @@ const CanchaAdmin = () => {
                       ))}
                       {disciplinasSeleccionadas.length === 0 && (
                         <p className="text-gray-500 text-sm text-center py-2">
-                          Sin disciplinas
+                          No hay disciplinas seleccionadas
                         </p>
                       )}
                     </div>
                   </div>
                 )}
               </div>
-
-              <div className="col-span-2 flex justify-end mt-4">
+              <div className="md:col-span-2 border-t pt-4 mt-4">
+                {modalError && (
+                  <div className="bg-red-100 text-red-600 p-3 mb-4 rounded-md text-sm">
+                    {modalError}
+                  </div>
+                )}
+              </div>
+              <div className="md:col-span-2 flex justify-end mt-1 gap-3">
                 <button
                   type="button"
                   onClick={closeModal}
-                  className="bg-gray-500 text-white px-4 py-2 rounded mr-2 hover:bg-gray-600"
+                  className="px-5 py-2 bg-gray-200 rounded-full text-md font-medium text-gray-700 hover:bg-gray-300"
                 >
                   Cerrar
                 </button>
                 {!viewMode && (
                   <button
                     type="submit"
-                    className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+                    className="px-5 py-2 bg-[#23475F] text-white rounded-full text-md font-medium hover:bg-[#1d3a4e]"
                   >
-                    {editMode ? "Actualizar" : "Crear"}
+                    {editMode ? 'Actualizar' : 'Crear'}
                   </button>
                 )}
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {mobileModal && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center">
+          <div className="bg-white rounded-2xl w-72 p-5 shadow-xl animate-scaleIn">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="font-bold text-[#23475F] text-lg">Opciones</h3>
+              <button onClick={() => setMobileModal(null)}>
+                <FiX size={20} />
+              </button>
+            </div>
+
+            <div className="flex flex-col text-md">
+              {/* Ver datos del cancha */}
+              <button
+                onClick={() => {
+                  setMobileModal(null);
+                  openViewModal(mobileModal.id_cancha); // Abre el modal para ver datos del cancha
+                }}
+                className="px-3 py-2 text-left hover:bg-gray-100"
+              >
+                Ver datos
+              </button>
+
+              {/* Editar cancha */}
+              <button
+                onClick={() => {
+                  setMobileModal(null);
+                  openEditModal(mobileModal.id_cancha); // Abre el modal para editar cancha
+                }}
+                className="px-3 py-2 text-left hover:bg-gray-100"
+              >
+                Editar
+              </button>
+
+              {/* Eliminar cancha */}
+              <button
+                onClick={() => {
+                  setMobileModal(null);
+                  setDeleteOpen(true);  // Abre el modal de eliminación
+                  setDeleteUser(mobileModal); // Establece el cancha a eliminar
+                }}
+                className="px-3 py-2 text-left text-red-600 hover:bg-red-50 mt-1 rounded"
+              >
+                Eliminar
+              </button>
+
+              {/* Cancelar opción */}
+              <button
+                onClick={() => setMobileModal(null)}
+                className="px-3 py-2 text-left text-gray-700 hover:bg-gray-100 mt-1 rounded"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {deleteOpen && deleteUser && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white p-6 rounded-2xl shadow-2xl max-w-md w-full border border-gray-200">
+
+            <h3 className="text-xl font-semibold text-red-600 mb-2">
+              Eliminar cancha
+            </h3>
+            <p className="text-gray-700 text-md">
+              ¿Estás seguro de eliminar a <span className="font-bold">{deleteUser.nombre} {deleteUser.apellido}</span>?
+            </p>
+
+            <div className="mt-6 flex justify-end gap-3">
+              {/* Botón de cancelar */}
+              <button
+                onClick={closeDeleteModal}
+                className="px-5 py-2 bg-gray-200 rounded-full text-md font-medium text-gray-700 hover:bg-gray-300"
+              >
+                Cancelar
+              </button>
+
+              {/* Botón de eliminar */}
+              <button
+                onClick={confirmDelete}
+                className="px-5 py-2 bg-red-600 text-white rounded-full text-md font-medium hover:bg-red-700"
+              >
+                Eliminar
+              </button>
+            </div>
+
           </div>
         </div>
       )}

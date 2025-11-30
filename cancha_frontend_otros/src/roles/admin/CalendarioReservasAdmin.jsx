@@ -139,42 +139,103 @@ const CalendarioReservasAdmin = () => {
   const onEventClick = (arg) => {
     const idReserva = arg.event.extendedProps?.reservaId;
     if (idReserva) navigate(`/administrador/reserva?id_reserva=${idReserva}`);
-    };
+  };
 
 
   return (
-    <div className="bg-white rounded-lg shadow p-4">
-      <div className="flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between mb-3">
-        <h2 className="text-xl font-semibold">Calendario de Reservas</h2>
-        <div className="flex gap-2">
-          <select value={espacioSel} onChange={onEspacioChange} className="border rounded px-3 py-2">
+    <div className="bg-white rounded-lg shadow p-4 md:p-6 pb-24 md:pb-6">
+
+      {/* TÍTULO */}
+      <h2 className="text-xl md:text-2xl font-bold mb-4 text-[#23475F] border-l-4 border-[#01CD6C] pl-3">
+        Calendario de Reservas
+      </h2>
+
+      {/* FILTROS */}
+      <div className="flex flex-col md:flex-row gap-3 md:items-center justify-between mb-4">
+
+        {/* INFO DEL FILTRO (solo mobile) */}
+        <div className="md:hidden bg-gray-50 border rounded-xl p-3 text-sm text-gray-700 shadow-sm">
+          <p className="font-semibold text-gray-800">Filtros activados:</p>
+
+          <p className="mt-1">
+            <span className="font-medium text-gray-900">Espacio:</span>{" "}
+            {espacioSel
+              ? espacios.find((e) => String(e.id_espacio) === espacioSel)?.nombre
+              : "Todos"}
+          </p>
+
+          <p>
+            <span className="font-medium text-gray-900">Cancha:</span>{" "}
+            {canchaSel
+              ? canchas.find((c) => String(c.id_cancha) === canchaSel)?.nombre
+              : "Todas"}
+          </p>
+        </div>
+
+        {/* SELECTORES */}
+        <div className="grid grid-cols-1 md:flex gap-3 w-full md:w-auto">
+
+          {/* Espacio */}
+          <select
+            value={espacioSel}
+            onChange={onEspacioChange}
+            className="border rounded-xl px-3 py-2 bg-gray-50 shadow-sm text-sm focus:ring-2 focus:ring-[#23475F]"
+          >
             <option value="">Todos los espacios</option>
-            {espacios.map(e => (
-              <option key={e.id_espacio} value={String(e.id_espacio)}>{e.nombre}</option>
+            {espacios.map((e) => (
+              <option key={e.id_espacio} value={String(e.id_espacio)}>
+                {e.nombre}
+              </option>
             ))}
           </select>
-          <select value={canchaSel} onChange={onCanchaChange} className="border rounded px-3 py-2">
+
+          {/* Cancha */}
+          <select
+            value={canchaSel}
+            onChange={onCanchaChange}
+            className="border rounded-xl px-3 py-2 bg-gray-50 shadow-sm text-sm focus:ring-2 focus:ring-[#23475F]"
+          >
             <option value="">Todas las canchas</option>
-            {filteredCanchas.map(c => (
-              <option key={c.id_cancha} value={String(c.id_cancha)}>{c.nombre}</option>
+            {filteredCanchas.map((c) => (
+              <option key={c.id_cancha} value={String(c.id_cancha)}>
+                {c.nombre}
+              </option>
             ))}
           </select>
         </div>
       </div>
-      <FullCalendar
-        ref={calRef}
-        plugins={[dayGridPlugin, timeGridPlugin, listPlugin, interactionPlugin]}
-        initialView="timeGridWeek"
-        headerToolbar={headerToolbar}
-        weekends={true}
-        nowIndicator={true}
-        slotMinTime="06:00:00"
-        slotMaxTime="24:00:00"
-        locale="es"
-        events={eventsFn}
-        eventClick={onEventClick}
-        height="auto"
-      />
+
+      {/* SEPARADOR */}
+      <hr className="my-4 border-gray-200" />
+
+      {/* CALENDARIO */}
+      <div className="rounded-xl border border-gray-200 bg-white overflow-x-auto">
+        <div className="min-w-[650px] md:min-w-full">
+          <div className="rounded-xl border border-gray-200 bg-white w-full overflow-hidden">
+            <FullCalendar
+              ref={calRef}
+              plugins={[dayGridPlugin, timeGridPlugin, listPlugin, interactionPlugin]}
+              initialView={window.innerWidth < 768 ? "listWeek" : "timeGridWeek"}
+              headerToolbar={{
+                left: window.innerWidth < 768 ? "prev,next" : "prev,next today",
+                center: "title",
+                right:
+                  window.innerWidth < 768
+                    ? ""
+                    : "dayGridMonth,timeGridWeek,timeGridDay,listWeek",
+              }}
+              weekends={true}
+              nowIndicator={true}
+              slotMinTime="06:00:00"
+              slotMaxTime="24:00:00"
+              locale="es"
+              events={eventsFn}
+              eventClick={onEventClick}
+              height="auto"
+            />
+          </div>
+        </div>
+      </div>
     </div>
   );
 };

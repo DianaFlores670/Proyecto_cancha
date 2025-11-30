@@ -13,6 +13,297 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-.sidebar-transition {
-  transition: all 0.3s ease;
+/* ===============================================
+   GOOGLE CALENDAR THEME — FULLCALENDAR MODERN
+   =============================================== */
+
+/* Fuente general */
+.fc {
+  font-family: 'Inter', sans-serif !important;
+  color: #1f2937 !important;
+}
+
+/* ---------------- TOOLBAR SUPERIOR (Google-like) ---------------- */
+.fc-toolbar {
+  padding: 8px 0 !important;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.fc-toolbar-title {
+  font-size: 1.4rem !important;
+  font-weight: 700 !important;
+  color: #23475F !important;
+}
+
+/* Botones Google Material Style */
+.fc-button {
+  border: none !important;
+  background: #f3f4f6 !important;
+  color: #374151 !important;
+  border-radius: 10px !important;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1) !important;
+  font-weight: 600 !important;
+}
+
+.fc-button:hover {
+  background: #e5e7eb !important;
+}
+
+.fc-button.fc-today-button {
+  background: #01CD6C !important;
+  color: white !important;
+}
+
+/* Botón activo (vista actual) */
+.fc-button-active {
+  background: #23475F !important;
+  color: white !important;
+}
+
+/* ---------------- HEADERS (dias) ---------------- */
+.fc-col-header-cell-cushion {
+  padding: 8px 0 !important;
+  font-size: 0.9rem !important;
+  font-weight: 600 !important;
+  color: #374151 !important;
+}
+
+/* ---------------- GRID ---------------- */
+.fc-theme-standard td, 
+.fc-theme-standard th {
+  border-color: #e5e7eb !important;
+}
+
+.fc-timegrid-slot {
+  height: 42px !important;
+}
+
+.fc-timegrid-slot-label {
+  color: #6b7280 !important;
+  font-size: 0.75rem !important;
+}
+
+/* ---------------- EVENTOS GOOGLE STYLE ---------------- */
+.fc-event {
+  border-radius: 10px !important;
+  border: none !important;
+  padding: 4px 8px !important;
+  font-size: 0.78rem !important;
+  font-weight: 500 !important;
+  background: #3b82f6 !important;
+  color: white !important;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.15) !important;
+}
+
+/* Detalle del evento */
+.fc-event-main {
+  color: white !important;
+}
+
+.fc-event:hover {
+  filter: brightness(1.1) !important;
+}
+
+/* ---------------- LIST VIEW (Google Cards en móvil) ---------------- */
+/* ===============================================
+   ULTRA COMPACT LIST VIEW (Google Calendar Mobile)
+   =============================================== */
+
+@media (max-width: 768px) {
+
+  /* Contenedor del evento */
+  .fc-list-event {
+    margin: 5px 10px !important;
+    padding: 8px 10px !important;
+    border-radius: 8px !important;
+    border-left: 4px solid #23475F !important;
+    background: white !important;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06) !important;
+  }
+
+  /* Eliminamos espacio interno adicional */
+  .fc-list-event > td {
+    padding: 0 !important;
+  }
+
+  /* Hora (muy compacta) */
+  .fc-list-event-time {
+    font-size: 0.65rem !important;
+    font-weight: 500 !important;
+    color: #6b7280 !important;
+    margin-bottom: 2px !important;
+    line-height: 0.9rem !important;
+  }
+
+  /* Título del evento (Compacto pero legible) */
+  .fc-list-event-title {
+    font-size: 0.75rem !important;
+    font-weight: 600 !important;
+    color: #23475F !important;
+    line-height: 1rem !important;
+  }
+
+  /* Puntito del lado izquierdo */
+  .fc-list-event-dot {
+    display: none !important;
+  }
+
+  /* Cabecera del día (más pequeña) */
+  .fc-list-day-cushion {
+    background: #f5f6f7 !important;
+    padding: 6px 12px !important;
+    font-size: 0.8rem !important;
+    font-weight: 600 !important;
+    color: #374151 !important;
+  }
+
+  .fc-list-table td {
+    padding: 4px 8px !important;
+  }
+
+  /* Título superior “23–29 nov 2025” más compacto */
+  .fc-toolbar-title {
+    font-size: 1rem !important;
+    font-weight: 600 !important;
+  }
+
+  /* Botones más chicos */
+  .fc-button {
+    padding: 4px 6px !important;
+    font-size: 0.75rem !important;
+    border-radius: 8px !important;
+  }
+
+  /* Ajustar altura mínima del contenedor */
+  .fc-view-harness {
+    min-height: 500px !important;
+  }
+}
+
+/* ---------------- MÓVIL — Vista compacta ---------------- */
+@media (max-width: 768px) {
+  .fc-toolbar {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .fc-toolbar-title {
+    font-size: 1.2rem !important;
+  }
+
+  .fc-scrollgrid {
+    font-size: 0.75rem !important;
+  }
+
+  .fc-view-harness {
+    min-height: 600px !important;
+  }
+}
+
+/* =====================================================
+   LIST VIEW — ESTILO PARA PANTALLAS GRANDES (DESKTOP)
+   ===================================================== */
+@media (min-width: 769px) {
+
+  /* Fondo general de la vista list */
+  .fc-list {
+    background: white !important;
+    color: #111827 !important; /* negro elegante */
+    border-radius: 10px !important;
+  }
+
+  /* Cabecera del día */
+  .fc-list-day-cushion {
+    background: #f3f4f6 !important;
+    color: #1f2937 !important;
+    font-weight: 600 !important;
+    padding: 10px 14px !important;
+  }
+
+  /* Card del evento */
+  .fc-list-event {
+    background: white !important;
+    color: #111827 !important;
+    border-left: 5px solid #23475F !important;
+    padding: 12px 14px !important;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08) !important;
+    margin: 8px 12px !important;
+    border-radius: 10px !important;
+  }
+
+  /* Hora del evento */
+  .fc-list-event-time {
+    color: #4b5563 !important;
+    font-size: 0.85rem !important;
+    font-weight: 500 !important;
+  }
+
+  /* Título del evento */
+  .fc-list-event-title {
+    color: #111827 !important;
+    font-size: 0.95rem !important;
+    font-weight: 600 !important;
+    margin-top: 2px !important;
+  }
+
+  /* Puntito decorativo */
+  .fc-list-event-dot {
+    display: none !important;
+  }
+
+  /* Bordes internos de la tabla list */
+  .fc-list-table td {
+    border-color: transparent !important;
+  }
+}
+
+/* ===============================
+   FIX SCROLL HORIZONTAL EN LIST VIEW
+   =============================== */
+
+/* Evitar que las tablas internas expandan el ancho */
+.fc-list-table,
+.fc-list-table td,
+.fc-list-table tr {
+  width: 100% !important;
+  max-width: 100% !important;
+  overflow: hidden !important;
+}
+
+/* El evento debe ajustarse al ancho y NO forzar scroll */
+.fc-list-event {
+  width: 100% !important;
+  max-width: 100% !important;
+  overflow: hidden !important;
+  white-space: normal !important;  /* evita que el título se haga largo en una sola línea */
+}
+
+/* El título del evento también debe ajustarse */
+.fc-list-event-title {
+  white-space: normal !important;
+  line-height: 1.1rem !important;
+}
+
+/* Evita que las columnas de hora/día se estiren */
+.fc-list-event-time,
+.fc-list-day-text,
+.fc-list-day-side-text {
+  max-width: 100% !important;
+  overflow: hidden !important;
+  white-space: nowrap !important;
+  text-overflow: ellipsis !important;
+}
+
+.fc {
+  width: 100% !important;
+}
+
+.fc-scroller,
+.fc-scrollgrid {
+  overflow-x: hidden !important;
 }

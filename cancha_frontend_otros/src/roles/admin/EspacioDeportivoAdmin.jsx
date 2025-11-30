@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import api from "../../services/api";
+import { FiMoreVertical, FiX } from "react-icons/fi";
 // ajusta la ruta según tu estructura
 
 const norm = (v) =>
@@ -79,11 +80,10 @@ const permissionsConfig = {
   },
 };
 
-const getImageUrl = (path) => {
-  if (!path) return "";
-  const base = (api.defaults?.baseURL || "").replace(/\/$/, "");
-  const clean = String(path).replace(/^\//, "");
-  return `${base}/${clean}`;
+const getImageUrlSafe = (path) => {
+  if (!path) return null;
+  if (path.startsWith("http://") || path.startsWith("https://")) return path;
+  return `${api.defaults.baseURL.replace(/\/$/, "")}/${String(path).replace(/^\//, "")}`;
 };
 
 const EspacioDeportivoAdmin = () => {
@@ -103,6 +103,8 @@ const EspacioDeportivoAdmin = () => {
   const [modalOpen, setModalOpen] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [viewMode, setViewMode] = useState(false);
+  const [modalError, setModalError] = useState(null);
+  const [mobileModal, setMobileModal] = useState(null);
   const [currentEspacio, setCurrentEspacio] = useState(null);
 
   const [formData, setFormData] = useState({
@@ -121,7 +123,7 @@ const EspacioDeportivoAdmin = () => {
     id_admin_esp_dep: "",
   });
 
-  const [imageFiles, setImageFiles] = useState({
+  const [selectedFiles, setSelectedFiles] = useState({
     imagen_principal: null,
     imagen_sec_1: null,
     imagen_sec_2: null,
@@ -245,7 +247,7 @@ const EspacioDeportivoAdmin = () => {
       imagen_sec_4: '',
       id_admin_esp_dep: role === 'ADMIN_ESP_DEP' && idAdminEspDep ? idAdminEspDep : ''
     });
-    setImageFiles({
+    setSelectedFiles({
       imagen_principal: null,
       imagen_sec_1: null,
       imagen_sec_2: null,
@@ -296,14 +298,15 @@ const EspacioDeportivoAdmin = () => {
           (role === "ADMIN_ESP_DEP" && idAdminEspDep ? idAdminEspDep : ""),
       });
       setImagePreviews({
-        imagen_principal: e.imagen_principal || null,
-        imagen_sec_1: e.imagen_sec_1 || null,
-        imagen_sec_2: e.imagen_sec_2 || null,
-        imagen_sec_3: e.imagen_sec_3 || null,
-        imagen_sec_4: e.imagen_sec_4 || null,
+        imagen_principal: e.imagen_principal ? getImageUrlSafe(e.imagen_principal) : null,
+        imagen_sec_1: e.imagen_sec_1 ? getImageUrlSafe(e.imagen_sec_1) : null,
+        imagen_sec_2: e.imagen_sec_2 ? getImageUrlSafe(e.imagen_sec_2) : null,
+        imagen_sec_3: e.imagen_sec_3 ? getImageUrlSafe(e.imagen_sec_3) : null,
+        imagen_sec_4: e.imagen_sec_4 ? getImageUrlSafe(e.imagen_sec_4) : null,
       });
 
-      setImageFiles({
+
+      setSelectedFiles({
         imagen_principal: null,
         imagen_sec_1: null,
         imagen_sec_2: null,
@@ -352,14 +355,14 @@ const EspacioDeportivoAdmin = () => {
           (role === "ADMIN_ESP_DEP" && idAdminEspDep ? idAdminEspDep : ""),
       });
       setImagePreviews({
-        imagen_principal: e.imagen_principal || null,
-        imagen_sec_1: e.imagen_sec_1 || null,
-        imagen_sec_2: e.imagen_sec_2 || null,
-        imagen_sec_3: e.imagen_sec_3 || null,
-        imagen_sec_4: e.imagen_sec_4 || null,
+        imagen_principal: e.imagen_principal ? getImageUrlSafe(e.imagen_principal) : null,
+        imagen_sec_1: e.imagen_sec_1 ? getImageUrlSafe(e.imagen_sec_1) : null,
+        imagen_sec_2: e.imagen_sec_2 ? getImageUrlSafe(e.imagen_sec_2) : null,
+        imagen_sec_3: e.imagen_sec_3 ? getImageUrlSafe(e.imagen_sec_3) : null,
+        imagen_sec_4: e.imagen_sec_4 ? getImageUrlSafe(e.imagen_sec_4) : null,
       });
 
-      setImageFiles({
+      setSelectedFiles({
         imagen_principal: null,
         imagen_sec_1: null,
         imagen_sec_2: null,
@@ -380,7 +383,7 @@ const EspacioDeportivoAdmin = () => {
     setCurrentEspacio(null);
     setError(null);
     setViewMode(false);
-    setImageFiles({
+    setSelectedFiles({
       imagen_principal: null,
       imagen_sec_1: null,
       imagen_sec_2: null,
@@ -404,7 +407,7 @@ const EspacioDeportivoAdmin = () => {
   const handleFileChange = (e, field) => {
     const file = e.target.files?.[0];
     if (file) {
-      setImageFiles((prev) => ({ ...prev, [field]: file }));
+      setSelectedFiles((prev) => ({ ...prev, [field]: file }));
       setImagePreviews((prev) => ({
         ...prev,
         [field]: URL.createObjectURL(file),
@@ -452,7 +455,7 @@ const EspacioDeportivoAdmin = () => {
         "imagen_sec_3",
         "imagen_sec_4",
       ].forEach((f) => {
-        if (imageFiles[f]) data.append(f, imageFiles[f]);
+        if (selectedFiles[f]) data.append(f, selectedFiles[f]);
       });
 
       // Validaciones
@@ -516,12 +519,18 @@ const EspacioDeportivoAdmin = () => {
         closeModal();
         fetchEspacios();
       } else {
-        setError(resp.data?.mensaje || "No se pudo guardar");
+        const mensajeError = resp.data.mensaje || "No se pudo guardar";
+        setModalError(mensajeError);  // Mostrar el mensaje de error del backend
+        setTimeout(() => {
+          setModalError(null);
+        }, 5000);
       }
     } catch (err) {
-      setError(
-        err.response?.data?.mensaje || err.message || "Error de conexion"
-      );
+      const errorMessage = err.response?.data?.mensaje || 'Error de conexión al servidor';
+      setModalError(errorMessage); // Mostramos el mensaje amigable desde el servidor
+      setTimeout(() => {
+        setModalError(null);
+      }, 5000);
     }
   };
 
@@ -532,35 +541,29 @@ const EspacioDeportivoAdmin = () => {
   if (!role) return <p>Cargando permisos...</p>;
 
   return (
-    <div className="bg-white rounded-lg shadow p-6">
-      <h2 className="text-xl font-semibold mb-4">
-        Gestion de Espacios Deportivos
-      </h2>
-
-      <div className="flex flex-col xl:flex-row gap-4 mb-6 items-stretch">
-        <div className="flex-1">
-          <form onSubmit={handleSearch} className="flex h-full">
+    <div className="bg-white rounded-lg shadow px-4 py-6 md:p-6">
+      <h2 className="text-2xl font-bold mb-6 text-[#23475F] border-l-4 border-[#01CD6C] pl-3">Gestion de Espacios Deportivos</h2>
+      <div className="sticky top-0 bg-white z-40 pb-4 pt-2 border-b md:border-0 md:static md:top-auto">
+        <div className="flex flex-col md:flex-row gap-3">
+          <form onSubmit={handleSearch} className="flex flex-1 bg-[#F1F5F9] rounded-full shadow-sm overflow-hidden">
             <input
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Buscar por nombre, direccion, descripcion o administrador"
-              className="border rounded-l px-4 py-2 w-full"
+              className="bg-transparent flex-1 px-4 py-2 focus:outline-none text-md"
             />
             <button
               type="submit"
-              className="bg-blue-500 text-white px-4 py-2 rounded-r hover:bg-blue-600 whitespace-nowrap"
+              className="bg-[#23475F] text-white px-6 text-md font-medium rounded-full"
             >
               Buscar
             </button>
           </form>
-        </div>
-
-        <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
           <select
             value={filtro}
             onChange={handleFiltroChange}
-            className="border rounded px-3 py-2 flex-1 sm:min-w-[180px]"
+            className="bg-[#F1F5F9] rounded-full px-4 py-2 shadow-sm text-md"
           >
             <option value="">Todos - sin filtro</option>
             <option value="nombre">Por nombre</option>
@@ -573,13 +576,13 @@ const EspacioDeportivoAdmin = () => {
       {loading ? (
         <p>Cargando espacios...</p>
       ) : error ? (
-        <p className="text-red-500">{error}</p>
+        <p className="text-red-500 mt-3">{error}</p>
       ) : (
         <>
-          <div className="overflow-x-auto">
-            <table className="min-w-full table-auto border-collapse">
-              <thead>
-                <tr className="bg-gray-50">
+          <div className="hidden md:block mt-6 overflow-x-auto">
+            <table className="min-w-full border-collapse rounded-lg overflow-hidden shadow-sm">
+              <thead className="bg-[#23475F] text-white text-md">
+                <tr>
                   <th className="px-4 py-2 text-left">#</th>
                   <th className="px-4 py-2 text-left">Nombre</th>
                   <th className="px-4 py-2 text-left">Direccion</th>
@@ -589,28 +592,27 @@ const EspacioDeportivoAdmin = () => {
                   <th className="px-4 py-2 text-left">Acciones</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="text-md">
                 {espacios.map((e, index) => (
-                  <tr key={e.id_espacio} className="border-t">
-                    <td className="px-4 py-2">
+                  <tr key={e.id_espacio} className="border-t hover:bg-gray-50 transition">
+                    <td className="px-4 py-3">
                       {(page - 1) * limit + index + 1}
                     </td>
-                    <td className="px-4 py-2">{e.nombre}</td>
-                    <td className="px-4 py-2">{e.direccion || "-"}</td>
-                    <td className="px-4 py-2">{e.horario_apertura || "-"}</td>
-                    <td className="px-4 py-2">{e.horario_cierre || "-"}</td>
-                    <td className="px-4 py-2">
+                    <td className="px-4 py-3">{e.nombre}</td>
+                    <td className="px-4 py-3">{e.direccion || "-"}</td>
+                    <td className="px-4 py-3">{e.horario_apertura || "-"}</td>
+                    <td className="px-4 py-3">{e.horario_cierre || "-"}</td>
+                    <td className="px-4 py-3">
                       {e.admin_nombre || e.admin_apellido
-                        ? `${e.admin_nombre || ""} ${
-                            e.admin_apellido || ""
+                        ? `${e.admin_nombre || ""} ${e.admin_apellido || ""
                           }`.trim()
                         : "Sin administrador"}
                     </td>
-                    <td className="px-4 py-2 flex gap-2">
+                    <td className="px-4 py-3 flex gap-3">
                       {permissions.canView && (
                         <button
                           onClick={() => openViewModal(e.id_espacio)}
-                          className="text-green-500 hover:text-green-700 mr-2"
+                          className="text-green-500 hover:text-green-700"
                         >
                           Ver datos
                         </button>
@@ -618,7 +620,7 @@ const EspacioDeportivoAdmin = () => {
                       {permissions.canEdit && (
                         <button
                           onClick={() => openEditModal(e.id_espacio)}
-                          className="text-blue-500 hover:text-blue-700 mr-2"
+                          className="text-blue-500 hover:text-blue-700"
                         >
                           Editar
                         </button>
@@ -629,22 +631,85 @@ const EspacioDeportivoAdmin = () => {
               </tbody>
             </table>
           </div>
+          {/* CARDS MOBILE */}
+          <div className="md:hidden mt-6 space-y-4 pb-32">
+            {espacios.map((espacio, index) => (
+              <div key={espacio.id_espacio} className="border bg-white rounded-lg p-4 shadow-sm">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <div className="font-bold text-[#23475F]">
+                      {espacio.nombre}
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      Espacio #{(page - 1) * limit + index + 1}
+                    </div>
+                    <div className="mt-3 text-sm space-y-1">
+                      <div>
+                        <span className="font-semibold">Direccion: </span>
+                        {espacio.direccion || '-'}
+                      </div>
+                      <div>
+                        <span className="font-semibold">Horario: </span>
+                        {espacio.horario_apertura && espacio.horario_cierre
+                          ? `${espacio.horario_apertura} - ${espacio.horario_cierre}`
+                          : '-'}
+                      </div>
+                      <div>
+                        <span className="font-semibold">Administrador: </span>
+                        {espacio.admin_nombre && espacio.admin_apellido
+                          ? `${espacio.admin_nombre} ${espacio.admin_apellido}`
+                          : 'Sin administrador'}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center">
+                    <button onClick={() => setMobileModal(espacio)}>
+                      <FiMoreVertical size={22} />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
 
-          <div className="flex justify-center mt-4">
+            {/* PAGINACIÓN SOLO MOVIL */}
+            <div className="md:hidden w-full flex justify-center items-center gap-3 py-4">
+              <button
+                onClick={() => handlePageChange(page - 1)}
+                disabled={page === 1}
+                className="px-4 py-2 bg-gray-200 rounded-full text-sm disabled:opacity-40"
+              >
+                Anterior
+              </button>
+
+              <div className="px-4 py-2 bg-gray-100 rounded-full text-sm">
+                Pag {page} de {Math.ceil(total / limit) || 1}
+              </div>
+
+              <button
+                onClick={() => handlePageChange(page + 1)}
+                disabled={page === Math.ceil(total / limit)}
+                className="px-4 py-2 bg-gray-200 rounded-full text-sm disabled:opacity-40"
+              >
+                Siguiente
+              </button>
+            </div>
+          </div>
+          {/* PAGINACION STICKY */}
+          <div className="fixed md:static bottom-0 left-0 right-0 bg-white border-t shadow-lg py-3 flex justify-center gap-3 z-50 mt-6">
             <button
               onClick={() => handlePageChange(page - 1)}
               disabled={page === 1}
-              className="bg-gray-300 text-gray-800 px-4 py-2 rounded-l hover:bg-gray-400 disabled:opacity-50"
+              className="px-4 py-2 bg-gray-200 rounded-full disabled:opacity-40"
             >
               Anterior
             </button>
-            <span className="px-4 py-2 bg-gray-100">
-              Pagina {page} de {Math.ceil(total / limit)}
+            <span className="px-4 py-2 bg-gray-100 rounded-full text-md">
+              Pag {page} de {Math.ceil(total / limit)}
             </span>
             <button
               onClick={() => handlePageChange(page + 1)}
               disabled={page === Math.ceil(total / limit)}
-              className="bg-gray-300 text-gray-800 px-4 py-2 rounded-r hover:bg-gray-400 disabled:opacity-50"
+              className="px-4 py-2 bg-gray-200 rounded-full disabled:opacity-40"
             >
               Siguiente
             </button>
@@ -653,183 +718,288 @@ const EspacioDeportivoAdmin = () => {
       )}
 
       {modalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-8 max-w-2xl w-full max-h-[80vh] overflow-y-auto">
-            <h3 className="text-xl font-semibold mb-4">
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl p-5 max-w-2xl w-full max-h-[80vh] overflow-y-auto border border-gray-200 shadow-2xl">
+            <h3 className="text-xl font-semibold mb-4 text-gray-900">
               {viewMode
-                ? "Ver datos de espacio"
+                ? "Ver Datos de Espacio Deportivo"
                 : editMode
-                ? "Editar espacio"
-                : "Crear espacio"}
+                  ? "Editar Espacio Deportivo"
+                  : "Crear Espacio Deportivo"}
             </h3>
-            <form onSubmit={handleSubmit} className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium mb-1">Nombre</label>
+            <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4 text-md">
+              {/* Nombre */}
+              <div className="col-span-2 md:col-span-1">
+                <label className="block text-sm font-semibold mb-1">Nombre</label>
                 <input
                   name="nombre"
                   value={formData.nombre}
                   onChange={handleInputChange}
-                  className="w-full border rounded px-3 py-2 bg-gray-100"
+                  className="w-full border rounded-xl px-3 py-2 bg-gray-50"
                   required
                   disabled={viewMode}
                 />
               </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">
-                  Direccion
-                </label>
+
+              {/* Dirección */}
+              <div className="col-span-2 md:col-span-1">
+                <label className="block text-sm font-semibold mb-1">Dirección</label>
                 <input
                   name="direccion"
                   value={formData.direccion}
                   onChange={handleInputChange}
-                  className="w-full border rounded px-3 py-2 bg-gray-100"
+                  className="w-full border rounded-xl px-3 py-2 bg-gray-50"
                   disabled={viewMode}
                 />
               </div>
+
+              {/* Descripción */}
               <div className="col-span-2">
-                <label className="block text-sm font-medium mb-1">
-                  Descripcion
-                </label>
+                <label className="block text-sm font-semibold mb-1">Descripción</label>
                 <textarea
                   name="descripcion"
                   value={formData.descripcion}
                   onChange={handleInputChange}
-                  className="w-full border rounded px-3 py-2 bg-gray-100"
+                  className="w-full border rounded-xl px-3 py-2 bg-gray-50"
                   rows="3"
                   disabled={viewMode}
                 />
               </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">
-                  Latitud
-                </label>
+              {/* Latitud y Longitud */}
+              <div className="col-span-2 md:col-span-1">
+                <label className="block text-sm font-semibold mb-1">Latitud</label>
                 <input
                   name="latitud"
                   value={formData.latitud}
                   onChange={handleInputChange}
-                  className="w-full border rounded px-3 py-2 bg-gray-100"
+                  className="w-full border rounded-xl px-3 py-2 bg-gray-50"
                   type="number"
                   step="0.000001"
-                  min="-90"
-                  max="90"
                   disabled={viewMode}
                 />
               </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">
-                  Longitud
-                </label>
+              <div className="col-span-2 md:col-span-1">
+                <label className="block text-sm font-semibold mb-1">Longitud</label>
                 <input
                   name="longitud"
                   value={formData.longitud}
                   onChange={handleInputChange}
-                  className="w-full border rounded px-3 py-2 bg-gray-100"
+                  className="w-full border rounded-xl px-3 py-2 bg-gray-50"
                   type="number"
                   step="0.000001"
-                  min="-180"
-                  max="180"
                   disabled={viewMode}
                 />
               </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">
-                  Horario apertura (HH:MM:SS)
-                </label>
+              {/* Horarios */}
+              <div className="col-span-2 md:col-span-1"><label className="block text-sm font-semibold mb-1">Horario de Apertura</label>
                 <input
                   name="horario_apertura"
                   value={formData.horario_apertura}
                   onChange={handleInputChange}
-                  className="w-full border rounded px-3 py-2 bg-gray-100"
-                  placeholder="HH:MM:SS"
+                  className="w-full border rounded-xl px-3 py-2 bg-gray-50"
+                  type="time"
+                  step="1"
                   disabled={viewMode}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">
-                  Horario cierre (HH:MM:SS)
-                </label>
+                /></div>
+              <div className="col-span-2 md:col-span-1"><label className="block text-sm font-semibold mb-1">Horario de Cierre</label>
                 <input
                   name="horario_cierre"
                   value={formData.horario_cierre}
                   onChange={handleInputChange}
-                  className="w-full border rounded px-3 py-2 bg-gray-100"
-                  placeholder="HH:MM:SS"
+                  className="w-full border rounded-xl px-3 py-2 bg-gray-50"
+                  type="time"
+                  step="1"
                   disabled={viewMode}
-                />
-              </div>
+                /></div>
 
+              {/* Imagen Principal */}
               <div className="col-span-2">
-                {/* esto es de la vista del adm_esp_dep */}
-                <label className="block text-sm font-medium mb-1">
-                  Imagen principal
-                </label>
-                {imagePreviews.imagen_principal ? (
+                <label className="block text-sm font-semibold mb-1">Imagen Principal</label>
+                {imagePreviews.imagen_principal && (
                   <img
-                    src={imagePreviews.imagen_principal}
-                    alt="imagen_principal"
+                    src={
+                      selectedFiles.imagen_principal
+                        ? URL.createObjectURL(selectedFiles.imagen_principal)
+                        : imagePreviews.imagen_principal
+                    }
                     className="w-32 h-32 object-cover rounded mb-2"
+                    alt="img"
                   />
-                ) : viewMode ? (
-                  <p className="text-gray-500">Sin imagen</p>
-                ) : null}
-
+                )}
                 {!viewMode && (
                   <input
                     type="file"
                     accept="image/*"
                     onChange={(e) => handleFileChange(e, "imagen_principal")}
-                    className="w-full border rounded px-3 py-2 bg-gray-100"
+                    className="w-full border rounded-xl px-3 py-2 bg-gray-50"
                   />
                 )}
               </div>
 
-              {[
-                "imagen_sec_1",
-                "imagen_sec_2",
-                "imagen_sec_3",
-                "imagen_sec_4",
-              ].map((f) => (
-                <div key={f}>
-                  <label className="block text-sm font-medium mb-1">{f}</label>
-                  {imagePreviews[f] ? (
-                    <img
-                      src={imagePreviews[f]}
-                      alt={f}
-                      className="w-32 h-32 object-cover rounded mb-2"
-                    />
-                  ) : viewMode ? (
-                    <p className="text-gray-500">Sin imagen</p>
-                  ) : null}
+              {/* Imagen Secundaria 1 */}
+              <div>
+                <label className="block text-sm font-semibold mb-1">Imagen Secundaria 1</label>
+                {imagePreviews.imagen_sec_1 && (
+                  <img
+                    src={
+                      selectedFiles.imagen_sec_1
+                        ? URL.createObjectURL(selectedFiles.imagen_sec_1)
+                        : imagePreviews.imagen_sec_1
+                    }
+                    alt="Imagen Secundaria 1"
+                    className="w-32 h-32 object-cover rounded mb-2"
+                  />
+                )}
+                {!viewMode && (
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => handleFileChange(e, "imagen_sec_1")}
+                    className="w-full border rounded-xl px-3 py-2 bg-gray-50"
+                  />
+                )}
+              </div>
 
-                  {!viewMode && (
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={(e) => handleFileChange(e, f)}
-                      className="w-full border rounded px-3 py-2 bg-gray-100"
-                    />
-                  )}
-                </div>
-              ))}
+              {/* Imagen Secundaria 2 */}
+              <div>
+                <label className="block text-sm font-semibold mb-1">Imagen Secundaria 2</label>
+                {imagePreviews.imagen_sec_2 && (
+                  <img
+                    src={
+                      selectedFiles.imagen_sec_2
+                        ? URL.createObjectURL(selectedFiles.imagen_sec_2)
+                        : imagePreviews.imagen_sec_2
+                    }
+                    alt="Imagen Secundaria 2"
+                    className="w-32 h-32 object-cover rounded mb-2"
+                  />
+                )}
+                {!viewMode && (
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => handleFileChange(e, "imagen_sec_2")}
+                    className="w-full border rounded-xl px-3 py-2 bg-gray-50"
+                  />
+                )}
+              </div>
 
-              <div className="col-span-2 flex justify-end mt-4">
+              {/* Imagen Secundaria 3 */}
+              <div>
+                <label className="block text-sm font-semibold mb-1">Imagen Secundaria 3</label>
+                {imagePreviews.imagen_sec_3 && (
+                  <img
+                    src={
+                      selectedFiles.imagen_sec_3
+                        ? URL.createObjectURL(selectedFiles.imagen_sec_3)
+                        : imagePreviews.imagen_sec_3
+                    }
+                    alt="Imagen Secundaria 3"
+                    className="w-32 h-32 object-cover rounded mb-2"
+                  />
+                )}
+                {!viewMode && (
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => handleFileChange(e, "imagen_sec_3")}
+                    className="w-full border rounded-xl px-3 py-2 bg-gray-50"
+                  />
+                )}
+              </div>
+
+              {/* Imagen Secundaria 4 */}
+              <div>
+                <label className="block text-sm font-semibold mb-1">Imagen Secundaria 4</label>
+                {imagePreviews.imagen_sec_4 && (
+                  <img
+                    src={
+                      selectedFiles.imagen_sec_4
+                        ? URL.createObjectURL(selectedFiles.imagen_sec_4)
+                        : imagePreviews.imagen_sec_4
+                    }
+                    alt="Imagen Secundaria 4"
+                    className="w-32 h-32 object-cover rounded mb-2"
+                  />
+                )}
+                {!viewMode && (
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => handleFileChange(e, "imagen_sec_4")}
+                    className="w-full border rounded-xl px-3 py-2 bg-gray-50"
+                  />
+                )}
+              </div>
+              <div className="md:col-span-2 border-t pt-4 mt-4">
+                {modalError && (
+                  <div className="bg-red-100 text-red-600 p-3 mb-2 rounded-md text-sm">
+                    {modalError}
+                  </div>
+                )}
+              </div>
+              <div className="col-span-2 flex justify-end mt-2 gap-3">
                 <button
                   type="button"
                   onClick={closeModal}
-                  className="bg-gray-500 text-white px-4 py-2 rounded mr-2 hover:bg-gray-600"
+                  className="px-5 py-2 bg-gray-200 rounded-full text-md font-medium text-gray-700 hover:bg-gray-300"
                 >
                   Cerrar
                 </button>
                 {!viewMode && (
                   <button
                     type="submit"
-                    className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+                    className="px-5 py-2 bg-[#23475F] text-white rounded-full text-md font-medium hover:bg-[#1d3a4e]"
                   >
-                    {editMode ? "Actualizar" : "Crear"}
+                    {editMode ? 'Actualizar' : 'Crear'}
                   </button>
                 )}
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {mobileModal && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center">
+          <div className="bg-white rounded-2xl w-72 p-5 shadow-xl animate-scaleIn">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="font-bold text-[#23475F] text-lg">Opciones</h3>
+              <button onClick={() => setMobileModal(null)}>
+                <FiX size={20} />
+              </button>
+            </div>
+
+            <div className="flex flex-col text-md">
+              {/* Ver datos del control */}
+              <button
+                onClick={() => {
+                  setMobileModal(null);
+                  openViewModal(mobileModal.id_espacio); // Abre el modal para ver datos del control
+                }}
+                className="px-3 py-2 text-left hover:bg-gray-100"
+              >
+                Ver datos
+              </button>
+
+              {/* Editar control */}
+              <button
+                onClick={() => {
+                  setMobileModal(null);
+                  openEditModal(mobileModal.id_espacio); // Abre el modal para editar control
+                }}
+                className="px-3 py-2 text-left hover:bg-gray-100"
+              >
+                Editar
+              </button>
+
+              {/* Cancelar opción */}
+              <button
+                onClick={() => setMobileModal(null)}
+                className="px-3 py-2 text-left text-gray-700 hover:bg-gray-100 mt-1 rounded"
+              >
+                Cancelar
+              </button>
+            </div>
           </div>
         </div>
       )}

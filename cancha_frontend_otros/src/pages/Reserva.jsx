@@ -172,10 +172,8 @@ const Reserva = () => {
     }
 
     try {
-      // Llamada a la API para eliminar el control
       const response = await api.delete(`/reserva/${deleteUser.id_reserva}`);
 
-      // Verificar la respuesta de la API
       if (response.data.exito) {
         setDeleteOpen(false);  // Cerrar el modal de eliminación
         setDeleteUser(null);  // Limpiar el control a eliminar
@@ -184,7 +182,6 @@ const Reserva = () => {
         setError(response.data.mensaje || 'No se pudo eliminar');  // Si hay un mensaje de error, mostrarlo
       }
     } catch (err) {
-      // Capturar cualquier error de la llamada a la API
       const errorMessage = err.response?.data?.mensaje || 'Error de conexión al servidor';
       setError(errorMessage);  // Mostrar el mensaje de error
     }

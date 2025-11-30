@@ -7,10 +7,7 @@ import { useNavigate } from "react-router-dom";
 import DashboardAdminEsp from "./DashboardAdminEsp";
 
 const norm = (v) =>
-  String(v || "")
-    .trim()
-    .toUpperCase()
-    .replace(/\s+/g, "_");
+  String(v || "").trim().toUpperCase().replace(/\s+/g, "_");
 
 const readUser = () => {
   try {
@@ -36,11 +33,7 @@ const pickRole = (u, p) => {
   const bag = new Set();
   const arr = Array.isArray(u?.roles) ? u.roles : u?.role ? [u.role] : [];
   arr.forEach((r) =>
-    bag.add(
-      norm(
-        typeof r === "string" ? r : r?.rol || r?.role || r?.nombre || r?.name
-      )
-    )
+    bag.add(norm(typeof r === "string" ? r : r?.rol || r?.role || r?.nombre || r?.name))
   );
   const parr = Array.isArray(p?.roles) ? p.roles : p?.rol ? [p.rol] : [];
   parr.forEach((r) => bag.add(norm(r)));
@@ -95,7 +88,7 @@ const EspaciosView = () => {
     fetchEspacios();
   }, [idAdminEspDep]);
 
-  const toggleExpand = async (idEspacio) => {
+  const toggleExpand = (idEspacio) => {
     setExpanded((prev) => ({
       ...prev,
       [idEspacio]: !prev[idEspacio],
@@ -114,44 +107,111 @@ const EspaciosView = () => {
   if (error) return <p className="text-red-500">{error}</p>;
 
   return (
-    <div className="bg-white rounded-lg shadow p-6">
-      <h2 className="text-xl font-semibold mb-4">Panel de Gestión</h2>
+    <div className="bg-white rounded-lg shadow px-4 py-6 md:p-6">
+      <h2 className="text-2xl font-bold mb-6 text-[#23475F] border-l-4 border-[#01CD6C] pl-3">Panel de Gestión</h2>
       <DashboardAdminEsp idAdminEspDep={idAdminEspDep} />
-      <h2 className="text-xl font-semibold mb-4">Mis Espacios Deportivos</h2>
+      <h2 className="text-2xl font-bold mb-6 text-[#23475F] border-l-4 border-[#01CD6C] pl-3">
+        Mis Espacios Deportivos
+      </h2>
 
       {espacios.length === 0 ? (
         <p>No tienes espacios registrados.</p>
       ) : (
         espacios.map((esp) => (
-          <div key={esp.id_espacio} className="border rounded-lg mb-4">
+          <div key={esp.id_espacio} className="border rounded-xl mb-4 shadow-sm">
+
+            {/* HEADER */}
             <div
-              className="flex justify-between items-center bg-gray-50 px-4 py-3 cursor-pointer hover:bg-gray-100"
+              className="flex justify-between items-center bg-gray-50 px-4 py-3 cursor-pointer hover:bg-gray-100 rounded-t-xl"
               onClick={() => toggleExpand(esp.id_espacio)}
             >
-              <div>
-                <h3 className="text-lg font-medium">{esp.nombre}</h3>
-                <p className="text-sm text-gray-600">
+              <div className="max-w-[70%]">
+                <h3 className="text-lg font-medium truncate">{esp.nombre}</h3>
+                <p classname="text-sm text-gray-600 truncate">
                   {esp.direccion || "Sin dirección registrada"}
                 </p>
               </div>
-              <div className="flex items-center gap-3">
-                <span className="text-sm text-gray-500">
+
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-500 whitespace-nowrap">
                   {esp.total_canchas || 0} canchas
                 </span>
                 {expanded[esp.id_espacio] ? (
-                  <FaChevronDown className="w-4 h-4 text-gray-600" />
+                  <FaChevronDown className="w-4 h-4" />
                 ) : (
-                  <FaChevronRight className="w-4 h-4 text-gray-600" />
+                  <FaChevronRight className="w-4 h-4" />
                 )}
               </div>
             </div>
 
+            {/* TABLE / CARDS */}
             {expanded[esp.id_espacio] && (
-              <div className="px-4 pb-4 overflow-x-auto">
-                {esp.canchas && esp.canchas.length > 0 ? (
-                  <table className="min-w-full table-auto border-collapse mt-2">
-                    <thead>
-                      <tr className="bg-gray-100">
+              <div className="p-4">
+                {/* MOBILE: CARDS */}
+                <div className="md:hidden space-y-4">
+                  {esp.canchas?.map((c) => (
+                    <div
+                      key={c.id_cancha}
+                      className="border border-gray-200 rounded-2xl p-4 bg-white shadow-sm hover:shadow-md transition-all"
+                    >
+                      {/* TÍTULO */}
+                      <div className="flex justify-between items-center mb-2">
+                        <h4 className="font-semibold text-lg text-gray-800">{c.nombre}</h4>
+                        <span
+                          className={`px-3 py-1 rounded-full text-xs font-medium ${c.estado === "disponible"
+                            ? "bg-green-100 text-green-700"
+                            : c.estado === "mantenimiento"
+                              ? "bg-yellow-100 text-yellow-700"
+                              : "bg-red-100 text-red-700"
+                            }`}
+                        >
+                          {c.estado}
+                        </span>
+                      </div>
+
+                      {/* INFO */}
+                      <div className="space-y-1 text-sm text-gray-700">
+                        <p>
+                          <span className="font-medium text-gray-900">Capacidad: </span>
+                          {c.capacidad}
+                        </p>
+
+                        <p>
+                          <span className="font-medium text-gray-900">Monto/hora: </span>
+                          Bs. {c.monto_por_hora}
+                        </p>
+
+                        <p>
+                          <span className="font-medium text-gray-900">Disciplinas: </span>
+                          {(c.disciplinas || []).join(", ") || "—"}
+                        </p>
+                      </div>
+
+                      {/* BOTONES */}
+                      <div className="flex mt-4 gap-2">
+                        <button
+                          onClick={() => handleVerReservas(c.id_cancha)}
+                          className="flex-1 bg-[#23475F] text-white text-sm px-3 py-2 rounded-full hover:bg-[#1d3a4e] transition"
+                        >
+                          Reservas
+                        </button>
+
+                        <button
+                          onClick={() => handleVerResenas(c.id_cancha)}
+                          className="flex-1 bg-[#01CD6C] text-white text-sm px-3 py-2 rounded-full hover:bg-[#00b25b] transition"
+                        >
+                          Reseñas
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* DESKTOP TABLE */}
+                <div className="hidden md:block mt-6 overflow-x-auto">
+                  <table className="min-w-full border-collapse rounded-lg overflow-hidden shadow-sm">
+                    <thead className="bg-[#23475F] text-white text-md">
+                      <tr>
                         <th className="px-4 py-2 text-left">Cancha</th>
                         <th className="px-4 py-2 text-left">Capacidad</th>
                         <th className="px-4 py-2 text-left">Monto/h</th>
@@ -161,20 +221,19 @@ const EspaciosView = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {esp.canchas.map((c) => (
-                        <tr key={c.id_cancha} className="border-t">
-                          <td className="px-4 py-2 font-medium">{c.nombre}</td>
-                          <td className="px-4 py-2">{c.capacidad}</td>
-                          <td className="px-4 py-2">Bs. {c.monto_por_hora}</td>
-                          <td className="px-4 py-2">
+                      {esp.canchas?.map((c) => (
+                        <tr key={c.id_cancha} className="border-t hover:bg-gray-50 transition">
+                          <td className="px-4 py-3">{c.nombre}</td>
+                          <td className="px-4 py-3">{c.capacidad}</td>
+                          <td className="px-4 py-3">Bs. {c.monto_por_hora}</td>
+                          <td className="px-4 py-3">
                             <span
-                              className={`px-2 py-1 rounded text-xs ${
-                                c.estado === "disponible"
-                                  ? "bg-green-100 text-green-700"
-                                  : c.estado === "mantenimiento"
-                                  ? "bg-yellow-100 text-yellow-700"
-                                  : "bg-red-100 text-red-700"
-                              }`}
+                              className={`px-3 py-1 rounded-full text-xs border ${c.estado === "disponible"
+                                ? "bg-green-100 text-green-800"
+                                : c.estado === "mantenimiento"
+                                  ? "bg-yellow-100 text-yellow-800"
+                                  : "bg-red-100 text-red-800"
+                                }`}
                             >
                               {c.estado}
                             </span>
@@ -182,16 +241,16 @@ const EspaciosView = () => {
                           <td className="px-4 py-2">
                             {(c.disciplinas || []).join(", ") || "-"}
                           </td>
-                          <td className="px-4 py-2 flex gap-2">
+                          <td className="px-4 py-3 flex gap-3">
                             <button
                               onClick={() => handleVerReservas(c.id_cancha)}
-                              className="bg-blue-500 text-white text-sm px-3 py-1 rounded hover:bg-blue-600"
+                              className="bg-blue-500 text-white text-sm px-3 py-1 rounded-full hover:bg-blue-600"
                             >
                               Reservas
                             </button>
                             <button
                               onClick={() => handleVerResenas(c.id_cancha)}
-                              className="bg-yellow-500 text-white text-sm px-3 py-1 rounded hover:bg-yellow-600"
+                              className="bg-yellow-500 text-white text-sm px-3 py-1 rounded-full hover:bg-yellow-600"
                             >
                               Reseñas
                             </button>
@@ -200,11 +259,8 @@ const EspaciosView = () => {
                       ))}
                     </tbody>
                   </table>
-                ) : (
-                  <p className="text-gray-500 mt-2">
-                    No hay canchas registradas en este espacio.
-                  </p>
-                )}
+                </div>
+
               </div>
             )}
           </div>
