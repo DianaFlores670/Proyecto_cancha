@@ -146,27 +146,24 @@ const Control = () => {
     }
 
     try {
-      // Llamada a la API para eliminar el control
       const response = await api.delete(`/control/${deleteUser.id_control}`);
 
-      // Verificar la respuesta de la API
       if (response.data.exito) {
-        setDeleteOpen(false);  // Cerrar el modal de eliminación
-        setDeleteUser(null);  // Limpiar el control a eliminar
-        fetchControles();  // Recargar la lista de controles
+        setDeleteOpen(false);
+        setDeleteUser(null);
+        fetchControles();
       } else {
-        setError(response.data.mensaje || 'No se pudo eliminar');  // Si hay un mensaje de error, mostrarlo
+        setError(response.data.mensaje || 'No se pudo eliminar');
       }
     } catch (err) {
-      // Capturar cualquier error de la llamada a la API
       const errorMessage = err.response?.data?.mensaje || 'Error de conexión al servidor';
-      setError(errorMessage);  // Mostrar el mensaje de error
+      setError(errorMessage);
     }
   };
 
   const closeDeleteModal = () => {
-    setDeleteOpen(false);  // Cerrar el modal de eliminación
-    setDeleteUser(null);  // Limpiar el control a eliminar
+    setDeleteOpen(false);
+    setDeleteUser(null);
   };
 
   const openCreateModal = () => {
@@ -312,7 +309,7 @@ const Control = () => {
 
   return (
     <div className="bg-white rounded-lg shadow px-4 py-6 md:p-6">
-      <h2 className="text-2xl font-bold mb-6 text-[#23475F] border-l-4 border-[#01CD6C] pl-3">Gestion de Controles</h2>
+      <h2 className="text-2xl font-bold mb-6 text-[#23475F] border-l-4 border-[#01CD6C] pl-3">Gestión de Controles</h2>
       <div className="sticky top-0 bg-white z-40 pb-4 pt-2 border-b md:border-0 md:static md:top-auto">
         <div className="flex flex-col md:flex-row gap-3">
           <form onSubmit={handleSearch} className="flex flex-1 bg-[#F1F5F9] rounded-full shadow-sm overflow-hidden">

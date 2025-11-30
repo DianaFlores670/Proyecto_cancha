@@ -158,15 +158,31 @@ const buscarQRs = async (texto, limite = 10, offset = 0) => {
 const obtenerQRPorId = async (id) => {
   try {
     const query = `
-      SELECT qr.*, 
-             r.id_reserva, c.id_cliente, p.nombre AS cliente_nombre, p.apellido AS cliente_apellido, p.correo AS cliente_correo,
-             ca.id_cancha, ca.nombre AS cancha_nombre
-      FROM qr_reserva qr
-      JOIN reserva r ON qr.id_reserva = r.id_reserva
-      JOIN cliente c ON r.id_cliente = c.id_cliente
-      JOIN usuario p ON c.id_cliente = p.id_persona
-      JOIN cancha ca ON r.id_cancha = ca.id_cancha
-      WHERE qr.id_qr = $1
+      SELECT 
+  qr.*, 
+  r.id_reserva, 
+  c.id_cliente, 
+  p.nombre AS cliente_nombre, 
+  p.apellido AS cliente_apellido, 
+  p.correo AS cliente_correo,
+  ca.id_cancha, 
+  ca.nombre AS cancha_nombre,
+  co.id_control,
+  u.nombre AS control_nombre,
+  u.apellido AS control_apellido
+
+FROM qr_reserva qr
+
+JOIN reserva r ON qr.id_reserva = r.id_reserva
+JOIN cliente c ON r.id_cliente = c.id_cliente
+JOIN usuario p ON c.id_cliente = p.id_persona
+JOIN cancha ca ON r.id_cancha = ca.id_cancha
+
+LEFT JOIN control co ON qr.id_control = co.id_control
+LEFT JOIN usuario u ON co.id_control = u.id_persona
+
+WHERE qr.id_qr = $1;
+
     `;
     const result = await pool.query(query, [id]);
     return result.rows[0] || null;
@@ -223,7 +239,7 @@ const crearQR = async (datosQR) => {
 
     const qrExistenteResult = await pool.query(
       "SELECT id_qr FROM qr_reserva WHERE id_reserva = $1"
-    , [datosQR.id_reserva]);
+      , [datosQR.id_reserva]);
 
     if (qrExistenteResult.rows[0]) {
       throw new Error("Ya existe un QR asociado a esta reserva");

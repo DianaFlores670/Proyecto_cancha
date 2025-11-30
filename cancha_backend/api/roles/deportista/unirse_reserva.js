@@ -1,6 +1,13 @@
 const express = require("express");
 const pool = require("../../../config/database");
 
+const dayjs = require("dayjs");
+const utc = require("dayjs/plugin/utc");
+const timezone = require("dayjs/plugin/timezone");
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
+
 const router = express.Router();
 
 const respuesta = (exito, mensaje, datos = null) => ({
@@ -42,9 +49,7 @@ const obtenerReservaDesdeCodigo = async (code) => {
   const resultQr = await pool.query(queryQr, [cleanCode]);
   const row = resultQr.rows[0];
 
-  if (!row) {
-    return null;
-  }
+  if (!row) return null;
 
   if (row.qr_estado !== "activo") {
     throw new Error("El codigo ya no esta activo");
@@ -65,6 +70,7 @@ const obtenerReservaDesdeCodigo = async (code) => {
     WHERE id_reserva = $1
       AND estado = 'activo'
   `;
+
   const resultCupo = await pool.query(queryCupo, [row.id_reserva]);
   const cupoOcupado = parseInt(resultCupo.rows[0].total, 10) || 0;
 
@@ -95,24 +101,19 @@ const obtenerParticipanteEnReserva = async (idReserva, idPersona) => {
     ORDER BY id_reserva_deportista DESC
     LIMIT 1
   `;
+
   const result = await pool.query(query, [idReserva, idPersona]);
   return result.rows[0] || null;
 };
 
 const listarDeportistasReservaController = async (req, res) => {
   try {
-    const idReservaRaw = req.query.id_reserva;
-    const limitRaw = req.query.limit;
-    const offsetRaw = req.query.offset;
-
-    const idReserva = idReservaRaw ? parseInt(idReservaRaw, 10) : NaN;
-    const limit = limitRaw ? parseInt(limitRaw, 10) : 10;
-    const offset = offsetRaw ? parseInt(offsetRaw, 10) : 0;
+    const idReserva = req.query.id_reserva ? parseInt(req.query.id_reserva, 10) : NaN;
+    const limit = req.query.limit ? parseInt(req.query.limit, 10) : 10;
+    const offset = req.query.offset ? parseInt(req.query.offset, 10) : 0;
 
     if (!idReserva || isNaN(idReserva)) {
-      return res
-        .status(400)
-        .json(respuesta(false, "id_reserva no valido o no proporcionado"));
+      return res.status(400).json(respuesta(false, "id_reserva no valido o no proporcionado"));
     }
 
     const queryReserva = `
@@ -121,26 +122,25 @@ const listarDeportistasReservaController = async (req, res) => {
       WHERE id_reserva = $1
       LIMIT 1
     `;
+
     const resultReserva = await pool.query(queryReserva, [idReserva]);
     const reservaRow = resultReserva.rows[0];
 
     if (!reservaRow) {
-      return res
-        .status(404)
-        .json(respuesta(false, "No se encontro la reserva"));
+      return res.status(404).json(respuesta(false, "No se encontro la reserva"));
     }
 
     const cupoTotalRaw = Number(reservaRow.cupo);
     const cupoTotal = !Number.isNaN(cupoTotalRaw) && cupoTotalRaw > 0 ? cupoTotalRaw : 0;
-    const cupoMaxDeportistas =
-      !Number.isNaN(cupoTotalRaw) && cupoTotalRaw > 1 ? cupoTotalRaw - 1 : 0;
+    const cupoMaxDeportistas = cupoTotal > 1 ? cupoTotal - 1 : 0;
 
     const queryTotal = `
       SELECT COUNT(*) AS total
-      FROM reserva_deportista rd
-      WHERE rd.id_reserva = $1
-        AND rd.estado = 'activo'
+      FROM reserva_deportista
+      WHERE id_reserva = $1
+        AND estado = 'activo'
     `;
+
     const resultTotal = await pool.query(queryTotal, [idReserva]);
     const total = parseInt(resultTotal.rows[0].total, 10) || 0;
 
@@ -159,104 +159,58 @@ const listarDeportistasReservaController = async (req, res) => {
       ORDER BY rd.fecha_union ASC, rd.id_reserva_deportista ASC
       LIMIT $2 OFFSET $3
     `;
+
     const resultLista = await pool.query(queryLista, [idReserva, limit, offset]);
-    const deportistas = resultLista.rows || [];
 
     return res.json(
       respuesta(true, "Deportistas obtenidos", {
-        deportistas,
-        paginacion: {
-          total,
-          limit,
-          offset
-        },
+        deportistas: resultLista.rows || [],
+        paginacion: { total, limit, offset },
         cupo_total: cupoTotal,
         cupo_ocupado: total,
         cupo_max_deportistas: cupoMaxDeportistas,
-        indice_cupo: cupoTotal > 0 ? `${total}/${cupoTotal}` : `0/0`
+        indice_cupo: `${total}/${cupoTotal}`
       })
     );
   } catch (error) {
-    console.error("Error en listarDeportistasReservaController:", error.message);
-    return res
-      .status(500)
-      .json(
-        respuesta(
-          false,
-          error.message || "Error al obtener los deportistas de la reserva"
-        )
-      );
+    return res.status(500).json(respuesta(false, error.message));
   }
 };
 
 const infoUnirseReservaController = async (req, res) => {
   try {
     const { code } = req.query;
-    const idPersonaRaw = req.query.id_persona;
-    const idPersona = idPersonaRaw ? parseInt(idPersonaRaw, 10) : null;
+    const idPersona = req.query.id_persona ? parseInt(req.query.id_persona, 10) : null;
 
     if (!code || typeof code !== "string" || code.trim() === "") {
-      return res
-        .status(400)
-        .json(respuesta(false, "Codigo no valido o no proporcionado"));
+      return res.status(400).json(respuesta(false, "Codigo no valido o no proporcionado"));
     }
 
     try {
       Buffer.from(code.trim(), "base64").toString();
     } catch {
-      return res
-        .status(400)
-        .json(respuesta(false, "Codigo QR invalido (no es Base64 valido)"));
+      return res.status(400).json(respuesta(false, "Codigo QR invalido (no es Base64 valido)"));
     }
 
     const data = await obtenerReservaDesdeCodigo(code.trim());
     if (!data) {
-      return res
-        .status(404)
-        .json(respuesta(false, "No se encontro una reserva para este codigo"));
+      return res.status(404).json(respuesta(false, "No se encontro una reserva para este codigo"));
     }
 
     const reserva = data.reserva;
-    const cupoTotalRaw = Number(reserva.cupo);
-    const cupoMaxDeportistas =
-      !Number.isNaN(cupoTotalRaw) && cupoTotalRaw > 1
-        ? cupoTotalRaw - 1
-        : 0;
 
+    const cupoTotalRaw = Number(reserva.cupo);
+    const cupoMaxDeportistas = cupoTotalRaw > 1 ? cupoTotalRaw - 1 : 0;
     const cupoOcupado = reserva.cupo_ocupado || 0;
 
-    let cupoLleno = false;
-    if (cupoMaxDeportistas > 0) {
-      cupoLleno = cupoOcupado >= cupoMaxDeportistas;
-    }
+    const cupoLleno = cupoOcupado >= cupoMaxDeportistas;
 
-    let yaUnido = false;
-    if (idPersona) {
-      const participante = await obtenerParticipanteEnReserva(
-        reserva.id_reserva,
-        idPersona
-      );
-      yaUnido = Boolean(participante && participante.estado === "activo");
-    }
+    const participante = idPersona
+      ? await obtenerParticipanteEnReserva(reserva.id_reserva, idPersona)
+      : null;
 
-    let esClienteResponsable = false;
-    if (idPersona && reserva.id_cliente) {
-      esClienteResponsable = Number(reserva.id_cliente) === idPersona;
-    }
-
-    let puedeUnirse = true;
-    if (cupoLleno) {
-      puedeUnirse = false;
-    }
-    if (reserva.estado === "cancelada") {
-      puedeUnirse = false;
-    }
-    if (yaUnido) {
-      puedeUnirse = false;
-    }
-    if (esClienteResponsable) {
-      puedeUnirse = false;
-    }
+    const yaUnido = participante && participante.estado === "activo";
+    const esClienteResponsable = idPersona && reserva.id_cliente == idPersona;
 
     return res.json(
       respuesta(true, "Informacion de reserva obtenida", {
@@ -264,17 +218,15 @@ const infoUnirseReservaController = async (req, res) => {
           ...reserva,
           cupo_max_deportistas: cupoMaxDeportistas
         },
-        puede_unirse: puedeUnirse,
+        puede_unirse:
+          !cupoLleno && !yaUnido && !esClienteResponsable && reserva.estado !== "cancelada",
         ya_unido: yaUnido,
         cupo_lleno: cupoLleno,
         es_cliente_responsable: esClienteResponsable
       })
     );
   } catch (error) {
-    console.error("Error en infoUnirseReservaController:", error.message);
-    return res
-      .status(500)
-      .json(respuesta(false, error.message || "Error al obtener la informacion"));
+    return res.status(500).json(respuesta(false, error.message));
   }
 };
 
@@ -283,23 +235,17 @@ const unirseReservaController = async (req, res) => {
     const { code, id_persona } = req.body;
 
     if (!code || typeof code !== "string" || code.trim() === "") {
-      return res
-        .status(400)
-        .json(respuesta(false, "Codigo no valido o no proporcionado"));
+      return res.status(400).json(respuesta(false, "Codigo no valido o no proporcionado"));
     }
 
     if (!id_persona || isNaN(parseInt(id_persona, 10))) {
-      return res
-        .status(400)
-        .json(respuesta(false, "id_persona no valido o no proporcionado"));
+      return res.status(400).json(respuesta(false, "id_persona no valido o no proporcionado"));
     }
 
     try {
       Buffer.from(code.trim(), "base64").toString();
     } catch {
-      return res
-        .status(400)
-        .json(respuesta(false, "Codigo QR invalido (no es Base64 valido)"));
+      return res.status(400).json(respuesta(false, "Codigo QR invalido (no es Base64 valido)"));
     }
 
     const idPersona = parseInt(id_persona, 10);
@@ -310,37 +256,25 @@ const unirseReservaController = async (req, res) => {
       WHERE id_persona = $1
       LIMIT 1
     `;
+
     const usuarioResult = await pool.query(usuarioQuery, [idPersona]);
     if (!usuarioResult.rows[0]) {
-      return res
-        .status(400)
-        .json(respuesta(false, "El usuario no existe en el sistema"));
+      return res.status(400).json(respuesta(false, "El usuario no existe en el sistema"));
     }
 
     const data = await obtenerReservaDesdeCodigo(code.trim());
     if (!data) {
-      return res
-        .status(404)
-        .json(respuesta(false, "No se encontro una reserva para este codigo"));
+      return res.status(404).json(respuesta(false, "No se encontro una reserva para este codigo"));
     }
 
     const reserva = data.reserva;
 
     if (Number(reserva.id_cliente) === idPersona) {
-      return res
-        .status(400)
-        .json(
-          respuesta(
-            false,
-            "El cliente responsable no puede unirse como deportista en su propia reserva"
-          )
-        );
+      return res.status(400).json(respuesta(false, "El cliente responsable no puede unirse"));
     }
 
     if (reserva.estado === "cancelada") {
-      return res
-        .status(400)
-        .json(respuesta(false, "La reserva esta cancelada"));
+      return res.status(400).json(respuesta(false, "La reserva esta cancelada"));
     }
 
     const participanteExistente = await obtenerParticipanteEnReserva(
@@ -349,16 +283,11 @@ const unirseReservaController = async (req, res) => {
     );
 
     if (participanteExistente && participanteExistente.estado === "activo") {
-      return res
-        .status(400)
-        .json(respuesta(false, "Ya se encuentra inscrito en esta reserva"));
+      return res.status(400).json(respuesta(false, "Ya se encuentra inscrito"));
     }
 
     const cupoTotalRaw = Number(reserva.cupo);
-    const cupoMaxDeportistas =
-      !Number.isNaN(cupoTotalRaw) && cupoTotalRaw > 1
-        ? cupoTotalRaw - 1
-        : 0;
+    const cupoMaxDeportistas = cupoTotalRaw > 1 ? cupoTotalRaw - 1 : 0;
 
     const queryCupo = `
       SELECT COUNT(*) AS total
@@ -366,16 +295,16 @@ const unirseReservaController = async (req, res) => {
       WHERE id_reserva = $1
         AND estado = 'activo'
     `;
+
     const resultCupo = await pool.query(queryCupo, [reserva.id_reserva]);
     const cupoOcupado = parseInt(resultCupo.rows[0].total, 10) || 0;
 
     if (cupoMaxDeportistas > 0 && cupoOcupado >= cupoMaxDeportistas) {
-      return res
-        .status(400)
-        .json(respuesta(false, "No hay cupos disponibles para esta reserva"));
+      return res.status(400).json(respuesta(false, "No hay cupos disponibles"));
     }
 
     let participante;
+
     if (participanteExistente) {
       const updateQuery = `
         UPDATE reserva_deportista
@@ -384,6 +313,7 @@ const unirseReservaController = async (req, res) => {
         WHERE id_reserva_deportista = $1
         RETURNING *
       `;
+
       const updateResult = await pool.query(updateQuery, [
         participanteExistente.id_reserva_deportista
       ]);
@@ -399,10 +329,12 @@ const unirseReservaController = async (req, res) => {
         VALUES ($1, $2, now(), 'activo')
         RETURNING *
       `;
+
       const insertResult = await pool.query(insertQuery, [
         reserva.id_reserva,
         idPersona
       ]);
+
       participante = insertResult.rows[0];
     }
 
@@ -411,43 +343,41 @@ const unirseReservaController = async (req, res) => {
       VALUES ($1)
       ON CONFLICT (id_deportista) DO NOTHING
     `;
-    try {
-      await pool.query(insertDeportistaQuery, [idPersona]);
-    } catch (e) {
-      console.error("Error al insertar en deportista:", e.message);
-    }
+
+    await pool.query(insertDeportistaQuery, [idPersona]);
 
     const insertParticipaQuery = `
       INSERT INTO participa_en (id_deportista, id_reserva, fecha_reserva)
-      VALUES ($1, $2, CURRENT_DATE)
+      VALUES ($1, $2, $3)
       ON CONFLICT (id_deportista, id_reserva) DO NOTHING
     `;
-    try {
-      await pool.query(insertParticipaQuery, [idPersona, reserva.id_reserva]);
-    } catch (e) {
-      console.error("Error al insertar en participa_en:", e.message);
-    }
+
+    const fechaReservaParticipa = dayjs(reserva.fecha_reserva)
+      .tz("America/La_Paz")
+      .startOf("day")
+      .format("YYYY-MM-DD");
+
+    await pool.query(insertParticipaQuery, [
+      idPersona,
+      reserva.id_reserva,
+      fechaReservaParticipa
+    ]);
 
     const resultCupoFinal = await pool.query(queryCupo, [reserva.id_reserva]);
     const cupoFinal = parseInt(resultCupoFinal.rows[0].total, 10) || 0;
 
-    const reservaFinal = {
-      ...reserva,
-      cupo_ocupado: cupoFinal,
-      cupo_max_deportistas: cupoMaxDeportistas
-    };
-
     return res.json(
       respuesta(true, "Inscripcion a la reserva completada", {
-        reserva: reservaFinal,
+        reserva: {
+          ...reserva,
+          cupo_ocupado: cupoFinal,
+          cupo_max_deportistas: cupoMaxDeportistas
+        },
         participante
       })
     );
   } catch (error) {
-    console.error("Error en unirseReservaController:", error.message);
-    return res
-      .status(500)
-      .json(respuesta(false, error.message || "Error al unirse a la reserva"));
+    return res.status(500).json(respuesta(false, error.message));
   }
 };
 

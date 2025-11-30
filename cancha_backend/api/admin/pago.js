@@ -103,7 +103,7 @@ const buscarPagos = async (texto, limite = 10, offset = 0) => {
         per.nombre ILIKE $1 OR 
         per.apellido ILIKE $1 OR 
         ca.nombre ILIKE $1 OR 
-        p.metodo_pago ILIKE $1
+        p.metodo_pago::text ILIKE $1
       ORDER BY p.fecha_pago DESC
       LIMIT $2 OFFSET $3
     `;
@@ -119,7 +119,7 @@ const buscarPagos = async (texto, limite = 10, offset = 0) => {
         per.nombre ILIKE $1 OR 
         per.apellido ILIKE $1 OR 
         ca.nombre ILIKE $1 OR 
-        p.metodo_pago ILIKE $1
+        p.metodo_pago::text ILIKE $1
     `;
     
     const sanitizeInput = (input) => input.replace(/[%_\\]/g, '\\$&');

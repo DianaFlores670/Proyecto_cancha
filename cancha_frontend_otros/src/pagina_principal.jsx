@@ -179,15 +179,8 @@ const roleRoutesConfig = {
       component: Resena,
     },
     {
-      id: "se_practica",
-      label: "Canchas-Disciplinas",
-      icon: "🏸",
-      path: "se-practica",
-      component: Se_Practica,
-    },
-    {
       id: "participa_en",
-      label: "Cliente-Reserva-Deportistas",
+      label: "Participantes por Reserva",
       icon: "👥",
       path: "participa-en",
       component: Participa_En,

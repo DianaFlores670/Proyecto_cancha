@@ -1,448 +1,789 @@
 /* eslint-disable no-empty */
-import React, { useState, useEffect } from 'react';
-import api from '../services/api';
-
-const permissionsConfig = {
-  ADMINISTRADOR: { canView: true, canCreate: true, canEdit: true, canDelete: true },
-  ADMIN_ESP_DEP: { canView: false, canCreate: false, canEdit: false, canDelete: false },
-  DEFAULT: { canView: false, canCreate: false, canEdit: false, canDelete: false },
-};
-
-const getEffectiveRole = () => {
-  const keys = Object.keys(permissionsConfig);
-  const bag = new Set();
-  try {
-    const u = JSON.parse(localStorage.getItem('user') || '{}');
-    const arr = Array.isArray(u?.roles) ? u.roles : [];
-    for (const r of arr) {
-      if (typeof r === 'string') bag.add(r);
-      else if (r && typeof r === 'object') ['rol','role','nombre','name'].forEach(k => { if (r[k]) bag.add(r[k]); });
-    }
-    if (bag.size === 0 && u?.role) bag.add(u.role);
-  } catch {}
-  const tok = localStorage.getItem('token');
-  if (bag.size === 0 && tok && tok.split('.').length === 3) {
-    try {
-      const payload = JSON.parse(atob(tok.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')));
-      const t = Array.isArray(payload?.roles) ? payload.roles : (payload?.rol ? [payload.rol] : []);
-      t.forEach(v => bag.add(v));
-    } catch {}
-  }
-  const norm = Array.from(bag).map(v => String(v || '').trim().toUpperCase().replace(/\s+/g,'_'));
-  const map = v => v === 'ADMIN' ? 'ADMINISTRADOR' : v;
-  const norm2 = norm.map(map);
-  const prio = ['ADMINISTRADOR','ADMIN_ESP_DEP'];
-  return prio.find(r => norm2.includes(r) && keys.includes(r)) || norm2.find(r => keys.includes(r)) || 'DEFAULT';
-};
+/* eslint-disable no-unused-vars */
+import React, { useEffect, useState } from "react";
+import api from "../services/api";
+import { FiMoreVertical, FiX } from "react-icons/fi";
 
 const ParticipaEn = () => {
-  const [participaEn, setParticipaEn] = useState([]);
-  const [deportistas, setDeportistas] = useState([]);
   const [reservas, setReservas] = useState([]);
+  const [clientes, setClientes] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filtro, setFiltro] = useState('');
+
   const [modalOpen, setModalOpen] = useState(false);
-  const [editMode, setEditMode] = useState(false);
+  const [modalCreateOpen, setModalCreateOpen] = useState(false);
+
   const [viewMode, setViewMode] = useState(false);
-  const [currentParticipaEn, setCurrentParticipaEn] = useState(null);
-  const [formData, setFormData] = useState({ id_deportista: '', id_reserva: '', fecha_reserva: '' });
+  const [editMode, setEditMode] = useState(false);
+
+  const [modalError, setModalError] = useState(null);
+  const [mobileModal, setMobileModal] = useState(null);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteUser, setDeleteUser] = useState(null);
+
+  const [currentReserva, setCurrentReserva] = useState(null);
+  const [participantes, setParticipantes] = useState([]);
+  const [selectedCliente, setSelectedCliente] = useState("");
+  const [selectedReservaForCreation, setSelectedReservaForCreation] = useState("");
+
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filtro, setFiltro] = useState("");
+
+  const limit = 10;
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
-  const limit = 10;
-  const [role, setRole] = useState(() => getEffectiveRole());
 
-  useEffect(() => {
-    const sync = () => setRole(getEffectiveRole());
-    window.addEventListener('storage', sync);
-    window.addEventListener('auth-changed', sync);
-    window.addEventListener('focus', sync);
-    return () => {
-      window.removeEventListener('storage', sync);
-      window.removeEventListener('auth-changed', sync);
-      window.removeEventListener('focus', sync);
-    };
-  }, []);
+  const parseError = (e, text = "Error de conexion") => {
+    if (!e) return text;
+    if (e.response?.data?.mensaje) return e.response.data.mensaje;
+    if (e.response?.data?.message) return e.response.data.message;
+    if (typeof e.response?.data === "string") return e.response.data;
+    if (e.message === "Network Error") return "No se pudo conectar al servidor";
+    return text;
+  };
 
-  const permissions = role && permissionsConfig[role] ? permissionsConfig[role] : permissionsConfig.DEFAULT;
-
-  useEffect(() => {
-    const fetchAux = async () => {
-      try {
-        const [r1, r2] = await Promise.all([
-          api.get('/deportista/datos-especificos', { params: { limit: 1000 } }),
-          api.get('/reserva/datos-especificos', { params: { limit: 1000 } })
-        ]);
-        if (r1.data?.exito) setDeportistas(r1.data.datos?.deportistas || []);
-        else setError(r1.data?.mensaje || 'Error al obtener deportistas');
-        if (r2.data?.exito) setReservas(r2.data.datos?.reservas || []);
-        else setError(r2.data?.mensaje || 'Error al obtener reservas');
-      } catch (e) {
-        setError(e.response?.data?.mensaje || 'Error de conexion al cargar datos base');
-      }
-    };
-    if (permissions.canView || permissions.canCreate || permissions.canEdit) fetchAux();
-    else setError('No tienes permisos para ver los datos');
-  }, [role]);
-
-  const fetchParticipa = async (params = {}) => {
-    if (!permissions.canView) { setError('No tienes permisos para ver los datos'); return; }
+  const fetchReservasBase = async () => {
     setLoading(true);
     setError(null);
-    const offset = (page - 1) * limit;
-    const fullParams = { ...params, limit, offset };
     try {
-      let r;
-      if (params.q) r = await api.get('/participa_en/buscar', { params: fullParams });
-      else if (params.tipo) r = await api.get('/participa_en/filtro', { params: fullParams });
-      else r = await api.get('/participa_en/datos-especificos', { params: fullParams });
+      const offset = (page - 1) * limit;
+      const r = await api.get("/participa_en/por-reserva", {
+        params: { limit, offset }
+      });
       if (r.data?.exito) {
-        setParticipaEn(r.data.datos?.participa_en || []);
+        setReservas(r.data.datos?.reservas || []);
         setTotal(r.data.datos?.paginacion?.total || 0);
       } else {
-        setError(r.data?.mensaje || 'Error al cargar datos');
+        setError(r.data?.mensaje || "Error al obtener reservas");
       }
     } catch (e) {
-      setError(e.response?.data?.mensaje || 'Error de conexion al servidor');
+      setError(parseError(e));
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => { fetchParticipa(); }, [page, role]);
-
-  const handleSearch = (e) => {
-    e.preventDefault();
-    setPage(1);
-    setFiltro('');
-    if (searchTerm.trim()) fetchParticipa({ q: searchTerm });
-    else fetchParticipa();
-  };
-
-  const handleFiltroChange = (e) => {
-    const tipo = e.target.value;
-    setFiltro(tipo);
-    setPage(1);
-    setSearchTerm('');
-    if (tipo) fetchParticipa({ tipo });
-    else fetchParticipa();
-  };
-
-  const handleDelete = async (id_deportista, id_reserva) => {
-    if (!permissions.canDelete) return;
-    if (!window.confirm('Estas seguro de eliminar esta relacion participa_en?')) return;
+  const fetchBuscar = async () => {
+    if (!searchTerm.trim()) {
+      fetchReservasBase();
+      return;
+    }
+    setLoading(true);
+    setError(null);
     try {
-      const r = await api.delete(`/participa_en/${id_deportista}/${id_reserva}`);
-      if (r.data?.exito) fetchParticipa();
-      else setError(r.data?.mensaje || 'No se pudo eliminar');
+      const offset = (page - 1) * limit;
+      const r = await api.get("/participa_en/buscar", {
+        params: { q: searchTerm, limit, offset }
+      });
+      if (r.data?.exito) {
+        setReservas(r.data.datos?.reservas || []);
+        setTotal(r.data.datos?.paginacion?.total || 0);
+      } else {
+        setError(r.data?.mensaje || "Error al buscar");
+      }
     } catch (e) {
-      setError(e.response?.data?.mensaje || 'Error de conexion al servidor');
+      setError(parseError(e));
+    } finally {
+      setLoading(false);
     }
   };
 
-  const openCreateModal = () => {
-    if (!permissions.canCreate) return;
+  const fetchFiltro = async () => {
+    if (!filtro) {
+      fetchReservasBase();
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      const offset = (page - 1) * limit;
+      let tipo = filtro;
+      if (filtro === "fecha") tipo = "fecha_desc";
+      if (filtro === "cliente") tipo = "cliente";
+      if (filtro === "cancha") tipo = "cancha";
+      const r = await api.get("/participa_en/filtro", {
+        params: { tipo, limit, offset }
+      });
+      if (r.data?.exito) {
+        setReservas(r.data.datos?.reservas || []);
+        setTotal(r.data.datos?.paginacion?.total || 0);
+      } else {
+        setError(r.data?.mensaje || "Error al filtrar");
+      }
+    } catch (e) {
+      setError(parseError(e));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (searchTerm.trim()) fetchBuscar();
+    else if (filtro) fetchFiltro();
+    else fetchReservasBase();
+  }, [page, searchTerm, filtro]);
+
+  const fetchClientes = async () => {
+    try {
+      const r = await api.get("/cliente/datos-especificos", {
+        params: { limit: 2000 }
+      });
+      if (r.data?.exito) setClientes(r.data.datos?.clientes || []);
+    } catch { }
+  };
+
+  useEffect(() => {
+    fetchClientes();
+  }, []);
+
+  const normalizeParticipantes = (arr) => {
+    return (arr || []).map((p) => ({
+      id_deportista: Number(p.id_deportista),
+      nombre: p.nombre,
+      apellido: p.apellido
+    }));
+  };
+
+  const openViewModal = (reserva) => {
+    setCurrentReserva(reserva);
+    setParticipantes(normalizeParticipantes(reserva.participantes));
+    setViewMode(true);
     setEditMode(false);
-    setViewMode(false);
-    setFormData({ id_deportista: '', id_reserva: '', fecha_reserva: '' });
-    setCurrentParticipaEn(null);
+    setModalError(null);
     setModalOpen(true);
   };
 
-  const openEditModal = async (id_deportista, id_reserva) => {
-    if (!permissions.canEdit) return;
-    try {
-      const r = await api.get(`/participa_en/dato-individual/${id_deportista}/${id_reserva}`);
-      if (r.data?.exito) {
-        const x = r.data.datos?.participa_en || {};
-        setFormData({
-          id_deportista: x.id_deportista || '',
-          id_reserva: x.id_reserva || '',
-          fecha_reserva: x.fecha_reserva ? new Date(x.fecha_reserva).toISOString().split('T')[0] : ''
-        });
-        setCurrentParticipaEn(x);
-        setEditMode(true);
-        setViewMode(false);
-        setModalOpen(true);
-      } else {
-        setError(r.data?.mensaje || 'No se pudo cargar el registro');
-      }
-    } catch (e) {
-      setError(e.response?.data?.mensaje || 'Error de conexion al servidor');
-    }
-  };
-
-  const openViewModal = async (id_deportista, id_reserva) => {
-    if (!permissions.canView) return;
-    try {
-      const r = await api.get(`/participa_en/dato-individual/${id_deportista}/${id_reserva}`);
-      if (r.data?.exito) {
-        const x = r.data.datos?.participa_en || {};
-        setFormData({
-          id_deportista: x.id_deportista || '',
-          id_reserva: x.id_reserva || '',
-          fecha_reserva: x.fecha_reserva ? new Date(x.fecha_reserva).toISOString().split('T')[0] : ''
-        });
-        setCurrentParticipaEn(x);
-        setEditMode(false);
-        setViewMode(true);
-        setModalOpen(true);
-      } else {
-        setError(r.data?.mensaje || 'No se pudo cargar el registro');
-      }
-    } catch (e) {
-      setError(e.response?.data?.mensaje || 'Error de conexion al servidor');
-    }
+  const openEditModal = (reserva) => {
+    setCurrentReserva(reserva);
+    setParticipantes(normalizeParticipantes(reserva.participantes));
+    setSelectedCliente("");
+    setViewMode(false);
+    setEditMode(true);
+    setModalError(null);
+    setModalOpen(true);
   };
 
   const closeModal = () => {
     setModalOpen(false);
-    setCurrentParticipaEn(null);
-    setError(null);
+    setEditMode(false);
     setViewMode(false);
+    setCurrentReserva(null);
+    setModalError(null);
+    setParticipantes([]);
   };
 
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+  const openCreateModal = () => {
+    setModalCreateOpen(true);
+    setSelectedReservaForCreation("");
+    setSelectedCliente("");
+    setModalError(null);
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (viewMode) return;
-    if ((editMode && !permissions.canEdit) || (!editMode && !permissions.canCreate)) return;
+  const closeCreateModal = () => {
+    setModalCreateOpen(false);
+    setSelectedReservaForCreation("");
+    setSelectedCliente("");
+    setModalError(null);
+  };
+
+  const handleAddParticipante = async () => {
+    if (!selectedCliente) {
+      setModalError("Debe seleccionar un cliente");
+      return;
+    }
     try {
-      const filtered = {};
-      Object.entries(formData).forEach(([k, v]) => {
-        if (['id_deportista','id_reserva'].includes(k)) filtered[k] = v;
-        else if (v !== '' && v !== null && v !== undefined) filtered[k] = v;
-      });
-      const did = parseInt(filtered.id_deportista);
-      const rid = parseInt(filtered.id_reserva);
-      if (!deportistas.some(d => d.id_deportista === did)) { setError('El deportista seleccionado no es valido'); return; }
-      if (!reservas.some(r => r.id_reserva === rid)) { setError('La reserva seleccionada no es valida'); return; }
-      if (filtered.fecha_reserva) {
-        const f = new Date(filtered.fecha_reserva);
-        if (isNaN(f.getTime())) { setError('La fecha de reserva no es valida'); return; }
+      const r = await api.post(
+        `/participa_en/reserva/${currentReserva.id_reserva}/agregar`,
+        { id_cliente: Number(selectedCliente) }
+      );
+      if (r.data?.exito) {
+        fetchReservasBase();
+
+        const cli = clientes.find((c) => c.id_cliente == selectedCliente);
+        const nuevo = {
+          id_deportista: Number(selectedCliente),
+          nombre: cli?.nombre,
+          apellido: cli?.apellido
+        };
+        setParticipantes((prev) => [...prev, nuevo]);
+        setSelectedCliente("");
+      } else {
+        setModalError(r.data?.mensaje || "No se pudo agregar");
       }
-      const payload = { ...filtered, id_deportista: did, id_reserva: rid };
-      let r;
-      if (editMode) r = await api.patch(`/participa_en/${currentParticipaEn.id_deportista}/${currentParticipaEn.id_reserva}`, payload);
-      else r = await api.post('/participa_en/', payload);
-      if (r.data?.exito) { closeModal(); fetchParticipa(); }
-      else setError(r.data?.mensaje || 'No se pudo guardar');
     } catch (e) {
-      setError(e.response?.data?.mensaje || 'Error de conexion al servidor');
+      setModalError(parseError(e, "Error al agregar participante"));
     }
   };
 
-  const handlePageChange = (newPage) => {
-    if (newPage >= 1 && newPage <= Math.ceil(total / limit)) setPage(newPage);
+  const handleDeleteParticipante = async (id_deportista) => {
+    const idReserva = Number(currentReserva?.id_reserva);
+    const idDep = Number(id_deportista);
+
+    try {
+      const r = await api.delete(
+        `/participa_en/reserva/${idReserva}/deportista/${idDep}`
+      );
+      if (r.data?.exito) {
+        setParticipantes((prev) =>
+          prev.filter((p) => p.id_deportista !== idDep)
+        );
+        fetchReservasBase();
+      } else {
+        setModalError(r.data?.mensaje || "No se pudo eliminar");
+      }
+    } catch (e) {
+      setModalError(parseError(e, "Error al eliminar"));
+    }
   };
 
-  if (!role) return <p>Cargando permisos...</p>;
+  const handleDeleteAll = async (id_reserva) => {
+    setMobileModal(null);
+    setDeleteOpen(true);
+    setDeleteUser({ id_reserva });
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteUser) return;
+
+    try {
+      const r = await api.delete(`/participa_en/reserva/${deleteUser.id_reserva}`);
+      if (r.data?.exito) {
+        setDeleteOpen(false);
+        setDeleteUser(null);
+        fetchReservasBase();
+      } else {
+        setError(r.data?.mensaje || "Error al eliminar");
+      }
+    } catch (e) {
+      setError(parseError(e));
+    }
+  };
+
+  const closeDeleteModal = () => {
+    setDeleteOpen(false);
+    setDeleteUser(null);
+  };
+
+  const handleCreateRelation = async () => {
+    if (!selectedReservaForCreation || !selectedCliente) {
+      setModalError("Debe seleccionar reserva y cliente");
+      return;
+    }
+
+    try {
+      const r = await api.post(
+        `/participa_en/reserva/${selectedReservaForCreation}/agregar`,
+        { id_cliente: Number(selectedCliente) }
+      );
+      if (r.data?.exito) {
+        closeCreateModal();
+        fetchReservasBase();
+      } else {
+        setModalError(r.data?.mensaje || "No se pudo crear la relacion");
+      }
+    } catch (e) {
+      setModalError(parseError(e, "Error al crear relacion"));
+    }
+  };
 
   return (
-    <div className="bg-white rounded-lg shadow p-6">
-      <h2 className="text-xl font-semibold mb-4">Gestion de Relaciones Cliente-Reserva-Deportistas</h2>
+    <div className="bg-white rounded-lg shadow px-4 py-6 md:p-6">
+      <h2 className="text-2xl font-bold mb-6 text-[#23475F] border-l-4 border-[#01CD6C] pl-3">Gestion de Participantes por Reserva</h2>
+      <div className="sticky top-0 bg-white z-40 pb-4 pt-2 border-b md:border-0 md:static md:top-auto">
+        <div className="flex flex-col md:flex-row gap-3 mb-4">
+          <input
+            type="text"
+            className="flex flex-1 bg-[#F1F5F9] rounded-full shadow-sm overflow-hidden px-4 py-2 focus:outline-none text-md"
+            placeholder="Buscar por cliente, cancha o participante"
+            value={searchTerm}
+            onChange={(e) => {
+              setSearchTerm(e.target.value);
+              setPage(1);
+            }}
+          />
 
-      <div className="flex flex-col xl:flex-row gap-4 mb-6 items-stretch">
-        <div className="flex-1">
-          <form onSubmit={handleSearch} className="flex h-full">
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Buscar por deportista, cliente o cancha"
-              className="border rounded-l px-4 py-2 w-full"
-            />
-            <button
-              type="submit"
-              className="bg-blue-500 text-white px-4 py-2 rounded-r hover:bg-blue-600 whitespace-nowrap"
-            >
-              Buscar
-            </button>
-          </form>
-        </div>
-
-        <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
           <select
             value={filtro}
-            onChange={handleFiltroChange}
-            className="border rounded px-3 py-2 flex-1 sm:min-w-[180px]"
+            onChange={(e) => {
+              setFiltro(e.target.value);
+              setPage(1);
+            }}
+            className="bg-[#F1F5F9] rounded-full px-4 py-2 shadow-sm text-md"
           >
-            <option value="">Todos - sin filtro</option>
-            <option value="deportista">Ordenar por deportista</option>
-            <option value="reserva">Ordenar por reserva</option>
-            <option value="fecha">Ordenar por fecha</option>
+            <option value="">Sin filtro</option>
+            <option value="fecha">Fecha</option>
+            <option value="cliente">Cliente responsable</option>
+            <option value="cancha">Cancha</option>
           </select>
 
-          {permissions.canCreate && (
-            <button
-              onClick={openCreateModal}
-              className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 whitespace-nowrap sm:w-auto w-full flex items-center justify-center gap-2"
-            >
-              <span>Link</span>
-              <span>Crear relacion</span>
-            </button>
-          )}
+          <button
+            onClick={openCreateModal}
+            className="bg-[#01CD6C] text-white rounded-full px-5 text-md shadow-sm disabled:opacity-40 py-2"
+          >
+            Crear relacion
+          </button>
         </div>
       </div>
 
       {loading ? (
-        <p>Cargando relaciones participa_en...</p>
+        <p>Cargando controles...</p>
       ) : error ? (
-        <p className="text-red-500">{error}</p>
+        <p className="text-red-500 mt-1">{error}</p>
       ) : (
         <>
-          <div className="overflow-x-auto">
-            <table className="min-w-full table-auto border-collapse">
-              <thead>
-                <tr className="bg-gray-50">
-                  <th className="px-4 py-2 text-left">#</th>
-                  <th className="px-4 py-2 text-left">Deportista</th>
-                  <th className="px-4 py-2 text-left">Cliente</th>
-                  <th className="px-4 py-2 text-left">Cancha</th>
-                  <th className="px-4 py-2 text-left">Fecha reserva</th>
-                  <th className="px-4 py-2 text-left">Acciones</th>
+          <div className="hidden md:block mt-2 overflow-x-auto">
+            <table className="min-w-full border-collapse rounded-lg overflow-hidden shadow-sm">
+              <thead className="bg-[#23475F] text-white text-md">
+                <tr>
+                  <th className="px-3 py-2 text-left">#</th>
+                  <th className="px-3 py-2 text-left">Cliente</th>
+                  <th className="px-3 py-2 text-left">Cancha</th>
+                  <th className="px-3 py-2 text-left">Fecha</th>
+                  <th className="px-3 py-2 text-left">Participantes</th>
+                  <th className="px-3 py-2 text-left">Acciones</th>
                 </tr>
               </thead>
-              <tbody>
-                {participaEn.map((rel, index) => (
-                  <tr key={`${rel.id_deportista}-${rel.id_reserva}`} className="border-t">
-                    <td className="px-4 py-2">{(page - 1) * limit + index + 1}</td>
-                    <td className="px-4 py-2">{`${rel.deportista_nombre} ${rel.deportista_apellido}`}</td>
-                    <td className="px-4 py-2">{`${rel.cliente_nombre} ${rel.cliente_apellido}`}</td>
-                    <td className="px-4 py-2">{rel.cancha_nombre}</td>
-                    <td className="px-4 py-2">{rel.fecha_reserva ? new Date(rel.fecha_reserva).toLocaleDateString() : '-'}</td>
-                    <td className="px-4 py-2 flex gap-2">
-                      {permissions.canView && (
+              <tbody className="text-md">
+                {reservas.map((r, idx) => {
+                  const totalParticipantes =
+                    (r.participantes ? r.participantes.length : 0) + 1;
+
+                  return (
+                    <tr key={r.id_reserva} className="border-t hover:bg-gray-50 transition">
+                      <td className="px-4 py-3">{(page - 1) * limit + idx + 1}</td>
+                      <td className="px-4 py-3">
+                        {r.cliente_nombre} {r.cliente_apellido}
+                      </td>
+                      <td className="px-4 py-3">{r.cancha_nombre}</td>
+                      <td className="px-4 py-3">
+                        {new Date(r.fecha_reserva).toLocaleDateString()}
+                      </td>
+                      <td className="px-4 py-3">
+                        {totalParticipantes}/{r.cupo}
+                      </td>
+                      <td className="px-4 py-3 flex gap-3">
                         <button
-                          onClick={() => openViewModal(rel.id_deportista, rel.id_reserva)}
-                          className="text-green-500 hover:text-green-700 mr-2"
+                          onClick={() => openViewModal(r)}
+                          className="text-green-500 hover:text-green-700"
                         >
-                          Ver datos
+                          Ver
                         </button>
-                      )}
-                      {permissions.canEdit && (
+
                         <button
-                          onClick={() => openEditModal(rel.id_deportista, rel.id_reserva)}
-                          className="text-blue-500 hover:text-blue-700 mr-2"
+                          onClick={() => openEditModal(r)}
+                          className="text-blue-500 hover:text-blue-700"
                         >
                           Editar
                         </button>
-                      )}
-                      {permissions.canDelete && (
+
                         <button
-                          onClick={() => handleDelete(rel.id_deportista, rel.id_reserva)}
+                          onClick={() => handleDeleteAll(r.id_reserva)}
                           className="text-red-500 hover:text-red-700"
                         >
                           Eliminar
                         </button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
+          {/* CARDS MOBILE */}
+          <div className="md:hidden mt-6 space-y-4 pb-32">
+            {reservas.map((r, index) => (
+              <div
+                key={r.id_reserva}
+                className="border bg-white rounded-lg p-4 shadow-sm"
+              >
+                <div className="flex justify-between items-start">
+                  <div>
+                    <div className="font-bold text-[#23475F]">
+                      {r.cliente_nombre} {r.cliente_apellido}
+                    </div>
 
-          <div className="flex justify-center mt-4">
+                    <div className="text-xs text-gray-500">
+                      Reserva #{(page - 1) * limit + index + 1}
+                    </div>
+
+                    <div className="mt-3 text-sm space-y-1">
+                      <div>
+                        <span className="font-semibold">Cancha: </span>
+                        {r.cancha_nombre}
+                      </div>
+
+                      <div>
+                        <span className="font-semibold">Fecha: </span>
+                        {new Date(r.fecha_reserva).toLocaleDateString()}
+                      </div>
+
+                      <div>
+                        <span className="font-semibold">Participantes: </span>
+                        {(r.participantes ? r.participantes.length : 0) + 1}/{r.cupo}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center">
+                    <button onClick={() => setMobileModal(r)}>
+                      <FiMoreVertical size={22} />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+
+            {/* PAGINACIÓN SOLO MOVIL */}
+            <div className="md:hidden w-full flex justify-center items-center gap-3 py-4">
+              <button
+                onClick={() => setPage(page - 1)}
+                disabled={page === 1}
+                className="px-4 py-2 bg-gray-200 rounded-full text-sm disabled:opacity-40"
+              >
+                Anterior
+              </button>
+
+              <div className="px-4 py-2 bg-gray-100 rounded-full text-sm">
+                Pag {page} de {Math.ceil(total / limit) || 1}
+              </div>
+
+              <button
+                onClick={() => setPage(page + 1)}
+                disabled={page === Math.ceil(total / limit)}
+                className="px-4 py-2 bg-gray-200 rounded-full text-sm disabled:opacity-40"
+              >
+                Siguiente
+              </button>
+            </div>
+          </div>
+          {/* PAGINACION STICKY */}
+          <div className="fixed md:static bottom-0 left-0 right-0 bg-white border-t shadow-lg py-3 flex justify-center gap-3 z-50 mt-6">
             <button
-              onClick={() => handlePageChange(page - 1)}
               disabled={page === 1}
-              className="bg-gray-300 text-gray-800 px-4 py-2 rounded-l hover:bg-gray-400 disabled:opacity-50"
+              onClick={() => setPage(page - 1)}
+              className="px-4 py-2 bg-gray-200 rounded-full disabled:opacity-40"
             >
               Anterior
             </button>
-            <span className="px-4 py-2 bg-gray-100">
-              Pagina {page} de {Math.ceil(total / limit)}
+            <span className="px-4 py-2 bg-gray-100 rounded-full text-md">
+              Pag {page} / {Math.ceil(total / limit)}
             </span>
             <button
-              onClick={() => handlePageChange(page + 1)}
               disabled={page === Math.ceil(total / limit)}
-              className="bg-gray-300 text-gray-800 px-4 py-2 rounded-r hover:bg-gray-400 disabled:opacity-50"
+              onClick={() => setPage(page + 1)}
+              className="px-4 py-2 bg-gray-200 rounded-full disabled:opacity-40"
             >
               Siguiente
             </button>
           </div>
         </>
       )}
+      {mobileModal && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center">
+          <div className="bg-white rounded-2xl w-72 p-5 shadow-xl animate-scaleIn">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="font-bold text-[#23475F] text-lg">Opciones</h3>
+              <button onClick={() => setMobileModal(null)}>
+                <FiX size={20} />
+              </button>
+            </div>
 
-      {modalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-8 max-w-2xl w-full max-h-[80vh] overflow-y-auto">
-            <h3 className="text-xl font-semibold mb-4">
-              {viewMode ? 'Ver datos de relacion participa en' : editMode ? 'Editar relacion participa en' : 'Crear relacion participa en'}
+            <div className="flex flex-col text-md">
+              <button
+                onClick={() => {
+                  setMobileModal(null);
+                  openViewModal(mobileModal);
+                }}
+                className="px-3 py-2 text-left hover:bg-gray-100"
+              >
+                Ver datos
+              </button>
+
+              <button
+                onClick={() => {
+                  setMobileModal(null);
+                  openEditModal(mobileModal);
+                }}
+                className="px-3 py-2 text-left hover:bg-gray-100"
+              >
+                Editar
+              </button>
+
+              <button
+                onClick={() => {
+                  setMobileModal(null);
+                  setDeleteOpen(true);
+                  setDeleteUser(mobileModal);
+                }}
+                className="px-3 py-2 text-left text-red-600 hover:bg-red-50 mt-1 rounded"
+              >
+                Eliminar
+              </button>
+
+              <button
+                onClick={() => setMobileModal(null)}
+                className="px-3 py-2 text-left text-gray-700 hover:bg-gray-100 mt-1 rounded"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {deleteOpen && deleteUser && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white p-6 rounded-2xl shadow-2xl max-w-md w-full border border-gray-200">
+            <h3 className="text-xl font-semibold text-red-600 mb-2">
+              Eliminar reserva
             </h3>
-            <form onSubmit={handleSubmit} className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium mb-1">Deportista</label>
-                <select
-                  name="id_deportista"
-                  value={formData.id_deportista}
-                  onChange={handleInputChange}
-                  className="w-full border rounded px-3 py-2 bg-gray-100"
-                  required
-                  disabled={editMode || viewMode}
-                >
-                  <option value="">Seleccione un deportista</option>
-                  {deportistas.map(d => (
-                    <option key={d.id_deportista} value={d.id_deportista}>
-                      {d.nombre} {d.apellido}
-                    </option>
-                  ))}
-                </select>
+
+            <p className="text-gray-700 text-md">
+              ¿Seguro que deseas eliminar todos los participantes de la reserva{" "}
+              <span className="font-bold">#{deleteUser.id_reserva}</span>?
+            </p>
+
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                onClick={closeDeleteModal}
+                className="px-5 py-2 bg-gray-200 rounded-full text-md font-medium text-gray-700 hover:bg-gray-300"
+              >
+                Cancelar
+              </button>
+
+              <button
+                onClick={confirmDelete}
+                className="px-5 py-2 bg-red-600 text-white rounded-full text-md font-medium hover:bg-red-700"
+              >
+                Eliminar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {modalOpen && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl p-5 max-w-2xl w-full max-h-[80vh] overflow-y-auto border border-gray-200 shadow-2xl">
+            <h3 className="text-xl font-semibold mb-4 text-gray-900">
+              {viewMode ? "Ver Reserva" : editMode ? "Editar Reserva" : "Crear Reserva"}
+            </h3>
+            {currentReserva && (
+              <>
+                <form className="grid grid-cols-1 md:grid-cols-2 gap-4 text-md">
+
+                  {/* CLIENTE */}
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-semibold mb-1">Cliente</label>
+                    <input
+                      disabled
+                      value={`${currentReserva.cliente_nombre} ${currentReserva.cliente_apellido}`}
+                      className="w-full border rounded-xl px-3 py-2 bg-gray-50"
+                    />
+                  </div>
+
+                  {/* CANCHA */}
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-semibold mb-1">Cancha</label>
+                    <input
+                      disabled
+                      value={currentReserva.cancha_nombre}
+                      className="w-full border rounded-xl px-3 py-2 bg-gray-50"
+                    />
+                  </div>
+
+                  {/* FECHA */}
+                  <div>
+                    <label className="block text-sm font-semibold mb-1">Fecha</label>
+                    <input
+                      disabled
+                      value={new Date(currentReserva.fecha_reserva).toLocaleDateString()}
+                      className="w-full border rounded-xl px-3 py-2 bg-gray-50"
+                    />
+                  </div>
+
+                  {/* CUPO */}
+                  <div>
+                    <label className="block text-sm font-semibold mb-1">Cupo</label>
+                    <input
+                      disabled
+                      value={currentReserva.cupo}
+                      className="w-full border rounded-xl px-3 py-2 bg-gray-50"
+                    />
+                  </div>
+
+                  {/* PARTICIPANTES */}
+                  <div className="md:col-span-2 mt-2">
+                    <label className="block text-sm font-semibold mb-2 text-gray-800">
+                      Participantes
+                    </label>
+
+                    {/* SIN PARTICIPANTES */}
+                    {participantes.length === 0 && (
+                      <div className="text-gray-500 text-sm italic bg-gray-50 border border-gray-200 rounded-xl p-4">
+                        No hay participantes.
+                      </div>
+                    )}
+
+                    {/* LISTA SIMPLE Y MODERNA */}
+                    <div className="space-y-2">
+                      {participantes.map((p, idx) => (
+                        <div
+                          key={p.id_deportista || idx}
+                          className="flex items-center justify-between border border-gray-200 bg-white rounded-xl px-4 py-3 shadow-sm hover:shadow transition-all cursor-default"
+                        >
+                          {/* Datos del participante */}
+                          <div>
+                            <span className="block text-gray-800 font-medium text-sm">
+                              {p.nombre} {p.apellido}
+                            </span>
+                            <span className="text-xs text-gray-500">
+                              ID: {p.id_deportista}
+                            </span>
+                          </div>
+
+                          {/* Botón delete minimal */}
+                          {editMode && (
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteParticipante(p.id_deportista)}
+                              className="text-red-500 text-sm bg-red-50 px-3 py-1 rounded-full hover:bg-red-100 hover:text-red-600 transition"
+                            >
+                              delete
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* AGREGAR PARTICIPANTE */}
+                  {editMode && (
+                    <div className="md:col-span-2 mt-3">
+                      <label className="block text-sm font-semibold mb-1">Agregar participante</label>
+                      <select
+                        value={selectedCliente}
+                        onChange={(e) => setSelectedCliente(e.target.value)}
+                        className="border px-3 py-2 rounded w-full mb-3"
+                      >
+                        <option value="">Seleccione un cliente</option>
+                        {clientes.map((c) => (
+                          <option key={c.id_cliente} value={c.id_cliente}>
+                            {c.nombre} {c.apellido}
+                          </option>
+                        ))}
+                      </select>
+
+                      <button
+                        onClick={handleAddParticipante}
+                        type="button"
+                        className="bg-[#23475F] text-white px-4 py-2 rounded-full hover:bg-[#1d3a4e] w-full"
+                      >
+                        Agregar participante
+                      </button>
+                    </div>
+                  )}
+                  {modalError && (
+                    <div className="bg-red-100 text-red-600 p-3 mb-2 rounded-md text-sm">
+                      {modalError}
+                    </div>
+                  )}
+                  <div className="md:col-span-2 flex justify-end mt-3 gap-3">
+                    <button
+                      type="button"
+                      onClick={closeModal}
+                      className="px-5 py-2 bg-gray-200 rounded-full text-md font-medium text-gray-700 hover:bg-gray-300"
+                    >
+                      Cerrar
+                    </button>
+
+                    {editMode && (
+                      <button
+                        type="button"
+                        onClick={() => handleAddParticipante()}
+                        className="px-5 py-2 bg-[#23475F] text-white rounded-full text-md font-medium hover:bg-[#1d3a4e]"
+                      >
+                        Guardar cambios
+                      </button>
+                    )}
+                  </div>
+                </form>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+      {modalCreateOpen && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl p-6 max-w-xl w-full border border-gray-200 shadow-2xl">
+
+            <h3 className="text-xl font-semibold mb-4 text-[#23475F]">
+              Crear Relacion
+            </h3>
+
+            {/* ERROR MODAL */}
+            {modalError && (
+              <div className="bg-red-100 text-red-600 p-3 mb-4 rounded-md text-sm">
+                {modalError}
               </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Reserva</label>
-                <select
-                  name="id_reserva"
-                  value={formData.id_reserva}
-                  onChange={handleInputChange}
-                  className="w-full border rounded px-3 py-2 bg-gray-100"
-                  required
-                  disabled={editMode || viewMode}
-                >
-                  <option value="">Seleccione una reserva</option>
-                  {reservas.map(r => (
-                    <option key={r.id_reserva} value={r.id_reserva}>
-                      Reserva #{r.id_reserva} - {r.cliente_nombre} {r.cliente_apellido} ({r.cancha_nombre})
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="col-span-2">
-                <label className="block text-sm font-medium mb-1">Fecha de reserva</label>
-                <input
-                  name="fecha_reserva"
-                  value={formData.fecha_reserva}
-                  onChange={handleInputChange}
-                  className="w-full border rounded px-3 py-2 bg-gray-100"
-                  type="date"
-                  disabled={viewMode}
-                />
-              </div>
-              <div className="col-span-2 flex justify-end mt-4">
-                <button
-                  type="button"
-                  onClick={closeModal}
-                  className="bg-gray-500 text-white px-4 py-2 rounded mr-2 hover:bg-gray-600"
-                >
-                  Cerrar
-                </button>
-                {!viewMode && (
-                  <button
-                    type="submit"
-                    className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
-                  >
-                    {editMode ? 'Actualizar' : 'Crear'}
-                  </button>
-                )}
-              </div>
-            </form>
-            {error && <p className="text-red-500 mt-4">{error}</p>}
+            )}
+
+            {/* RESERVA */}
+            <div className="mb-4">
+              <label className="block text-sm font-semibold mb-1 text-gray-800">
+                Reserva
+              </label>
+
+              <select
+                value={selectedReservaForCreation}
+                onChange={(e) => setSelectedReservaForCreation(e.target.value)}
+                className="w-full border rounded-xl bg-gray-50 px-3 py-2 text-sm shadow-sm focus:ring-2 focus:ring-[#23475F] transition"
+              >
+                <option value="">Seleccione una reserva</option>
+                {reservas.map((r) => (
+                  <option key={r.id_reserva} value={r.id_reserva}>
+                    Reserva #{r.id_reserva} - {r.cliente_nombre} {r.cliente_apellido} ({r.cancha_nombre})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* CLIENTE */}
+            <div className="mb-5">
+              <label className="block text-sm font-semibold mb-1 text-gray-800">
+                Cliente
+              </label>
+
+              <select
+                value={selectedCliente}
+                onChange={(e) => setSelectedCliente(e.target.value)}
+                className="w-full border rounded-xl bg-gray-50 px-3 py-2 text-sm shadow-sm focus:ring-2 focus:ring-[#23475F] transition"
+              >
+                <option value="">Seleccione un cliente</option>
+                {clientes.map((c) => (
+                  <option key={c.id_cliente} value={c.id_cliente}>
+                    {c.nombre} {c.apellido}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* BOTÓN CREAR */}
+            <button
+              onClick={handleCreateRelation}
+              className="w-full bg-[#23475F] text-white px-4 py-2 rounded-full text-md font-medium hover:bg-[#1d3a4e] shadow-sm transition"
+            >
+              Crear relación
+            </button>
+
+            {/* FOOTER */}
+            <div className="flex justify-end mt-4">
+              <button
+                onClick={closeCreateModal}
+                className="px-5 py-2 bg-gray-200 rounded-full text-md font-medium text-gray-700 hover:bg-gray-300 transition"
+              >
+                Cerrar
+              </button>
+            </div>
+
           </div>
         </div>
       )}
