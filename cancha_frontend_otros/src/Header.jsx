@@ -5,30 +5,48 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import api from "./services/api";
 import {
-  FaEnvelope, FaLock, FaUser, FaUsersCog, FaClipboardList, FaCheckCircle, FaPhone, FaVenusMars, FaIdBadge, FaCalendarAlt,
-  FaInfoCircle, FaUserTag, FaMapMarkerAlt, FaAlignLeft, FaCamera, FaKey, FaTimes, FaSave, FaBars,
+  FaEnvelope,
+  FaLock,
+  FaUser,
+  FaUsersCog,
+  FaClipboardList,
+  FaCheckCircle,
+  FaPhone,
+  FaVenusMars,
+  FaIdBadge,
+  FaCalendarAlt,
+  FaInfoCircle,
+  FaUserTag,
+  FaMapMarkerAlt,
+  FaAlignLeft,
+  FaCamera,
+  FaKey,
+  FaTimes,
+  FaSave,
+  FaBars,
+  FaChevronDown,
 } from "react-icons/fa";
 import { getImageUrl } from "./utils";
 
 const ROLE_PANEL_MAP = {
   administrador: {
     path: "/administrador",
-    label: "Ir a Panel Administrador Gral.",
+    label: "de Administrador Gral.",
     value: "ADMINISTRADOR",
   },
   admin_esp_dep: {
     path: "/administrador",
-    label: "Ir a Panel Administrador",
+    label: "de Administrador",
     value: "ADMIN_ESP_DEP",
   },
   control: {
-    path: "/administrador",
-    label: "Ir a Panel Control",
+    path: "/encargadocontrol",
+    label: "de Control",
     value: "CONTROL",
   },
   encargado: {
-    path: "/administrador",
-    label: "Ir a Panel Encargado",
+    path: "/encargadocontrol",
+    label: "de Encargado",
     value: "ENCARGADO",
   },
 };
@@ -55,8 +73,7 @@ const formatValue = (v) => {
         month: "long",
         day: "numeric",
       });
-    } catch {
-    }
+    } catch { }
   }
   return String(v ?? "");
 };
@@ -133,9 +150,12 @@ const Header = () => {
   const [imagePreview, setImagePreview] = useState(null);
   const navigate = useNavigate();
   const menuRef = useRef(null);
+  const panelMenuRef = useRef(null);
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [mobileUserMenu, setMobileUserMenu] = useState(false);
+  const [showPanelMenu, setShowPanelMenu] = useState(false);
+  const [mobilePanelMenuOpen, setMobilePanelMenuOpen] = useState(false);
 
   const sexosPermitidos = ["masculino", "femenino"];
   const rolesDisponibles = [
@@ -160,6 +180,9 @@ const Header = () => {
   const userRolesSet = new Set(
     (user?.roles ?? []).map((r) => (r.rol || "").toLowerCase())
   );
+
+  const panelEntries = getPanelEntries(user || {});
+  const hasPanels = isLoggedIn && panelEntries.length > 0;
 
   const availableRoles = rolesDisponibles.filter(
     (r) => !userRolesSet.has(r.valor)
@@ -273,6 +296,9 @@ const Header = () => {
       if (menuRef.current && !menuRef.current.contains(event.target)) {
         setShowMenu(false);
       }
+      if (panelMenuRef.current && !panelMenuRef.current.contains(event.target)) {
+        setShowPanelMenu(false);
+      }
     };
     document.addEventListener("mousedown", handleClickOutside);
     document.addEventListener("touchstart", handleClickOutside);
@@ -320,23 +346,33 @@ const Header = () => {
           (normalized.roles ?? []).map((r) => (r.rol || "").toUpperCase())
         );
 
-        const isMobile = window.innerWidth < 768; // md breakpoint
+        const isMobile = window.innerWidth < 768;
 
         if (roleSet.has("ADMINISTRADOR")) {
-
           if (isMobile) {
-            navigate("/administrador/inicio");   // móvil
+            navigate("/administrador/inicio");
           } else {
-            navigate("/administrador");          // PC
+            navigate("/administrador");
           }
-
-        } else if (roleSet.has("ADMIN_ESP_DEP")){
+        } else if (roleSet.has("ADMIN_ESP_DEP")) {
           if (isMobile) {
-            navigate("/administrador/inicio");   // móvil
+            navigate("/administrador/inicio");
           } else {
-            navigate("/administrador");          // PC
+            navigate("/administrador");
           }
-        }else{
+        } else if (roleSet.has("ENCARGADO")) {
+          if (isMobile) {
+            navigate("/encargadocontrol/inicio");
+          } else {
+            navigate("/encargadocontrol");
+          }
+        } else if (roleSet.has("CONTROL")) {
+          if (isMobile) {
+            navigate("/encargadocontrol/inicio");
+          } else {
+            navigate("/encargadocontrol");
+          }
+        } else {
           navigate("/espacios-deportivos");
         }
       } else {
@@ -345,7 +381,7 @@ const Header = () => {
     } catch (err) {
       setLoginError(
         err.response?.data?.message ||
-        "Error al Iniciar sesión. Verifica tus credenciales."
+        "Error al iniciar sesion. Verifica tus credenciales."
       );
     } finally {
       setLoginLoading(false);
@@ -418,7 +454,7 @@ const Header = () => {
       );
       setSubmissionMessage(
         rol === "cliente"
-          ? "Bienvenido. Puede Iniciar sesión."
+          ? "Bienvenido. Puede iniciar sesion."
           : "Solicitud creada. Te avisaremos por correo cuando se revise."
       );
       setShowSubmissionModal(true);
@@ -460,8 +496,10 @@ const Header = () => {
     setImagePreview(null);
     setSelectedFile(null);
     setShowMenu(false);
+    setShowPanelMenu(false);
     setMobileMenuOpen(false);
     setMobileUserMenu(false);
+    setMobilePanelMenuOpen(false);
     navigate("/");
   };
 
@@ -954,6 +992,7 @@ const Header = () => {
               onClick={() => {
                 setMobileMenuOpen((s) => !s);
                 setMobileUserMenu(false);
+                setMobilePanelMenuOpen(false);
               }}
               aria-label="Abrir menu"
               className="ml-1 text-white text-2xl hover:text-[#01CD6C] transition-all focus:outline-none flex-shrink-0"
@@ -968,6 +1007,7 @@ const Header = () => {
                 onClick={() => {
                   setMobileUserMenu((s) => !s);
                   setMobileMenuOpen(false);
+                  setMobilePanelMenuOpen(false);
                 }}
                 className="flex items-center gap-2 focus:outline-none"
                 aria-haspopup="menu"
@@ -992,6 +1032,10 @@ const Header = () => {
                 <span className="text-white font-medium truncate max-w-[6rem] text-sm">
                   {user?.nombre ?? "Usuario"}
                 </span>
+                <FaChevronDown
+                  className={`text-white text-xs transition-transform ${mobileUserMenu ? "rotate-180" : ""
+                    }`}
+                />
               </button>
             ) : (
               <button
@@ -999,10 +1043,11 @@ const Header = () => {
                   setShowLoginModal(true);
                   setMobileMenuOpen(false);
                   setMobileUserMenu(false);
+                  setMobilePanelMenuOpen(false);
                 }}
                 className="bg-[#01CD6C] px-3 py-1 rounded-lg text-white font-semibold text-sm"
               >
-                Iniciar sesión
+                Iniciar sesion
               </button>
             )}
           </div>
@@ -1042,11 +1087,52 @@ const Header = () => {
                 </Link>
               ) : null}
 
+              {hasPanels && (
+                <div className="mt-2">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setMobilePanelMenuOpen((prev) => !prev)
+                    }
+                    className="w-full flex items-center justify-between py-2.5 px-3 rounded-lg text-sm font-medium bg-[#01CD6C] hover:bg-[#00b359] transition-all"
+                  >
+                    <span>Ir a Panel... </span>
+                    <FaChevronDown
+                      className={`text-xs transition-transform ${mobilePanelMenuOpen ? "rotate-180" : ""
+                        }`}
+                    />
+                  </button>
+                  {mobilePanelMenuOpen && (
+                    <div className="mt-2 flex flex-col gap-1">
+                      {panelEntries.map((p, idx) => (
+                        <button
+                          key={idx}
+                          onClick={() => {
+                            setMobilePanelMenuOpen(false);
+                            setMobileMenuOpen(false);
+                            if (p.value) {
+                              localStorage.setItem("panelRole", p.value);
+                              navigate(`${p.path}?role=${p.value}`);
+                            } else {
+                              navigate(p.path);
+                            }
+                          }}
+                          className="w-full text-left py-2 px-3 rounded-lg text-xs font-medium bg-white/5 hover:bg-[#01CD6C]/30 transition-all"
+                        >
+                          {p.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
               {!isLoggedIn ? (
                 <button
                   onClick={() => {
                     setShowRegisterModal(true);
                     setMobileMenuOpen(false);
+                    setMobilePanelMenuOpen(false);
                   }}
                   className="mt-2 py-2 text-left font-medium text-sm text-white bg-[#01CD6C]/10 rounded-lg px-3"
                 >
@@ -1064,24 +1150,6 @@ const Header = () => {
             </div>
 
             <div className="px-2 py-2 flex flex-col gap-1">
-              {getPanelEntries(user).map((p, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => {
-                    setMobileUserMenu(false);
-                    if (p.value) {
-                      localStorage.setItem("panelRole", p.value);
-                      navigate(`${p.path}?role=${p.value}`);
-                    } else {
-                      navigate(p.path);
-                    }
-                  }}
-                  className="text-left px-3 py-2 text-sm hover:bg-[#01CD6C] hover:text-white rounded"
-                >
-                  {p.label}
-                </button>
-              ))}
-
               <button
                 onClick={() => {
                   setMobileUserMenu(false);
@@ -1119,7 +1187,7 @@ const Header = () => {
                 }}
                 className="text-left px-3 py-2 text-sm hover:bg-[#A31621] hover:text-white rounded text-red-600"
               >
-                Cerrar sesión
+                Cerrar sesion
               </button>
             </div>
           </div>
@@ -1184,6 +1252,7 @@ const Header = () => {
               >
                 Canchas
               </Link>
+
               {isLoggedIn && (
                 <Link
                   to="/mis-reservas"
@@ -1193,6 +1262,44 @@ const Header = () => {
                   Mis reservas
                 </Link>
               )}
+
+              {hasPanels && (
+                <div className="relative" ref={panelMenuRef}>
+                  <button
+                    type="button"
+                    onClick={() => setShowPanelMenu((prev) => !prev)}
+                    className="bg-[#01CD6C] hover:bg-[#00b359] text-white font-semibold py-2 px-4 rounded-full shadow-md hover:shadow-lg transition-all duration-300 hover:-translate-y-[2px] text-sm flex items-center gap-2"
+                  >
+                    <span>Ir a panel...</span>
+                    <FaChevronDown
+                      className={`text-xs transition-transform ${showPanelMenu ? "rotate-180" : ""
+                        }`}
+                    />
+                  </button>
+                  {showPanelMenu && (
+                    <div className="absolute right-0 mt-2 w-64 bg-[#0F2634] rounded-xl shadow-xl border border-gray-100 z-50 py-2">
+                      {panelEntries.map((p, idx) => (
+                        <button
+                          key={idx}
+                          onClick={() => {
+                            setShowPanelMenu(false);
+                            if (p.value) {
+                              localStorage.setItem("panelRole", p.value);
+                              navigate(`${p.path}?role=${p.value}`);
+                            } else {
+                              navigate(p.path);
+                            }
+                          }}
+                          className="block w-full text-left px-4 py-2 text-white hover:bg-[#01CD6C]/30 hover:text-white transition-colors duration-200 text-sm"
+                        >
+                          {p.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
               {!isLoggedIn && (
                 <button
                   onClick={() => setShowRegisterModal(true)}
@@ -1237,8 +1344,12 @@ const Header = () => {
                     )}
 
                     <span className="text-white font-medium md:max-w-[12rem] truncate pr-2 text-sm md:text-base">
-                      {user?.nombre ?? "Nombre"}
+                      {user?.nombre ?? "Usuario"}
                     </span>
+                    <FaChevronDown
+                      className={`text-white text-xs md:text-sm opacity-80 transition-transform ${showMenu ? "rotate-180" : ""
+                        }`}
+                    />
                   </button>
 
                   {showMenu && (
@@ -1247,24 +1358,6 @@ const Header = () => {
                         {user?.nombre || "Sin nombre"}{" "}
                         {user?.apellido || "Sin apellido"}
                       </div>
-
-                      {getPanelEntries(user).map((p, idx) => (
-                        <button
-                          key={idx}
-                          onClick={() => {
-                            setShowMenu(false);
-                            if (p.value) {
-                              localStorage.setItem("panelRole", p.value);
-                              navigate(`${p.path}?role=${p.value}`);
-                            } else {
-                              navigate(p.path);
-                            }
-                          }}
-                          className="block w-full text-left px-4 py-2 text-[#23475F] hover:bg-[#01CD6C] hover:text-white transition-colors duration-200 text-sm"
-                        >
-                          {p.label}
-                        </button>
-                      ))}
 
                       <button
                         onClick={openProfileModal}
@@ -1299,7 +1392,7 @@ const Header = () => {
                         onClick={handleLogout}
                         className="w-full text-left px-4 py-2 text-[#23475F] hover:bg-[#A31621] hover:text-white transition-colors duration-200 text-sm"
                       >
-                        Cerrar sesión
+                        Cerrar sesion
                       </button>
                     </div>
                   )}
@@ -1308,9 +1401,9 @@ const Header = () => {
                 <button
                   onClick={() => setShowLoginModal(true)}
                   className="bg-[#01CD6C] hover:bg-[#00b359] text-white font-semibold py-2 px-4 rounded-full shadow-md hover:shadow-lg transition-all duration-300 hover:-translate-y-[2px] text-sm"
-                  aria-label="Iniciar sesión"
+                  aria-label="Iniciar sesion"
                 >
-                  Iniciar sesión
+                  Iniciar sesion
                 </button>
               )}
             </div>
@@ -1324,13 +1417,13 @@ const Header = () => {
             <button
               onClick={handleCloseLoginModal}
               className="absolute top-3 right-3 text-[#23475F] hover:text-[#01CD6C] text-2xl sm:text-3xl transition-all flex items-center justify-center"
-              aria-label="Cerrar modal de inicio de sesión"
+              aria-label="Cerrar modal de inicio de sesion"
             >
               <FaTimes />
             </button>
 
             <h2 className="text-2xl sm:text-3xl font-bold text-center text-[#23475F] mb-6">
-              Iniciar sesión
+              Iniciar sesion
             </h2>
 
             <div className="space-y-5">
@@ -1383,7 +1476,7 @@ const Header = () => {
                 disabled={loginLoading}
                 className={`w-full py-3 px-4 bg-[#01CD6C] text-white text-base rounded-full shadow-lg hover:bg-[#00b359] transition-all font-semibold hover:translate-y-[-2px] hover:shadow-xl ${loginLoading ? "opacity-50 cursor-not-allowed" : ""
                   }`}
-                aria-label="Iniciar sesión"
+                aria-label="Iniciar sesion"
               >
                 {loginLoading ? (
                   <div className="flex justify-center items-center gap-3">
@@ -1391,7 +1484,7 @@ const Header = () => {
                     Cargando...
                   </div>
                 ) : (
-                  "Iniciar sesión"
+                  "Iniciar sesion"
                 )}
               </button>
             </div>
@@ -1680,11 +1773,7 @@ const Header = () => {
               <div className="inline-block relative">
                 {imagePreview ? (
                   <img
-                    src={
-                      imagePreview
-                        ? imagePreview
-                        : "/placeholder-profile.png"
-                    }
+                    src={imagePreview ? imagePreview : "/placeholder-profile.png"}
                     alt="Perfil"
                     className="w-24 h-24 sm:w-28 sm:h-28 rounded-full border-4 border-white shadow-lg object-cover"
                     onError={handleImageError}
@@ -1775,9 +1864,7 @@ const Header = () => {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
                   <div>
-                    <p className="text-xs sm:text-sm text-gray-500">
-                      Usuario
-                    </p>
+                    <p className="text-xs sm:text-sm text-gray-500">Usuario</p>
                     <p className="text-base sm:text-lg font-semibold text-[#23475F]">
                       {formData.usuario}
                     </p>
@@ -2002,9 +2089,7 @@ const Header = () => {
             <div className="text-center mb-6 sm:mb-8">
               {imagePreview ? (
                 <img
-                  src={
-                    imagePreview ? imagePreview : "/placeholder-profile.png"
-                  }
+                  src={imagePreview ? imagePreview : "/placeholder-profile.png"}
                   alt="Perfil"
                   className="w-20 h-20 sm:w-24 sm:h-24 rounded-full border-4 border-[#01CD6C] shadow-xl object-cover mx-auto"
                   onError={handleImageError}
@@ -2023,16 +2108,10 @@ const Header = () => {
                 Actualiza tu informacion personal
               </p>
             </div>
-
-            {editProfileError && (
-              <div className="bg-red-50 border border-red-200 rounded-full px-4 py-3 text-center mb-5 sm:mb-6">
-                <p className="text-[#A31621] text-xs sm:text-sm font-medium">
-                  {editProfileError}
-                </p>
-              </div>
-            )}
-
-            <form onSubmit={handleEditProfileSubmit} className="space-y-6 sm:space-y-8">
+            <form
+              onSubmit={handleEditProfileSubmit}
+              className="space-y-6 sm:space-y-8"
+            >
               <div className="bg-white border border-gray-200 shadow-sm rounded-2xl p-5 sm:p-6">
                 <h4 className="text-base sm:text-lg font-bold text-[#23475F] mb-3 sm:mb-4 flex items-center gap-2">
                   <FaCamera className="text-[#01CD6C]" />
@@ -2176,7 +2255,13 @@ const Header = () => {
                   </div>
                 </div>
               </div>
-
+              {editProfileError && (
+                <div className="bg-red-50 border border-red-200 rounded-full px-4 py-3 text-center mb-2 sm:mb-4">
+                  <p className="text-[#A31621] text-xs sm:text-sm font-medium">
+                    {editProfileError}
+                  </p>
+                </div>
+              )}
               <div className="flex flex-col sm:flex-row justify-end gap-3 sm:gap-4 pt-3 sm:pt-4 border-t border-gray-200">
                 <button
                   type="button"

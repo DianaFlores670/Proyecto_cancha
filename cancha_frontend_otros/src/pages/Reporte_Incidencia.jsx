@@ -382,7 +382,7 @@ const ReporteIncidencia = () => {
               </thead>
               <tbody className="text-md">
                 {reportes.map((reporte, index) => (
-                  <tr key={reporte.id_reporte} className="border-t">
+                  <tr key={reporte.id_reporte} className="border-t hover:bg-gray-50 transition">
                     <td className="px-4 py-3">{(page - 1) * limit + index + 1}</td>
                     <td className="px-4 py-3">{`${reporte.cliente_nombre} ${reporte.cliente_apellido}`}</td>
                     <td className="px-4 py-3">{reporte.cancha_nombre}</td>
@@ -527,7 +527,7 @@ const ReporteIncidencia = () => {
               {viewMode ? 'Ver datos de reporte de incidencia' : editMode ? 'Editar reporte de incidencia' : 'Crear reporte de incidencia'}
             </h3>
             <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4 text-md">
-              <div>
+              <div className="col-span-2 md:col-span-1">
                 <label className="block text-sm font-semibold mb-1">Reserva</label>
                 <select
                   name="id_reserva"
@@ -545,7 +545,7 @@ const ReporteIncidencia = () => {
                   ))}
                 </select>
               </div>
-              <div>
+              <div className="col-span-2 md:col-span-1">
                 <label className="block text-sm font-semibold mb-1">Encargado</label>
                 <select
                   name="id_encargado"
@@ -645,7 +645,7 @@ const ReporteIncidencia = () => {
               <button
                 onClick={() => {
                   setMobileModal(null);
-                  openViewModal(mobileModal.id_control); // Abre el modal para ver datos del control
+                  openViewModal(mobileModal.id_reporte); // Abre el modal para ver datos del control
                 }}
                 className="px-3 py-2 text-left hover:bg-gray-100"
               >
@@ -656,7 +656,7 @@ const ReporteIncidencia = () => {
               <button
                 onClick={() => {
                   setMobileModal(null);
-                  openEditModal(mobileModal.id_control); // Abre el modal para editar control
+                  openEditModal(mobileModal.id_reporte); // Abre el modal para editar control
                 }}
                 className="px-3 py-2 text-left hover:bg-gray-100"
               >

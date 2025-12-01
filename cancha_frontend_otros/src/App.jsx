@@ -28,6 +28,7 @@ import MisReservasCliente from "./roles/cliente/MisReservasCliente";
 import ComprobantePagoCliente from "./roles/cliente/ComprobantePagoCliente";
 import UnirseReserva from "./roles/deportista/UnirseReserva";
 import { getImageUrl } from "./utils"; // ajusta la ruta según tu estructura
+import DashboardConEnc from "./DashboardConEnc";
 
 // Componente ProtectedRoute para verificar roles
 const ProtectedRoute = ({ children }) => {
@@ -355,6 +356,14 @@ const App = () => {
           element={
             <ProtectedRoute>
               <DashboardAdministradores/>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/encargadocontrol/*"
+          element={
+            <ProtectedRoute>
+              <DashboardConEnc/>
             </ProtectedRoute>
           }
         />

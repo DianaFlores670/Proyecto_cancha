@@ -24,6 +24,9 @@ SELECT
   p.apellido AS cliente_apellido,
   ca.id_cancha,
   ca.nombre AS cancha_nombre,
+  ed.id_espacio,
+  ed.nombre AS espacio_nombre,
+  ed.direccion AS espacio_direccion,
   rh.hora_inicio,
   rh.hora_fin,
   qr.codigo_qr,
@@ -39,6 +42,7 @@ FROM reserva r
 JOIN cliente c ON r.id_cliente = c.id_cliente
 JOIN usuario p ON c.id_cliente = p.id_persona
 JOIN cancha ca ON r.id_cancha = ca.id_cancha
+JOIN espacio_deportivo ed ON ca.id_espacio = ed.id_espacio
 LEFT JOIN (
   SELECT 
     id_reserva,
@@ -108,6 +112,9 @@ SELECT
   p.apellido AS cliente_apellido,
   ca.id_cancha,
   ca.nombre AS cancha_nombre,
+  ed.id_espacio,
+  ed.nombre AS espacio_nombre,
+  ed.direccion AS espacio_direccion,
   rh.hora_inicio,
   rh.hora_fin,
   qr.codigo_qr,
@@ -123,6 +130,7 @@ FROM reserva r
 JOIN cliente c ON r.id_cliente = c.id_cliente
 JOIN usuario p ON c.id_cliente = p.id_persona
 JOIN cancha ca ON r.id_cancha = ca.id_cancha
+JOIN espacio_deportivo ed ON ca.id_espacio = ed.id_espacio
 LEFT JOIN (
   SELECT 
     id_reserva,
@@ -186,6 +194,9 @@ SELECT
   p.apellido AS cliente_apellido,
   ca.id_cancha,
   ca.nombre AS cancha_nombre,
+  ed.id_espacio,
+  ed.nombre AS espacio_nombre,
+  ed.direccion AS espacio_direccion,
   rh.hora_inicio,
   rh.hora_fin,
   qr.codigo_qr,
@@ -201,6 +212,7 @@ FROM reserva r
 JOIN cliente c ON r.id_cliente = c.id_cliente
 JOIN usuario p ON c.id_cliente = p.id_persona
 JOIN cancha ca ON r.id_cancha = ca.id_cancha
+JOIN espacio_deportivo ed ON ca.id_espacio = ed.id_espacio
 LEFT JOIN (
   SELECT 
     id_reserva,
@@ -270,6 +282,9 @@ SELECT
   p.correo AS cliente_correo,
   ca.id_cancha,
   ca.nombre AS cancha_nombre,
+  ed.id_espacio,
+  ed.nombre AS espacio_nombre,
+  ed.direccion AS espacio_direccion,
   rh.hora_inicio,
   rh.hora_fin,
   qr.codigo_qr,
@@ -285,6 +300,7 @@ FROM reserva r
 JOIN cliente c ON r.id_cliente = c.id_cliente
 JOIN usuario p ON c.id_cliente = p.id_persona
 JOIN cancha ca ON r.id_cancha = ca.id_cancha
+JOIN espacio_deportivo ed ON ca.id_espacio = ed.id_espacio
 LEFT JOIN (
   SELECT 
     id_reserva,

@@ -3,6 +3,7 @@ import React, { useEffect, useState } from "react";
 import api from "../services/api";
 import { getImageUrl } from "../utils";
 import EditarPerfilModal from "./EditarPerfilModal";
+import { FaUser, FaEnvelope, FaClock } from "react-icons/fa";
 
 // ========================================================
 // FORMATO DE FECHAS Y DATOS
@@ -113,7 +114,7 @@ const PerfilAdmin = ({ user }) => {
     return <div className="p-6 text-red-600 font-semibold">{error}</div>;
   }
 
-  const rolPrincipal = perfil.roles?.[0]?.rol || "SIN ROL";
+  //const rolPrincipal = perfil.roles?.[0]?.rol || "SIN ROL";
 
   return (
     <div className="p-4 md:p-8 max-w-4xl mx-auto pb-28 md:pb-8">
@@ -153,10 +154,6 @@ const PerfilAdmin = ({ user }) => {
             </div>
           )}
 
-          <span className="mt-3 text-xs bg-[#01CD6C]/20 text-[#01CD6C] px-3 py-1 rounded-full font-semibold uppercase">
-            {rolPrincipal}
-          </span>
-
           <button
             onClick={() => setShowEditModal(true)}
             className="mt-4 md:hidden flex items-center gap-2 bg-[#01CD6C] hover:bg-[#00b85f] text-white px-4 py-2 rounded-xl shadow"
@@ -165,22 +162,29 @@ const PerfilAdmin = ({ user }) => {
           </button>
         </div>
 
-        <div className="flex-1 text-center md:text-left">
+        <div className="flex-1 text-center md:text-left space-y-1.5">
+
           <h2 className="text-2xl md:text-3xl font-bold text-[#23475F] leading-tight">
             {perfil.nombre} {perfil.apellido}
           </h2>
 
-          <p className="text-sm md:text-base text-[#23475F]/70 mt-1">
-            Usuario: <b>{perfil.usuario}</b>
+          <p className="flex items-center justify-center md:justify-start gap-2 text-sm md:text-base text-[#23475F]/80">
+            <FaUser className="text-[#01CD6C] text-lg" />
+            <span className="font-medium">Usuario:</span>
+            <b className="text-[#23475F]">{perfil.usuario}</b>
           </p>
 
-          <p className="text-sm md:text-base text-[#23475F]/70">
-            Correo: <b>{perfil.correo}</b>
+          <p className="flex items-center justify-center md:justify-start gap-2 text-sm md:text-base text-[#23475F]/80">
+            <FaEnvelope className="text-[#01CD6C] text-lg" />
+            <span className="font-medium">Correo:</span>
+            <b className="text-[#23475F]">{perfil.correo}</b>
           </p>
 
           {perfil.ultimo_login && (
-            <p className="text-sm md:text-base text-[#23475F]/60 mt-2">
-              Último inicio de sesión: <b>{formatDate(perfil.ultimo_login)}</b>
+            <p className="flex items-center justify-center md:justify-start gap-2 text-sm md:text-base text-[#23475F]/60 mt-2">
+              <FaClock className="text-[#01CD6C] text-lg" />
+              <span>Último inicio:</span>
+              <b className="text-[#23475F]">{formatDate(perfil.ultimo_login)}</b>
             </p>
           )}
         </div>
@@ -233,9 +237,8 @@ const PerfilAdmin = ({ user }) => {
               </span>
 
               <svg
-                className={`w-5 h-5 transition-transform ${
-                  openAccordion === i ? "rotate-180" : ""
-                }`}
+                className={`w-5 h-5 transition-transform ${openAccordion === i ? "rotate-180" : ""
+                  }`}
                 fill="none" stroke="#23475F" strokeWidth="2" viewBox="0 0 24 24"
               >
                 <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />

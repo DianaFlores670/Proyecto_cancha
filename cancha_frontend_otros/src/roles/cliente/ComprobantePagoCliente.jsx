@@ -297,13 +297,13 @@ const ComprobantePagoCliente = () => {
                 <button
                   type="button"
                   onClick={handlePrint}
-                  className="flex-1 px-4 py-2 rounded-md bg-[#01CD6C] text-white text-sm font-semibold hover:bg-[#00b359] transition-all"
+                  className="flex-1 px-4 py-2 rounded-full bg-[#01CD6C] text-white text-sm font-semibold hover:bg-[#00b359] transition-all"
                 >
                   Imprimir o guardar PDF
                 </button>
                 <Link
                   to={-1}
-                  className="flex-1 text-center px-4 py-2 rounded-md bg-[#E2E8F0] text-[#0F2634] text-sm font-semibold hover:bg-[#CBD5E1] transition-all"
+                  className="flex-1 text-center px-4 py-2 rounded-full bg-[#E2E8F0] text-[#0F2634] text-sm font-semibold hover:bg-[#CBD5E1] transition-all"
                 >
                   Volver
                 </Link>

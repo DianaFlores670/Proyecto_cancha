@@ -4,6 +4,7 @@
 
 import React, { useState, useEffect } from "react";
 import api from "../../services/api";
+import { FiMoreVertical, FiX } from "react-icons/fi";
 
 const Reporte_IncidenciaEncargado = () => {
   const [reportes, setReportes] = useState([]);
@@ -20,7 +21,7 @@ const Reporte_IncidenciaEncargado = () => {
   const [modalOpen, setModalOpen] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [detalle, setDetalle] = useState(null);
-
+  const [mobileModal, setMobileModal] = useState(null);
   const [formDetalle, setFormDetalle] = useState("");
   const [formSugerencia, setFormSugerencia] = useState("");
   const [formReserva, setFormReserva] = useState("");
@@ -205,79 +206,73 @@ const Reporte_IncidenciaEncargado = () => {
     }
   };
 
-const loadReservas = async (modo = "todas") => {
-  try {
-    const url =
-      modo === "pasadas"
-        ? "/reporte-incidencia-encargado/reservas-pasadas"
-        : "/reporte-incidencia-encargado/reservas-disponibles";
+  const loadReservas = async (modo = "todas") => {
+    try {
+      const url =
+        modo === "pasadas"
+          ? "/reporte-incidencia-encargado/reservas-pasadas"
+          : "/reporte-incidencia-encargado/reservas-disponibles";
 
-    const r = await api.get(url);
-    if (r.data?.exito) {
-      setReservasDisponibles(r.data.datos.reservas);
+      const r = await api.get(url);
+      if (r.data?.exito) {
+        setReservasDisponibles(r.data.datos.reservas);
+      }
+    } catch (e) {
+      console.error("Error al cargar reservas");
     }
-  } catch (e) {
-    console.error("Error al cargar reservas");
-  }
-};
+  };
 
-
+  const handlePageChange = (newPage) => {
+    if (newPage >= 1 && newPage <= Math.ceil(total / limit)) {
+      setPage(newPage);
+    }
+  };
 
   /* ========================= RENDER ========================= */
 
   return (
-    <div className="bg-white rounded-lg shadow p-6">
-      <h2 className="text-xl font-semibold mb-4">Reportes de Incidencias</h2>
-
-      {/* BUSQUEDA Y FILTRO */}
-      <div className="flex flex-col xl:flex-row gap-4 mb-6 items-stretch">
-        {/* BUSCAR */}
-        <div className="flex-1">
-          <form onSubmit={handleSearch} className="flex h-full">
+    <div className="bg-white rounded-lg shadow px-4 py-6 md:p-6">
+      <h2 className="text-2xl font-bold mb-6 text-[#23475F] border-l-4 border-[#01CD6C] pl-3">Reportes de Incidencias</h2>
+      <div className="sticky top-0 bg-white z-40 pb-4 pt-2 border-b md:border-0 md:static md:top-auto">
+        <div className="flex flex-col md:flex-row gap-3">
+          <form onSubmit={handleSearch} className="flex flex-1 bg-[#F1F5F9] rounded-full shadow-sm overflow-hidden">
             <input
               type="text"
               placeholder="Buscar por detalle, sugerencia o cancha"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="border rounded-l px-4 py-2 w-full"
+              className="bg-transparent flex-1 px-4 py-2 focus:outline-none text-md"
             />
-            <button className="bg-blue-500 text-white px-4 py-2 rounded-r hover:bg-blue-600 whitespace-nowrap">
+            <button className="bg-[#23475F] text-white px-6 text-md font-medium rounded-full">
               Buscar
             </button>
           </form>
-        </div>
-
-        {/* FILTRO */}
-        <div>
           <select
             value={filtro}
             onChange={handleFiltro}
-            className="border rounded px-3 py-2 sm:min-w-[200px]"
+            className="bg-[#F1F5F9] rounded-full px-4 py-2 shadow-sm text-md"
           >
             <option value="">Todos - sin filtro</option>
             <option value="fecha">Por fecha</option>
             <option value="verificado">Por verificado</option>
             <option value="cancha">Por cancha</option>
           </select>
+          <button
+            onClick={openCreate}
+            className="bg-[#01CD6C] text-white rounded-full px-5 text-md shadow-sm disabled:opacity-40 py-2"
+          >
+            Crear Reporte
+          </button>
         </div>
-
-        {/* CREAR */}
-        <button
-          onClick={openCreate}
-          className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 whitespace-nowrap"
-        >
-          Crear Reporte
-        </button>
       </div>
 
-      {/* TABLA */}
       {error ? (
-        <p className="text-red-500">{error}</p>
+        <p className="text-red-500 mt-3">{error}</p>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="min-w-full table-auto border-collapse">
-            <thead>
-              <tr className="bg-gray-50">
+        <div className="hidden md:block mt-6 overflow-x-auto">
+          <table className="min-w-full border-collapse rounded-lg overflow-hidden shadow-sm">
+            <thead className="bg-[#23475F] text-white text-md">
+              <tr>
                 <th className="px-4 py-2 text-left">#</th>
                 <th className="px-4 py-2 text-left">Cancha</th>
                 <th className="px-4 py-2 text-left">Reserva cliente</th>
@@ -287,30 +282,37 @@ const loadReservas = async (modo = "todas") => {
                 <th className="px-4 py-2 text-left">Acciones</th>
               </tr>
             </thead>
-
-            <tbody>
+            <tbody className="text-md">
               {reportes.map((r, i) => (
-                <tr key={r.id_reporte} className="border-t">
-                  <td className="px-4 py-2">{(page - 1) * limit + i + 1}</td>
-                  <td className="px-4 py-2">{r.nombre_cancha}</td>
-                  <td className="px-4 py-2">
+                <tr key={r.id_reporte} className="border-t hover:bg-gray-50 transition">
+                  <td className="px-4 py-3">{(page - 1) * limit + i + 1}</td>
+                  <td className="px-4 py-3">{r.nombre_cancha}</td>
+                  <td className="px-4 py-3">
                     #{r.id_reserva} {r.cliente_completo}
                   </td>
-                  <td className="px-4 py-2">
+                  <td className="px-4 py-3">
                     {r.fecha_reserva?.split("T")[0]}
                   </td>
-                  <td className="px-4 py-2">
+                  <td className="px-4 py-3">
                     {r.detalle.length > 30
                       ? r.detalle.slice(0, 30) + "..."
                       : r.detalle}
                   </td>
-                  <td className="px-4 py-2">
-                    {r.verificado ? "✔" : "❌"}
+                  <td className="px-4 py-3">
+                    {r.verificado ? (
+                      <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs">
+                        Si
+                      </span>
+                    ) : (
+                      <span className="px-2 py-1 bg-red-100 text-red-700 rounded-full text-xs">
+                        No
+                      </span>
+                    )}
                   </td>
-                  <td className="px-4 py-2">
+                  <td className="px-4 py-3 flex gap-3">
                     <button
                       onClick={() => openModal(r.id_reporte)}
-                      className="text-blue-500 hover:text-blue-700 mr-3"
+                      className="text-blue-500 hover:text-blue-700"
                     >
                       Ver
                     </button>
@@ -326,8 +328,6 @@ const loadReservas = async (modo = "todas") => {
                     >
                       Editar
                     </button>
-
-
                   </td>
                 </tr>
               ))}
@@ -343,30 +343,99 @@ const loadReservas = async (modo = "todas") => {
           </table>
         </div>
       )}
+      {/* CARDS MOBILE */}
+      <div className="md:hidden mt-6 space-y-4 pb-32">
+        {reportes.map((rep, index) => (
+          <div key={rep.id_reporte} className="border bg-white rounded-lg p-4 shadow-sm">
+            <div className="flex justify-between items-start">
 
-      {/* PAGINACION */}
-      <div className="flex justify-center mt-4">
+              {/* Datos principales del reporte */}
+              <div>
+                <div className="font-bold text-[#23475F]">
+                  {rep.cliente_nombre} {rep.cliente_apellido}
+                </div>
+
+                <div className="text-xs text-gray-500">
+                  Reporte #{(page - 1) * limit + index + 1}
+                </div>
+
+                <div className="mt-3 text-sm space-y-1">
+                  <div>
+                    <span className="font-semibold">Cancha: </span>
+                    {rep.cancha_nombre}
+                  </div>
+
+                  <div>
+                    <span className="font-semibold">Encargado: </span>
+                    {rep.encargado_nombre} {rep.encargado_apellido}
+                  </div>
+
+                  <div>
+                    <span className="font-semibold">Verificado: </span>
+                    {rep.verificado ? (
+                      <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs">
+                        Si
+                      </span>
+                    ) : (
+                      <span className="px-2 py-1 bg-red-100 text-red-700 rounded-full text-xs">
+                        No
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center">
+                <button onClick={() => setMobileModal(rep)}>
+                  <FiMoreVertical size={22} />
+                </button>
+              </div>
+            </div>
+          </div>
+        ))}
+
+        {/* PAGINACIÓN SOLO MÓVIL */}
+        <div className="md:hidden w-full flex justify-center items-center gap-3 py-4">
+          <button
+            onClick={() => handlePageChange(page - 1)}
+            disabled={page === 1}
+            className="px-4 py-2 bg-gray-200 rounded-full text-sm disabled:opacity-40"
+          >
+            Anterior
+          </button>
+
+          <div className="px-4 py-2 bg-gray-100 rounded-full text-sm">
+            Pag {page} de {Math.ceil(total / limit) || 1}
+          </div>
+
+          <button
+            onClick={() => handlePageChange(page + 1)}
+            disabled={page === Math.ceil(total / limit) || total === 0}
+            className="px-4 py-2 bg-gray-200 rounded-full text-sm disabled:opacity-40"
+          >
+            Siguiente
+          </button>
+        </div>
+      </div>
+      {/* PAGINACION STICKY */}
+      <div className="fixed md:static bottom-0 left-0 right-0 bg-white border-t shadow-lg py-3 flex justify-center gap-3 z-50 mt-6">
         <button
-          onClick={() => setPage(page - 1)}
+          onClick={() => handlePageChange(page - 1)}
           disabled={page === 1}
-          className="bg-gray-300 text-gray-800 px-4 py-2 rounded-l disabled:opacity-50"
+          className="px-4 py-2 bg-gray-200 rounded-full disabled:opacity-40"
         >
           Anterior
         </button>
-
-        <span className="px-4 py-2 bg-gray-100">
-          Página {page} de {Math.ceil(total / limit)}
+        <span className="px-4 py-2 bg-gray-100 rounded-full text-md">
+          Pag {page} de {Math.ceil(total / limit) || 1}
         </span>
-
         <button
-          onClick={() => setPage(page + 1)}
-          disabled={page === Math.ceil(total / limit)}
-          className="bg-gray-300 text-gray-800 px-4 py-2 rounded-r disabled:opacity-50"
+          onClick={() => handlePageChange(page + 1)}
+          disabled={page === Math.ceil(total / limit) || total === 0}
+          className="px-4 py-2 bg-gray-200 rounded-full disabled:opacity-40"
         >
           Siguiente
         </button>
       </div>
-
       {/* MODAL */}
       {modalOpen && (
         <div className="fixed inset-0 bg-[#020617]/60 backdrop-blur-sm flex items-center justify-center z-50 px-4">
@@ -537,12 +606,12 @@ const loadReservas = async (modo = "todas") => {
                     <button
                       type="button"
                       onClick={closeModal}
-                      className="px-4 py-2 text-sm font-semibold rounded-lg border border-[#CBD5E1] text-[#0F172A] bg-white hover:bg-[#F1F5F9] transition-colors"
+                      className="px-4 py-2 text-sm font-semibold rounded-full border border-[#CBD5E1] text-[#0F172A] bg-white hover:bg-[#F1F5F9] transition-colors"
                     >
                       Cancelar
                     </button>
                     <button
-                      className="px-4 py-2 text-sm font-semibold rounded-lg bg-[#0F172A] text-white hover:bg-[#020617] transition-colors"
+                      className="px-4 py-2 text-sm font-semibold rounded-full bg-[#0F172A] text-white hover:bg-[#020617] transition-colors"
                     >
                       {detalle && editMode === "editar" ? "Actualizar" : "Crear"}
                     </button>
@@ -556,12 +625,67 @@ const loadReservas = async (modo = "todas") => {
                 <button
                   type="button"
                   onClick={closeModal}
-                  className="px-4 py-2 text-sm font-semibold rounded-lg bg-[#0F172A] text-white hover:bg-[#020617] transition-colors"
+                  className="px-4 py-2 text-sm font-semibold rounded-full bg-[#0F172A] text-white hover:bg-[#020617] transition-colors"
                 >
                   Cerrar
                 </button>
               </div>
             )}
+          </div>
+        </div>
+      )}
+      {mobileModal && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center">
+          <div className="bg-white rounded-2xl w-72 p-5 shadow-xl animate-scaleIn">
+
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="font-bold text-[#23475F] text-lg">Opciones</h3>
+              <button onClick={() => setMobileModal(null)}>
+                <FiX size={20} />
+              </button>
+            </div>
+
+            <div className="flex flex-col text-md">
+
+              {/* Ver */}
+              <button
+                onClick={() => {
+                  openModal(mobileModal.id_reporte);
+                  setMobileModal(null);
+                }}
+                className="px-3 py-2 text-left hover:bg-gray-100"
+              >
+                Ver datos
+              </button>
+
+              {/* Editar */}
+              <button
+                onClick={() => {
+                  if (!mobileModal.verificado) {
+                    openEditar(mobileModal.id_reporte);
+                  }
+                  setMobileModal(null);
+                }}
+                disabled={mobileModal.verificado}
+                className={
+                  "px-3 py-2 text-left rounded " +
+                  (mobileModal.verificado
+                    ? "text-gray-400 bg-gray-50 cursor-not-allowed"
+                    : "text-green-600 hover:bg-gray-100")
+                }
+              >
+                Editar
+              </button>
+
+              {/* Cancelar */}
+              <button
+                onClick={() => setMobileModal(null)}
+                className="px-3 py-2 text-left text-gray-700 hover:bg-gray-100 mt-1 rounded"
+              >
+                Cancelar
+              </button>
+
+            </div>
           </div>
         </div>
       )}

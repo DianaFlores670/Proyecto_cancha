@@ -634,7 +634,7 @@ const CanchaAdmin = () => {
                     <td className="px-4 py-3">{c.capacidad || "-"}</td>
                     <td className="px-4 py-3">{c.estado || "-"}</td>
                     <td className="px-4 py-3">
-                      {c.monto_por_hora ? `$${c.monto_por_hora}` : "-"}
+                      {c.monto_por_hora ? `${c.monto_por_hora} Bs.` : "-"}
                     </td>
                     <td className="px-4 py-3 flex gap-3">
                       {permissions.canView && (

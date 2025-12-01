@@ -181,24 +181,34 @@ const PagosCliente = ({ idReserva, saldoPendienteInicial }) => {
   const pagosPagina = pagos.slice(start, end);
 
   return (
-    <div className="border border-[#E2E8F0] rounded-xl p-4 md:p-5 bg-[#FFF]">
-      <h2 className="text-xl md:text-2xl font-bold text-[#0F2634] mb-4">
-        Pagos de la reserva
-      </h2>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+    <div className="border border-[#E2E8F0] rounded-2xl p-4 sm:p-5 md:p-6 bg-[#FFFFFF] shadow-sm space-y-5">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <p className="text-sm text-[#64748B] mb-1">Saldo pendiente</p>
-          <p className="text-lg font-semibold text-[#0F2634]">
+          <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-[#0F2634]">
+            Pagos de la reserva
+          </h2>
+          <p className="text-xs sm:text-sm text-[#64748B] mt-1">
+            Registra pagos y revisa el historial asociado a esta reserva.
+          </p>
+        </div>
+
+        <div className="bg-[#F1F5F9] rounded-xl px-3 py-2 sm:px-4 sm:py-3 text-right">
+          <p className="text-xs sm:text-sm text-[#64748B] leading-tight">
+            Saldo pendiente
+          </p>
+          <p className="text-lg sm:text-xl font-semibold text-[#0F2634]">
             Bs. {saldoPendiente}
           </p>
         </div>
+      </div>
+
+      <div className="w-full rounded-2xl bg-[#F8FAFC] border border-[#E2E8F0] px-3 py-4 sm:px-4 sm:py-5">
         <form
           onSubmit={handleCrearPago}
-          className="md:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-3 items-end"
+          className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4 items-end"
         >
-          <div>
-            <label className="block text-sm text-[#64748B] mb-1">
+          <div className="w-full">
+            <label className="block text-xs sm:text-sm text-[#64748B] mb-1">
               Monto a pagar
             </label>
             <input
@@ -208,7 +218,7 @@ const PagosCliente = ({ idReserva, saldoPendienteInicial }) => {
               max={saldoPendiente > 0 ? saldoPendiente : undefined}
               value={monto}
               onChange={handleMontoChange}
-              className="w-full border border-[#CBD5E1] rounded-md px-3 py-2 text-sm text-[#0F2634]"
+              className="w-full border border-[#CBD5E1] rounded-lg px-3 py-2 text-sm text-[#0F2634] focus:ring-2 focus:ring-[#01CD6C] focus:border-[#01CD6C] outline-none bg-white"
               placeholder={
                 saldoPendiente > 0
                   ? `Hasta Bs. ${saldoPendiente}`
@@ -217,14 +227,15 @@ const PagosCliente = ({ idReserva, saldoPendienteInicial }) => {
               disabled={saldoPendiente <= 0}
             />
           </div>
-          <div>
-            <label className="block text-sm text-[#64748B] mb-1">
+
+          <div className="w-full">
+            <label className="block text-xs sm:text-sm text-[#64748B] mb-1">
               Metodo de pago
             </label>
             <select
               value={metodo}
               onChange={(e) => setMetodo(e.target.value)}
-              className="w-full border border-[#CBD5E1] rounded-md px-3 py-2 text-sm text-[#0F2634]"
+              className="w-full border border-[#CBD5E1] rounded-lg px-3 py-2 text-sm text-[#0F2634] focus:ring-2 focus:ring-[#01CD6C] focus:border-[#01CD6C] outline-none bg-white"
             >
               <option value="transferencia">Transferencia</option>
               <option value="tarjeta">Tarjeta</option>
@@ -232,14 +243,15 @@ const PagosCliente = ({ idReserva, saldoPendienteInicial }) => {
               <option value="QR">QR</option>
             </select>
           </div>
+
           <button
             type="submit"
             disabled={saving || saldoPendiente <= 0}
             className={
-              "w-full px-4 py-2 rounded-md text-sm font-semibold text-white " +
+              "w-full px-4 py-2.5 rounded-lg text-sm font-semibold text-white mt-1 md:mt-0 transition-all " +
               (saving || saldoPendiente <= 0
                 ? "bg-[#94A3B8] cursor-not-allowed"
-                : "bg-[#01CD6C] hover:bg-[#00b359] shadow-md hover:shadow-lg transition-all")
+                : "bg-[#01CD6C] hover:bg-[#00b359] shadow-md hover:shadow-lg")
             }
           >
             {saving ? "Guardando..." : "Registrar pago"}
@@ -247,107 +259,154 @@ const PagosCliente = ({ idReserva, saldoPendienteInicial }) => {
         </form>
       </div>
 
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
         <form
           onSubmit={handleSearchSubmit}
-          className="w-full md:w-2/3 flex gap-2"
+          className="w-full flex flex-col sm:flex-row gap-2"
         >
           <input
             type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="Buscar por cliente, cancha o metodo de pago"
-            className="flex-1 border border-[#CBD5E1] rounded-md px-3 py-2 text-sm text-[#23475F]"
+            className="flex-1 border border-[#CBD5E1] rounded-lg px-3 py-2 text-sm text-[#23475F] focus:ring-2 focus:ring-[#01CD6C] focus:border-[#01CD6C] outline-none"
           />
-          <select
-            value={filter}
-            onChange={handleFilterChange}
-            className="border border-[#CBD5E1] rounded-md px-3 py-2 text-sm text-[#23475F]"
-          >
-            <option value="default">Sin filtro</option>
-            <option value="fecha">Ordenar por fecha</option>
-            <option value="monto">Ordenar por monto</option>
-            <option value="metodo">Ordenar por metodo</option>
-          </select>
-          <button
-            type="submit"
-            className="px-4 py-2 rounded-md bg-[#01CD6C] text-white text-sm font-semibold hover:bg-[#00b359] transition-all"
-          >
-            Buscar
-          </button>
+          <div className="flex gap-2 sm:w-auto">
+            <select
+              value={filter}
+              onChange={handleFilterChange}
+              className="w-full sm:w-40 border border-[#CBD5E1] rounded-lg px-3 py-2 text-sm text-[#23475F] focus:ring-2 focus:ring-[#01CD6C] focus:border-[#01CD6C] outline-none bg-white"
+            >
+              <option value="default">Sin filtro</option>
+              <option value="fecha">Ordenar por fecha</option>
+              <option value="monto">Ordenar por monto</option>
+              <option value="metodo">Ordenar por metodo</option>
+            </select>
+            <button
+              type="submit"
+              className="w-full sm:w-auto px-4 py-2 rounded-lg bg-[#01CD6C] text-white text-sm font-semibold hover:bg-[#00b359] transition-all"
+            >
+              Buscar
+            </button>
+          </div>
         </form>
       </div>
 
       {loading && (
-        <div className="mb-4 text-sm text-[#23475F]">
+        <div className="mb-2 text-xs sm:text-sm text-[#23475F]">
           Cargando pagos...
         </div>
       )}
 
       {error && (
-        <div className="mb-4 bg-red-100 text-red-700 px-4 py-2 rounded">
+        <div className="mb-3 bg-red-100 text-red-700 px-4 py-2 rounded-lg text-sm">
           {error}
         </div>
       )}
 
       {success && (
-        <div className="mb-4 bg-green-100 text-green-700 px-4 py-2 rounded">
+        <div className="mb-3 bg-green-100 text-green-700 px-4 py-2 rounded-lg text-sm">
           {success}
         </div>
       )}
 
       {pagos.length === 0 && !loading && !error && (
-        <div className="text-center text-[#64748B] py-6">
+        <div className="text-center text-[#64748B] py-6 text-sm">
           No se registraron pagos para esta reserva
         </div>
       )}
 
       {pagos.length > 0 && (
-        <div className="overflow-x-auto mt-2">
-          <table className="min-w-full text-sm">
-            <thead>
-              <tr className="bg-[#F1F5F9] text-[#0F2634]">
-                <th className="px-3 py-2 text-left">Fecha</th>
-                <th className="px-3 py-2 text-left">Monto</th>
-                <th className="px-3 py-2 text-left">Metodo</th>
-                <th className="px-3 py-2 text-left">Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {pagosPagina.map((p) => (
-                <tr
-                  key={p.id_pago}
-                  className="border-b border-[#E2E8F0] hover:bg-[#F8FAFC]"
-                >
-                  <td className="px-3 py-2">
-                    {p.fecha_pago
-                      ? String(p.fecha_pago).substring(0, 10)
-                      : "-"}
-                  </td>
-                  <td className="px-3 py-2">Bs. {p.monto}</td>
-                  <td className="px-3 py-2">{p.metodo_pago}</td>
-                  <td className="px-3 py-2">
-                    <Link
-                      to={`/comprobante-pago/${p.id_pago}`}
-                      className="inline-block px-3 py-1 rounded-md bg-[#0F2634] text-white text-xs font-semibold hover:bg-[#01CD6C] transition-all"
+        <div className="mt-2 space-y-3">
+          <div className="sm:hidden flex flex-col gap-3">
+            {pagosPagina.map((p) => (
+              <div
+                key={p.id_pago}
+                className="bg-white border border-[#E2E8F0] rounded-2xl px-4 py-3 shadow-sm flex flex-col gap-2"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex flex-col">
+                    <span className="text-xs text-[#64748B]">
+                      Fecha de pago
+                    </span>
+                    <span className="text-sm font-semibold text-[#0F2634]">
+                      {p.fecha_pago
+                        ? String(p.fecha_pago).substring(0, 10)
+                        : "-"}
+                    </span>
+                  </div>
+                  <span className="text-sm font-bold text-[#0F2634]">
+                    Bs. {p.monto}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between text-xs text-[#64748B]">
+                  <span>Metodo</span>
+                  <span className="px-2 py-1 rounded-full bg-[#F1F5F9] text-[#0F2634] text-[11px] font-medium">
+                    {p.metodo_pago}
+                  </span>
+                </div>
+
+                <div className="pt-1">
+                  <Link
+                    to={`/comprobante-pago/${p.id_pago}`}
+                    className="w-full inline-flex items-center justify-center px-3 py-2 rounded-full bg-[#0F2634] text-white text-xs font-semibold hover:bg-[#01CD6C] transition-all"
+                  >
+                    Ver comprobante
+                  </Link>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="hidden sm:block">
+            <div className="overflow-x-auto rounded-2xl border border-[#E2E8F0]">
+              <table className="min-w-full text-xs sm:text-sm">
+                <thead>
+                  <tr className="bg-[#F1F5F9] text-[#0F2634]">
+                    <th className="px-3 sm:px-4 py-2 text-left">Fecha</th>
+                    <th className="px-3 sm:px-4 py-2 text-left">Monto</th>
+                    <th className="px-3 sm:px-4 py-2 text-left">Metodo</th>
+                    <th className="px-3 sm:px-4 py-2 text-left">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pagosPagina.map((p) => (
+                    <tr
+                      key={p.id_pago}
+                      className="border-t border-[#E2E8F0] hover:bg-[#F8FAFC]"
                     >
-                      Comprobante
-                    </Link>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                      <td className="px-3 sm:px-4 py-2">
+                        {p.fecha_pago
+                          ? String(p.fecha_pago).substring(0, 10)
+                          : "-"}
+                      </td>
+                      <td className="px-3 sm:px-4 py-2">Bs. {p.monto}</td>
+                      <td className="px-3 sm:px-4 py-2">{p.metodo_pago}</td>
+                      <td className="px-3 sm:px-4 py-2">
+                        <Link
+                          to={`/comprobante-pago/${p.id_pago}`}
+                          className="inline-flex items-center justify-center px-3 py-1.5 rounded-full bg-[#0F2634] text-white text-[11px] sm:text-xs font-semibold hover:bg-[#01CD6C] transition-all"
+                        >
+                          Comprobante
+                        </Link>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       )}
 
       {totalPages > 1 && (
-        <div className="flex justify-center mt-4 gap-2">
+        <div className="flex flex-wrap justify-center mt-4 gap-2">
           <button
             onClick={() => setCurrentPage(currentPage - 1)}
             disabled={currentPage === 1}
             className={
-              "px-3 py-1 rounded-md text-sm " +
+              "px-3 py-1 rounded-md text-xs sm:text-sm " +
               (currentPage === 1
                 ? "bg-gray-200 text-gray-500 cursor-not-allowed"
                 : "bg-[#23475F] text-white hover:bg-[#01CD6C]")
@@ -360,7 +419,7 @@ const PagosCliente = ({ idReserva, saldoPendienteInicial }) => {
               key={p}
               onClick={() => setCurrentPage(p)}
               className={
-                "px-3 py-1 rounded-md text-sm " +
+                "px-3 py-1 rounded-md text-xs sm:text-sm " +
                 (p === currentPage
                   ? "bg-[#01CD6C] text-white"
                   : "bg-[#E2E8F0] text-[#0F2634] hover:bg-[#CBD5E1]")
@@ -373,7 +432,7 @@ const PagosCliente = ({ idReserva, saldoPendienteInicial }) => {
             onClick={() => setCurrentPage(currentPage + 1)}
             disabled={currentPage === totalPages}
             className={
-              "px-3 py-1 rounded-md text-sm " +
+              "px-3 py-1 rounded-md text-xs sm:text-sm " +
               (currentPage === totalPages
                 ? "bg-gray-200 text-gray-500 cursor-not-allowed"
                 : "bg-[#23475F] text-white hover:bg-[#01CD6C]")

@@ -69,12 +69,9 @@ const MisReservasCliente = () => {
   const [idCliente, setIdCliente] = useState(null);
   const [idPersona, setIdPersona] = useState(null);
   const [viewMode, setViewMode] = useState("RESPONSABLE");
-  const [reservas, setReservas] = useState([]);
-  const [total, setTotal] = useState(0);
   const [searchTerm, setSearchTerm] = useState("");
   const [filter, setFilter] = useState("default");
-  const [currentPage, setCurrentPage] = useState(1);
-  const [limit] = useState(10);
+  const [limit] = useState(5);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
@@ -99,7 +96,14 @@ const MisReservasCliente = () => {
   const [detalleDepReserva, setDetalleDepReserva] = useState(null);
   const [actionMenuOpen, setActionMenuOpen] = useState(false);
   const [actionReserva, setActionReserva] = useState(null);
+  const [reservasResp, setReservasResp] = useState([]);
+  const [reservasInv, setReservasInv] = useState([]);
 
+  const [currentPageResp, setCurrentPageResp] = useState(1);
+  const [currentPageInv, setCurrentPageInv] = useState(1);
+
+  const [totalResp, setTotalResp] = useState(0);
+  const [totalInv, setTotalInv] = useState(0);
 
   useEffect(() => {
     const userData = localStorage.getItem("user");
@@ -169,12 +173,10 @@ const MisReservasCliente = () => {
       if (!resp.data?.exito) {
         const msg = resp.data?.mensaje || "No se pudieron cargar las reservas";
         setError(msg);
-        setReservas([]);
-        setTotal(0);
       } else {
         const datos = resp.data?.datos || {};
-        setReservas(datos.reservas || []);
-        setTotal(datos.paginacion?.total || 0);
+        setReservasResp(datos.reservas || []);
+        setTotalResp(datos.paginacion?.total || 0);
       }
     } catch (err) {
       const msg =
@@ -182,8 +184,6 @@ const MisReservasCliente = () => {
         err.message ||
         "Error de conexion al cargar reservas";
       setError(msg);
-      setReservas([]);
-      setTotal(0);
     } finally {
       setLoading(false);
     }
@@ -213,12 +213,11 @@ const MisReservasCliente = () => {
       if (!resp.data?.exito) {
         const msg = resp.data?.mensaje || "No se pudieron cargar las reservas";
         setError(msg);
-        setReservas([]);
-        setTotal(0);
       } else {
         const datos = resp.data?.datos || {};
-        setReservas(datos.reservas || []);
-        setTotal(datos.paginacion?.total || 0);
+        const lista = Array.isArray(datos.reservas) ? datos.reservas : [];
+        setReservasInv(lista);
+        setTotalInv(lista.length);
       }
     } catch (err) {
       const msg =
@@ -226,8 +225,6 @@ const MisReservasCliente = () => {
         err.message ||
         "Error de conexion al cargar reservas";
       setError(msg);
-      setReservas([]);
-      setTotal(0);
     } finally {
       setLoading(false);
     }
@@ -240,17 +237,25 @@ const MisReservasCliente = () => {
         await api.post("/reserva/cancelar-vencidas");
       } catch (err) { }
       if (viewMode === "RESPONSABLE" && idCliente) {
-        fetchReservasResponsable(searchTerm, filter, currentPage);
-      } else if (viewMode === "DEPORTISTA" && idPersona) {
-        fetchReservasDeportista(searchTerm, filter, currentPage);
+        fetchReservasResponsable(searchTerm, filter, currentPageResp);
+      }
+      if (viewMode === "DEPORTISTA" && idPersona) {
+        fetchReservasDeportista(searchTerm, filter, currentPageInv);
       }
     };
     cargarReservas();
-  }, [role, idCliente, idPersona, viewMode, currentPage, filter]);
+  }, [
+    role,
+    idCliente,
+    idPersona,
+    viewMode,
+    currentPageResp,
+    currentPageInv,
+    filter,
+  ]);
 
   const handleSearchSubmit = (e) => {
     e.preventDefault();
-    setCurrentPage(1);
     if (viewMode === "RESPONSABLE") {
       fetchReservasResponsable(searchTerm, filter, 1);
     } else {
@@ -260,11 +265,16 @@ const MisReservasCliente = () => {
 
   const handleFilterChange = (e) => {
     setFilter(e.target.value);
-    setCurrentPage(1);
   };
 
+  const isResponsableView = viewMode === "RESPONSABLE";
+
   const handlePageChange = (page) => {
-    setCurrentPage(page);
+    if (isResponsableView) {
+      setCurrentPageResp(page);
+    } else {
+      setCurrentPageInv(page);
+    }
   };
 
   const handleCancel = async (reserva) => {
@@ -286,7 +296,7 @@ const MisReservasCliente = () => {
         setError(msg);
       } else {
         setSuccess("Reserva cancelada correctamente");
-        fetchReservasResponsable(searchTerm, filter, currentPage);
+        fetchReservasResponsable(searchTerm, filter, currentPageResp);
       }
     } catch (err) {
       const msg =
@@ -425,7 +435,7 @@ const MisReservasCliente = () => {
       setEditModalOpen(false);
       setEditReserva(null);
       setSuccess("Reserva actualizada");
-      fetchReservasResponsable(searchTerm, filter, currentPage);
+      fetchReservasResponsable(searchTerm, filter, currentPageResp);
     } catch (err) {
       const msg =
         err.response?.data?.mensaje ||
@@ -479,7 +489,7 @@ const MisReservasCliente = () => {
         resp = await api.post("/resena-cliente", payload);
       }
       if (!resp.data?.exito) {
-        const msg = resp.data?.mensaje || "No se pudo guardar la resena";
+        const msg = resp.data?.mensaje || "No se pudo guardar la reseña";
         setReviewError(msg);
         setReviewSaving(false);
         return;
@@ -487,16 +497,14 @@ const MisReservasCliente = () => {
       setReviewModalOpen(false);
       setReviewReserva(null);
       setSuccess(
-        reviewMode === "edit"
-          ? "Resena actualizada"
-          : "Resena enviada"
+        reviewMode === "edit" ? "Reseña actualizada" : "Reseña enviada"
       );
-      fetchReservasResponsable(searchTerm, filter, currentPage);
+      fetchReservasResponsable(searchTerm, filter, currentPageResp);
     } catch (err) {
       const msg =
         err.response?.data?.mensaje ||
         err.message ||
-        "Error al enviar la resena";
+        "Error al enviar la reseña";
       setReviewError(msg);
     } finally {
       setReviewSaving(false);
@@ -508,8 +516,10 @@ const MisReservasCliente = () => {
     setDetalleDepModalOpen(true);
   };
 
+  const reservas = isResponsableView ? reservasResp : reservasInv;
+  const total = isResponsableView ? totalResp : totalInv;
+  const currentPage = isResponsableView ? currentPageResp : currentPageInv;
   const totalPages = Math.ceil(total / limit) || 1;
-  const isResponsableView = viewMode === "RESPONSABLE";
 
   if (loading && reservas.length === 0) {
     return (
@@ -527,14 +537,15 @@ const MisReservasCliente = () => {
       <Header />
       <div className="min-h-screen bg-[#F5F7FA] pt-28 sm:pt-32 px-3 sm:px-4 pb-24">
         <div className="w-full max-w-7xl mx-auto bg-white rounded-2xl shadow-lg p-4 sm:p-6 md:p-8">
-
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
             <div>
               <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-[#0F2634]">
                 Mis reservas
               </h1>
               <div className="mt-3 bg-[#FEF3C7] border border-[#FACC15] text-[#92400E] text-xs md:text-sm rounded-xl px-3 py-2 max-w-xl">
-                <span className="font-semibold">Importante:</span> si no se registra el pago del monto total antes del inicio del horario reservado, esta se cancelara automaticamente.
+                <span className="font-semibold">Importante:</span> si no se
+                registra el pago del monto total antes del inicio del horario
+                reservado, esta se cancelara automaticamente.
               </div>
             </div>
 
@@ -543,7 +554,6 @@ const MisReservasCliente = () => {
                 type="button"
                 onClick={() => {
                   setViewMode("RESPONSABLE");
-                  setCurrentPage(1);
                 }}
                 className={
                   "px-3 py-2 rounded-full text-xs md:text-sm font-semibold " +
@@ -558,7 +568,6 @@ const MisReservasCliente = () => {
                 type="button"
                 onClick={() => {
                   setViewMode("DEPORTISTA");
-                  setCurrentPage(1);
                 }}
                 className={
                   "px-3 py-2 rounded-full text-xs md:text-sm font-semibold " +
@@ -624,186 +633,276 @@ const MisReservasCliente = () => {
           )}
 
           {reservas.length > 0 && (
-            <div className="overflow-x-auto rounded-xl border border-[#E2E8F0]">
-              <table className="min-w-full text-xs sm:text-sm">
-                <thead>
-                  <tr className="bg-[#F1F5F9] text-[#0F2634]">
-                    <th className="px-3 py-2 text-left">Fecha</th>
-                    <th className="px-3 py-2 text-left">Horario</th>
-                    <th className="px-3 py-2 text-left">Cancha</th>
-                    <th className="px-3 py-2 text-left">Monto</th>
-                    <th className="px-3 py-2 text-left">Estado</th>
-                    <th className="px-3 py-2 text-left">
-                      {isResponsableView ? "Acciones" : "Detalle"}
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {reservas.map((r) => {
-                    const hasReview = Boolean(r.id_resena);
-                    const reviewVerified = Boolean(r.resena_verificado);
-                    const expiredNotPaid = isExpiredAndNotPaid(r);
-                    const estadoReal = r.estado;
-                    const isCanceled = estadoReal === "cancelada";
+            <>
+              <div className="hidden sm:block overflow-x-auto rounded-xl border border-[#E2E8F0]">
+                <table className="min-w-full text-xs sm:text-sm">
+                  <thead>
+                    <tr className="bg-[#F1F5F9] text-[#0F2634]">
+                      <th className="px-3 py-2 text-left">Fecha</th>
+                      <th className="px-3 py-2 text-left">Horario</th>
+                      <th className="px-3 py-2 text-left">Cancha</th>
+                      <th className="px-3 py-2 text-left">Monto</th>
+                      <th className="px-3 py-2 text-left">Estado</th>
+                      <th className="px-3 py-2 text-left">
+                        {isResponsableView ? "Acciones" : "Detalle"}
+                      </th>
+                    </tr>
+                  </thead>
 
-                    return (
-                      <tr
-                        key={
-                          r.id_reserva_deportista
-                            ? "dep_" + r.id_reserva_deportista
-                            : "cli_" + r.id_reserva
-                        }
-                        className="border-b border-[#E2E8F0] hover:bg-[#F8FAFC]"
-                      >
-                        <td className="px-3 py-2">
-                          {r.fecha_reserva
-                            ? String(r.fecha_reserva).substring(0, 10)
-                            : "-"}
-                        </td>
+                  <tbody>
+                    {reservas.map((r) => {
+                      const hasReview = Boolean(r.id_resena);
+                      const reviewVerified = Boolean(r.resena_verificado);
+                      const expiredNotPaid = isExpiredAndNotPaid(r);
+                      const estadoReal = r.estado;
+                      const isCanceled = estadoReal === "cancelada";
 
-                        <td className="px-3 py-2">
-                          {r.hora_inicio && r.hora_fin
-                            ? String(r.hora_inicio).substring(0, 5) +
-                            " - " +
-                            String(r.hora_fin).substring(0, 5)
-                            : "-"}
-                        </td>
+                      return (
+                        <tr
+                          key={r.id_reserva}
+                          className="border-b border-[#E2E8F0] hover:bg-[#F8FAFC]"
+                        >
+                          <td className="px-3 py-2">
+                            {r.fecha_reserva
+                              ? String(r.fecha_reserva).substring(0, 10)
+                              : "-"}
+                          </td>
 
-                        <td className="px-3 py-2">{r.cancha_nombre || "-"}</td>
+                          <td className="px-3 py-2">
+                            {r.hora_inicio && r.hora_fin
+                              ? `${String(r.hora_inicio).substring(
+                                0,
+                                5
+                              )} - ${String(r.hora_fin).substring(0, 5)}`
+                              : "-"}
+                          </td>
 
-                        <td className="px-3 py-2">Bs. {r.monto_total || 0}</td>
+                          <td className="px-3 py-2">
+                            {r.cancha_nombre || "-"}
+                          </td>
+                          <td className="px-3 py-2">
+                            Bs. {r.monto_total || 0}
+                          </td>
 
-                        <td className="px-3 py-2">
+                          <td className="px-3 py-2">
+                            <span
+                              className={
+                                "inline-block px-2 py-1 rounded-full text-xs font-semibold " +
+                                (estadoReal === "pagada"
+                                  ? "bg-green-100 text-green-700"
+                                  : estadoReal === "cancelada"
+                                    ? "bg-red-100 text-red-700"
+                                    : estadoReal === "en_cuotas" ||
+                                      estadoReal === "pendiente"
+                                      ? "bg-yellow-100 text-yellow-700"
+                                      : expiredNotPaid
+                                        ? "bg-red-100 text-red-700"
+                                        : "bg-gray-100 text-gray-700")
+                              }
+                            >
+                              {estadoReal}
+                            </span>
+                          </td>
+
+                          <td className="px-3 py-2">
+                            <div className="hidden sm:flex gap-2 flex-wrap">
+                              {!isCanceled && (
+                                <>
+                                  {isResponsableView ? (
+                                    <>
+                                      <Link
+                                        to={`/reserva-detalle/${r.id_reserva}`}
+                                        className="px-3 py-1 rounded-full bg-[#0F2634] text-white text-xs font-semibold hover:bg-[#01CD6C]"
+                                      >
+                                        Ver detalle
+                                      </Link>
+
+                                      <button
+                                        onClick={() =>
+                                          handleOpenQr(r.id_reserva)
+                                        }
+                                        className="px-3 py-1 rounded-full bg-[#38BDF8] text-white text-xs font-semibold hover:bg-[#0EA5E9]"
+                                      >
+                                        Ver QR
+                                      </button>
+
+                                      {canLeaveReview(r) && !hasReview && (
+                                        <button
+                                          onClick={() =>
+                                            handleOpenReview("create", r)
+                                          }
+                                          className="px-3 py-1 rounded-full bg-[#4ADE80] text-white text-xs font-semibold hover:bg-[#22C55E]"
+                                        >
+                                          Dejar reseña
+                                        </button>
+                                      )}
+
+                                      {canLeaveReview(r) &&
+                                        hasReview &&
+                                        !reviewVerified && (
+                                          <button
+                                            onClick={() =>
+                                              handleOpenReview("edit", r)
+                                            }
+                                            className="px-3 py-1 rounded-full bg-[#22C55E] text-white text-xs font-semibold hover:bg-[#16A34A]"
+                                          >
+                                            Editar reseña
+                                          </button>
+                                        )}
+
+                                      {!expiredNotPaid &&
+                                        r.estado !== "cancelada" &&
+                                        r.estado !== "pagada" && (
+                                          <>
+                                            <button
+                                              onClick={() =>
+                                                handleOpenEdit(r)
+                                              }
+                                              className="px-3 py-1 rounded-full bg-[#FACC15] text-[#0F2634] text-xs font-semibold hover:bg-[#EAB308]"
+                                            >
+                                              Editar
+                                            </button>
+
+                                            <button
+                                              onClick={() =>
+                                                handleCancel(r)
+                                              }
+                                              className="px-3 py-1 rounded-full bg-[#F97373] text-white text-xs font-semibold hover:bg-[#EF4444]"
+                                            >
+                                              Cancelar
+                                            </button>
+                                          </>
+                                        )}
+                                    </>
+                                  ) : (
+                                    <>
+                                      <button
+                                        onClick={() =>
+                                          handleOpenDetalleDeportista(r)
+                                        }
+                                        className="px-3 py-1 rounded-full bg-[#0F2634] text-white text-xs font-semibold hover:bg-[#01CD6C]"
+                                      >
+                                        Ver detalle
+                                      </button>
+
+                                      <button
+                                        onClick={() =>
+                                          handleOpenQr(r.id_reserva)
+                                        }
+                                        className="px-3 py-1 rounded-full bg-[#38BDF8] text-white text-xs font-semibold hover:bg-[#0EA5E9]"
+                                      >
+                                        Ver QR
+                                      </button>
+                                    </>
+                                  )}
+                                </>
+                              )}
+                            </div>
+
+                            <div className="sm:hidden flex justify-center">
+                              <button
+                                className="px-2 py-1 text-2xl text-[#0F2634]"
+                                onClick={() => {
+                                  setActionReserva(r);
+                                  setActionMenuOpen(true);
+                                }}
+                              >
+                                ⋮
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="sm:hidden flex flex-col gap-4 mt-4">
+                {reservas.map((r) => {
+                  const estadoReal = r.estado;
+                  const expiredNotPaid = isExpiredAndNotPaid(r);
+                  const isCanceled = estadoReal === "cancelada";
+                  const estadoColor =
+                    estadoReal === "pagada"
+                      ? "bg-green-100 text-green-700"
+                      : estadoReal === "cancelada"
+                        ? "bg-red-100 text-red-700"
+                        : estadoReal === "pendiente" || estadoReal === "en_cuotas"
+                          ? "bg-yellow-100 text-yellow-700"
+                          : expiredNotPaid
+                            ? "bg-red-100 text-red-700"
+                            : "bg-gray-100 text-gray-700";
+
+                  return (
+                    <div
+                      key={r.id_reserva}
+                      className="bg-white rounded-2xl border border-[#E2E8F0] shadow-lg px-5 py-3 relative overflow-hidden transition-all duration-300 hover:shadow-xl"
+                    >
+                      <div className="absolute top-0 left-0 w-2 h-12 bg-[#01CD6C] rounded-br-xl"></div>
+
+                      {!isCanceled && (
+                        <button
+                          className="absolute top-3 right-3 text-2xl text-[#0F2634] px-2 py-1 rounded-full hover:bg-gray-100 transition"
+                          onClick={() => {
+                            setActionReserva(r);
+                            setActionMenuOpen(true);
+                          }}
+                        >
+                          ⋮
+                        </button>
+                      )}
+
+                      <div className="mb-3 flex items-center justify-between">
+                        <h3 className="text-base font-bold text-[#0F2634]">
+                          {r.cancha_nombre}
+                        </h3>
+                        <div className="px-4">
                           <span
                             className={
-                              "inline-block px-2 py-1 rounded-full text-xs font-semibold " +
-                              (estadoReal === "pagada"
-                                ? "bg-green-100 text-green-700"
-                                : estadoReal === "cancelada"
-                                  ? "bg-red-100 text-red-700"
-                                  : estadoReal === "en_cuotas" ||
-                                    estadoReal === "pendiente"
-                                    ? "bg-yellow-100 text-yellow-700"
-                                    : expiredNotPaid
-                                      ? "bg-red-100 text-red-700"
-                                      : "bg-gray-100 text-gray-700")
+                              "px-2 py-1 rounded-full text-[11px] font-semibold " +
+                              estadoColor
                             }
                           >
                             {estadoReal}
                           </span>
-                        </td>
+                        </div>
+                      </div>
 
-                        <td className="px-3 py-2">
+                      <div className="space-y-1 text-[15px] text-[#23475F]">
+                        <div className="flex justify-between">
+                          <span className="font-medium text-[#64748B]">
+                            Fecha:
+                          </span>
+                          <span>
+                            {String(r.fecha_reserva).substring(0, 10)}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="font-medium text-[#64748B]">
+                            Horario:
+                          </span>
+                          <span>
+                            {String(r.hora_inicio).substring(0, 5)} -{" "}
+                            {String(r.hora_fin).substring(0, 5)}
+                          </span>
+                        </div>
 
-                          {/* Desktop */}
-                          <div className="hidden sm:flex flex-wrap gap-2">
-                            {!isCanceled && (
-                              <>
-                                {isResponsableView ? (
-                                  <>
-                                    <Link
-                                      to={"/reserva-detalle/" + r.id_reserva}
-                                      className="px-3 py-1 rounded-full bg-[#0F2634] text-white text-xs font-semibold hover:bg-[#01CD6C]"
-                                    >
-                                      Ver detalle
-                                    </Link>
-
-                                    <button
-                                      type="button"
-                                      onClick={() => handleOpenQr(r.id_reserva)}
-                                      className="px-3 py-1 rounded-full bg-[#38BDF8] text-white text-xs font-semibold hover:bg-[#0EA5E9]"
-                                    >
-                                      Ver QR
-                                    </button>
-
-                                    {canLeaveReview(r) && !hasReview && (
-                                      <button
-                                        type="button"
-                                        onClick={() => handleOpenReview("create", r)}
-                                        className="px-3 py-1 rounded-full bg-[#4ADE80] text-white text-xs font-semibold hover:bg-[#22C55E]"
-                                      >
-                                        Dejar resena
-                                      </button>
-                                    )}
-
-                                    {canLeaveReview(r) && hasReview && !reviewVerified && (
-                                      <button
-                                        type="button"
-                                        onClick={() => handleOpenReview("edit", r)}
-                                        className="px-3 py-1 rounded-full bg-[#22C55E] text-white text-xs font-semibold hover:bg-[#16A34A]"
-                                      >
-                                        Editar resena
-                                      </button>
-                                    )}
-
-                                    {!expiredNotPaid &&
-                                      r.estado !== "cancelada" &&
-                                      r.estado !== "pagada" && (
-                                        <>
-                                          <button
-                                            type="button"
-                                            onClick={() => handleOpenEdit(r)}
-                                            className="px-3 py-1 rounded-full bg-[#FACC15] text-[#0F2634] text-xs font-semibold hover:bg-[#EAB308]"
-                                          >
-                                            Editar
-                                          </button>
-
-                                          <button
-                                            type="button"
-                                            onClick={() => handleCancel(r)}
-                                            className="px-3 py-1 rounded-full bg-[#F97373] text-white text-xs font-semibold hover:bg-[#EF4444]"
-                                          >
-                                            Cancelar
-                                          </button>
-                                        </>
-                                      )}
-                                  </>
-                                ) : (
-                                  <>
-                                    <button
-                                      type="button"
-                                      onClick={() => handleOpenDetalleDeportista(r)}
-                                      className="px-3 py-1 rounded-full bg-[#0F2634] text-white text-xs font-semibold hover:bg-[#01CD6C]"
-                                    >
-                                      Ver detalle
-                                    </button>
-
-                                    <button
-                                      type="button"
-                                      onClick={() => handleOpenQr(r.id_reserva)}
-                                      className="px-3 py-1 rounded-full bg-[#38BDF8] text-white text-xs font-semibold hover:bg-[#0EA5E9]"
-                                    >
-                                      Ver QR
-                                    </button>
-                                  </>
-                                )}
-                              </>
-                            )}
-                          </div>
-
-                          {/* Movil - boton de 3 puntos */}
-                          <div className="sm:hidden flex justify-center">
-                            <button
-                              className="px-2 py-1 text-2xl text-[#0F2634]"
-                              onClick={() => {
-                                setActionReserva(r);
-                                setActionMenuOpen(true);
-                              }}
-                            >
-                              ⋮
-                            </button>
-                          </div>
-
-                        </td>
-
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+                        <div className="flex justify-between">
+                          <span className="font-medium text-[#64748B]">
+                            Monto total:
+                          </span>
+                          <span className="font-bold text-[#0F2634]">
+                            Bs. {r.monto_total}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
           )}
-
           {totalPages > 1 && (
             <div className="flex flex-wrap justify-center mt-6 gap-2">
               <button
@@ -819,22 +918,20 @@ const MisReservasCliente = () => {
                 Anterior
               </button>
 
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map(
-                (p) => (
-                  <button
-                    key={p}
-                    onClick={() => handlePageChange(p)}
-                    className={
-                      "px-3 py-1 rounded-md text-sm " +
-                      (p === currentPage
-                        ? "bg-[#01CD6C] text-white"
-                        : "bg-[#E2E8F0] text-[#0F2634] hover:bg-[#CBD5E1]")
-                    }
-                  >
-                    {p}
-                  </button>
-                )
-              )}
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+                <button
+                  key={p}
+                  onClick={() => handlePageChange(p)}
+                  className={
+                    "px-3 py-1 rounded-md text-sm " +
+                    (p === currentPage
+                      ? "bg-[#01CD6C] text-white"
+                      : "bg-[#E2E8F0] text-[#0F2634] hover:bg-[#CBD5E1]")
+                  }
+                >
+                  {p}
+                </button>
+              ))}
 
               <button
                 onClick={() => handlePageChange(currentPage + 1)}
@@ -863,9 +960,12 @@ const MisReservasCliente = () => {
                 setQrError(null);
                 setQrLink("");
               }}
-              className="absolute top-3 right-3 w-8 h-8 rounded-full flex items-center justify-center bg-black text-white text-xl"
+              className="absolute top-3 right-3 w-8 h-8 rounded-full flex items-center justify-center bg-black hover:bg-black/70 text-white text-xl"
             >
-              <AiOutlineClose slassName="bg-gray-200 hover:bg-gray-300 rounded-full p-1" size={22} />
+              <AiOutlineClose
+                className=" rounded-full p-1"
+                size={22}
+              />
             </button>
 
             <h2 className="text-lg sm:text-xl font-bold text-[#0F2634] mb-3 text-center">
@@ -942,9 +1042,12 @@ const MisReservasCliente = () => {
                 setEditReserva(null);
                 setEditError(null);
               }}
-              className="absolute top-3 right-3 w-8 h-8 rounded-full flex items-center justify-center bg-black text-white text-xl"
+              className="absolute top-3 right-3 w-8 h-8 rounded-full flex items-center justify-center bg-black hover:bg-black/60 text-white text-xl"
             >
-              <AiOutlineClose slassName="bg-gray-200 hover:bg-gray-300 rounded-full p-1" size={22} />
+              <AiOutlineClose
+                className="rounded-full p-1"
+                size={22}
+              />
             </button>
 
             <h2 className="text-lg sm:text-xl font-bold text-[#0F2634] mb-4 text-center">
@@ -1017,13 +1120,16 @@ const MisReservasCliente = () => {
                 setReviewReserva(null);
                 setReviewError(null);
               }}
-              className="absolute top-3 right-3 w-8 h-8 rounded-full flex items-center justify-center bg-black text-white text-xl"
+              className="absolute top-3 right-3 w-8 h-8 rounded-full flex items-center justify-center bg-black hover:bg-black/60 text-white text-xl"
             >
-              <AiOutlineClose slassName="bg-gray-200 hover:bg-gray-300 rounded-full p-1" size={22} />
+              <AiOutlineClose
+                className="rounded-full p-1"
+                size={22}
+              />
             </button>
 
             <h2 className="text-lg sm:text-xl font-bold text-[#0F2634] mb-4 text-center">
-              {reviewMode === "edit" ? "Editar resena" : "Dejar resena"}
+              {reviewMode === "edit" ? "Editar reseña" : "Dejar reseña"}
             </h2>
 
             <div className="mb-3 text-sm text-[#64748B]">
@@ -1034,7 +1140,7 @@ const MisReservasCliente = () => {
               <p>
                 Fecha:{" "}
                 {reviewReserva.fecha_reserva
-                  ? String(reviewReserva.fecha_reserva).substring(0, 16)
+                  ? String(reviewReserva.fecha_reserva).substring(0, 10)
                   : "-"}
               </p>
             </div>
@@ -1047,7 +1153,7 @@ const MisReservasCliente = () => {
                 <select
                   value={reviewRating}
                   onChange={(e) => setReviewRating(Number(e.target.value))}
-                  className="w-full border border-[#CBD5E1] rounded-full px-3 py-2 text-sm"
+                  className="w-full border border-[#CBD5E1] rounded-xl px-3 py-2 text-sm"
                 >
                   <option value={5}>5</option>
                   <option value={4}>4</option>
@@ -1065,7 +1171,7 @@ const MisReservasCliente = () => {
                   rows={4}
                   value={reviewComment}
                   onChange={(e) => setReviewComment(e.target.value)}
-                  className="w-full border border-[#CBD5E1] rounded-md px-3 py-2 text-sm resize-none"
+                  className="w-full border border-[#CBD5E1] rounded-xl px-3 py-2 text-sm resize-none"
                   placeholder="Escribe tu experiencia"
                 />
               </div>
@@ -1085,7 +1191,7 @@ const MisReservasCliente = () => {
                     (reviewSaving ? "opacity-70" : "hover:bg-[#00b359]")
                   }
                 >
-                  {reviewSaving ? "Enviando..." : "Enviar resena"}
+                  {reviewSaving ? "Enviando..." : "Enviar reseña"}
                 </button>
 
                 <button
@@ -1113,9 +1219,12 @@ const MisReservasCliente = () => {
                 setDetalleDepModalOpen(false);
                 setDetalleDepReserva(null);
               }}
-              className="absolute top-3 right-3 w-8 h-8 rounded-full flex items-center justify-center bg-black text-white text-xl"
+              className="absolute top-3 right-3 w-8 h-8 rounded-full flex items-center justify-center bg-black hover:bg-black/60 text-white text-xl"
             >
-              <AiOutlineClose slassName="bg-gray-200 hover:bg-gray-300 rounded-full p-1" size={22} />
+              <AiOutlineClose
+                className="rounded-full p-1"
+                size={22}
+              />
             </button>
 
             <h2 className="text-lg sm:text-xl font-bold text-[#0F2634] mb-4 text-center">
@@ -1125,7 +1234,9 @@ const MisReservasCliente = () => {
             <div className="space-y-3 text-sm text-[#23475F]">
               <div>
                 <p className="text-[#64748B]">Codigo de reserva</p>
-                <p className="font-semibold">#{detalleDepReserva.id_reserva}</p>
+                <p className="font-semibold">
+                  #{detalleDepReserva.id_reserva}
+                </p>
               </div>
 
               <div>
@@ -1140,7 +1251,8 @@ const MisReservasCliente = () => {
               <div>
                 <p className="text-[#64748B]">Horario reservado</p>
                 <p className="font-medium">
-                  {detalleDepReserva.hora_inicio && detalleDepReserva.hora_fin
+                  {detalleDepReserva.hora_inicio &&
+                    detalleDepReserva.hora_fin
                     ? String(detalleDepReserva.hora_inicio).substring(0, 5) +
                     " - " +
                     String(detalleDepReserva.hora_fin).substring(0, 5)
@@ -1160,7 +1272,8 @@ const MisReservasCliente = () => {
                   Cliente responsable
                 </p>
                 <p className="font-medium">
-                  {detalleDepReserva.cliente_nombre} {detalleDepReserva.cliente_apellido}
+                  {detalleDepReserva.cliente_nombre}{" "}
+                  {detalleDepReserva.cliente_apellido}
                 </p>
               </div>
             </div>
@@ -1182,7 +1295,6 @@ const MisReservasCliente = () => {
       {actionMenuOpen && actionReserva && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
           <div className="bg-white w-80 rounded-2xl shadow-xl p-4 relative">
-
             <button
               onClick={() => {
                 setActionMenuOpen(false);
@@ -1190,7 +1302,10 @@ const MisReservasCliente = () => {
               }}
               className="absolute top-2 right-2 text-xl"
             >
-              <AiOutlineClose slassName="bg-gray-200 hover:bg-gray-300 rounded-full p-1" size={22} />
+              <AiOutlineClose
+                className="bg-gray-200 hover:bg-gray-300 rounded-full p-1"
+                size={22}
+              />
             </button>
 
             <h2 className="text-lg font-bold text-[#0F2634] mb-3 text-center">
@@ -1198,7 +1313,6 @@ const MisReservasCliente = () => {
             </h2>
 
             <div className="flex flex-col gap-2">
-
               <button
                 onClick={() => {
                   setActionMenuOpen(false);
@@ -1209,27 +1323,42 @@ const MisReservasCliente = () => {
                 Ver QR
               </button>
 
-              <Link
-                to={"/reserva-detalle/" + actionReserva.id_reserva}
-                onClick={() => setActionMenuOpen(false)}
-                className="w-full py-2 bg-[#0F2634] text-white rounded-lg text-center"
-              >
-                Ver detalle
-              </Link>
-
-              {canLeaveReview(actionReserva) && !actionReserva.id_resena && (
+              {isResponsableView ? (
+                <Link
+                  to={"/reserva-detalle/" + actionReserva.id_reserva}
+                  onClick={() => setActionMenuOpen(false)}
+                  className="w-full py-2 bg-[#0F2634] text-white rounded-lg text-center"
+                >
+                  Ver detalle
+                </Link>
+              ) : (
                 <button
                   onClick={() => {
                     setActionMenuOpen(false);
-                    handleOpenReview("create", actionReserva);
+                    handleOpenDetalleDeportista(actionReserva);
                   }}
-                  className="w-full py-2 bg-[#4ADE80] text-white rounded-lg"
+                  className="w-full py-2 bg-[#0F2634] text-white rounded-lg text-center"
                 >
-                  Dejar resena
+                  Ver detalle
                 </button>
               )}
 
-              {!isExpiredAndNotPaid(actionReserva) &&
+              {isResponsableView &&
+                canLeaveReview(actionReserva) &&
+                !actionReserva.id_resena && (
+                  <button
+                    onClick={() => {
+                      setActionMenuOpen(false);
+                      handleOpenReview("create", actionReserva);
+                    }}
+                    className="w-full py-2 bg-[#4ADE80] text-white rounded-lg"
+                  >
+                    Dejar reseña
+                  </button>
+                )}
+
+              {isResponsableView &&
+                !isExpiredAndNotPaid(actionReserva) &&
                 actionReserva.estado !== "cancelada" &&
                 actionReserva.estado !== "pagada" && (
                   <>
@@ -1254,12 +1383,10 @@ const MisReservasCliente = () => {
                     </button>
                   </>
                 )}
-
             </div>
           </div>
         </div>
       )}
-
     </>
   );
 };

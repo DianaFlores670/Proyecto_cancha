@@ -470,7 +470,7 @@ const actualizarUsuario = async (id, camposActualizar) => {
   try {
     const camposPermitidosUsuario = [
       'nombre', 'apellido', 'telefono', 'sexo', 'correo',
-      'imagen_perfil', 'latitud', 'longitud'
+      'imagen_perfil', 'latitud', 'longitud', 'contrasena'
     ];
 
     // Separar campos
@@ -955,16 +955,20 @@ const actualizarUsuarioController = async (req, res) => {
     const usuarioActual = await obtenerUsuarioPorId(parseInt(id));
 
     if (!id || isNaN(id)) {
-      return res.status(400).json(respuesta(false, 'ID de usuario no válido'));
+      return res.status(400).json(respuesta(false, "ID de usuario no valido"));
     }
 
-    // Procesar archivo subido con Multer (imagen_perfil, opcional)
     const processedFiles = await createUploadAndProcess(["imagen_perfil"], nombreFolder, usuarioActual.nombre)(req, res);
 
-    // Preparar campos para actualizar
     const camposActualizar = { ...req.body };
 
-    // Si se subió nueva imagen, agregarla a los campos a actualizar
+    if (camposActualizar.nueva_contrasena) {
+      const hash = await bcrypt.hash(camposActualizar.nueva_contrasena, 10);
+      camposActualizar.contrasena = hash;
+      delete camposActualizar.nueva_contrasena;
+      delete camposActualizar.confirmar_contrasena;
+    }
+
     if (processedFiles.imagen_perfil) {
       camposActualizar.imagen_perfil = processedFiles.imagen_perfil;
       uploadedFile = camposActualizar.imagen_perfil;
@@ -974,42 +978,38 @@ const actualizarUsuarioController = async (req, res) => {
     }
 
     if (Object.keys(camposActualizar).length === 0 && !processedFiles.imagen_perfil) {
-      // Limpiar archivo nuevo si no hay campos para actualizar
       if (uploadedFile) {
         await unlinkFile(uploadedFile);
       }
-      return res.status(400).json(respuesta(false, 'No se proporcionaron campos para actualizar'));
+      return res.status(400).json(respuesta(false, "No se proporcionaron campos para actualizar"));
     }
 
-    // Verificar si el correo ya existe en la base de datos
     if (camposActualizar.correo) {
-      const existingUser = await pool.query('SELECT * FROM usuario WHERE correo = $1 AND id_persona != $2', [camposActualizar.correo, id]);
+      const existingUser = await pool.query("SELECT * FROM usuario WHERE correo = $1 AND id_persona != $2", [camposActualizar.correo, id]);
       if (existingUser.rowCount > 0) {
         if (uploadedFile) {
           await unlinkFile(uploadedFile);
         }
-        return res.status(400).json(respuesta(false, 'El correo electrónico ya está en uso.'));
+        return res.status(400).json(respuesta(false, "El correo electronico ya esta en uso."));
       }
     }
 
     const usuarioActualizado = await actualizarUsuario(parseInt(id), camposActualizar);
 
     if (!usuarioActualizado) {
-      // Limpiar archivo nuevo si el usuario no existe
       if (uploadedFile) {
         await unlinkFile(uploadedFile);
       }
-      return res.status(404).json(respuesta(false, 'Usuario no encontrado'));
+      return res.status(404).json(respuesta(false, "Usuario no encontrado"));
     }
 
-    // Eliminar archivo anterior después de una actualización exitosa
     if (oldFileToDelete) {
       await unlinkFile(oldFileToDelete).catch(err => {
-        console.warn('⚠️ No se pudo eliminar el archivo anterior:', err.message);
+        console.warn("No se pudo eliminar el archivo anterior:", err.message);
       });
     }
 
-    let mensaje = 'Usuario actualizado correctamente';
+    let mensaje = "Usuario actualizado correctamente";
     if (usuarioActualizado.rol_agregado) {
       mensaje += `. Rol agregado: ${camposActualizar.rol_agregar}`;
     }
@@ -1017,21 +1017,19 @@ const actualizarUsuarioController = async (req, res) => {
       mensaje += `. Rol eliminado: ${camposActualizar.rol_eliminar}`;
     }
     if (processedFiles.imagen_perfil) {
-      mensaje += '. Imagen de perfil actualizada';
+      mensaje += ". Imagen de perfil actualizada";
     }
 
     res.json(respuesta(true, mensaje, { usuario: usuarioActualizado }));
   } catch (error) {
-    console.error('Error in actualizarUsuarioController:', error);
+    console.error("Error in actualizarUsuarioController:", error);
 
-    // Limpiar archivo subido en caso de error
     if (uploadedFile) {
       await unlinkFile(uploadedFile);
     }
 
-    // Verificar si el error es de duplicidad de correo
-    if (error.code === '23505' && error.constraint === 'persona_correo_key') {
-      return res.status(400).json(respuesta(false, 'El correo electrónico ya está en uso.'));
+    if (error.code === "23505" && error.constraint === "persona_correo_key") {
+      return res.status(400).json(respuesta(false, "El correo electronico ya esta en uso."));
     }
 
     res.status(500).json(respuesta(false, error.message));

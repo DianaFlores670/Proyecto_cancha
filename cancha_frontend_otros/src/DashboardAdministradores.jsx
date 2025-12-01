@@ -47,7 +47,7 @@ import MobileTabBar from "./MobileTabBar";
 import PerfilAdmin from "./pages/PerfilAdmin";
 import InicioModulos from "./InicioModulos";
 
-// roles que usan este dashboard
+// roles permitidos para este dashboard
 const roleRoutesConfig = {
   ADMINISTRADOR: [
     { id: "solicitud_admin_esp", label: "Solicitudes Admin Esp", icon: "📑", path: "solicitud-admin-esp", component: SolicitudAdminEspDep },
@@ -65,13 +65,11 @@ const roleRoutesConfig = {
     { id: "cancha", label: "Cancha", icon: "🎾", path: "cancha", component: Cancha },
     { id: "disciplina", label: "Disciplina", icon: "🥋", path: "disciplina", component: Disciplina },
     { id: "reserva", label: "Reserva", icon: "📅", path: "reserva", component: Reserva },
-    { id: "reserva_horario", label: "Reserva Horario", icon: "⏰", path: "reserva-horario", component: Reserva_Horario },
     { id: "pago", label: "Pago", icon: "💳", path: "pago", component: Pago },
     { id: "qr_reserva", label: "QR Reserva", icon: "📱", path: "qr-reserva", component: QR_Reserva },
     { id: "reporte_incidencia", label: "Reporte Incidencia", icon: "⚠️", path: "reporte-incidencia", component: Reporte_Incidencia },
-    { id: "resena", label: "Resena", icon: "⭐", path: "resena", component: Resena },
-    { id: "se_practica", label: "Canchas-Disciplinas", icon: "🏸", path: "se-practica", component: Se_Practica },
-    { id: "participa_en", label: "Cliente-Reserva-Deportistas", icon: "👥", path: "participa-en", component: Participa_En }
+    { id: "resena", label: "Reseña", icon: "⭐", path: "resena", component: Resena },
+    { id: "participa_en", label: "Participantes por Reserva", icon: "👥", path: "participa-en", component: Participa_En }
   ],
 
   ADMIN_ESP_DEP: [
@@ -80,9 +78,8 @@ const roleRoutesConfig = {
     { id: "espacio_deportivo", label: "Espacio Deportivo", icon: "🏟️", path: "espacio-deportivo", component: EspacioDeportivoAdmin },
     { id: "cancha", label: "Cancha", icon: "🎾", path: "cancha", component: CanchaAdmin },
     { id: "reserva", label: "Reserva", icon: "📅", path: "reserva", component: ReservaAdmin },
-    { id: "reserva_horario", label: "Reserva Horario", icon: "⏰", path: "reserva-horario", component: Reserva_HorarioAdmin },
     { id: "pago", label: "Pago", icon: "💳", path: "pago", component: PagoAdmin },
-    { id: "resena", label: "Resena", icon: "⭐", path: "resena", component: ResenaAdmin },
+    { id: "resena", label: "Reseña", icon: "⭐", path: "resena", component: ResenaAdmin },
     { id: "reporte_incidencia", label: "Reporte Incidencia", icon: "⚠️", path: "reporte_incidencia", component: Reporte_incidenciaAdmin },
     { id: "encargado", label: "Encargado", icon: "👨‍💼", path: "encargado", component: EncargadoAdmin },
     { id: "control", label: "Control", icon: "🎮", path: "control", component: ControlAdmin }
@@ -92,39 +89,34 @@ const roleRoutesConfig = {
 const PANEL_ROLES = ["ADMINISTRADOR", "ADMIN_ESP_DEP"];
 const PANEL_ROLE_KEY = "panelRole";
 
+// Obtener roles reales del usuario
 const getUserRoles = (u) => {
   if (Array.isArray(u?.roles)) return u.roles.map((r) => String(r?.rol ?? r).toUpperCase());
   if (u?.role) return [String(u.role).toUpperCase()];
   return [];
 };
 
+// Elegir el rol efectivo
 const pickEffectiveRole = (u, preferredRole) => {
   const roles = getUserRoles(u).filter((r) => PANEL_ROLES.includes(r));
   if (roles.length === 0) return null;
+
   const normalized = preferredRole ? preferredRole.toUpperCase() : null;
   if (normalized && roles.includes(normalized)) return normalized;
+
   return roles[0];
 };
 
 const Header = ({ title, toggleSidebar, isSidebarOpen }) => {
   return (
     <header className="bg-white/90 backdrop-blur-sm shadow-md border-b flex items-center justify-between px-4 md:px-6 py-3 sticky top-0 z-40">
-
-      {/* Botón PC/Laptop: hamburguesa o X */}
       <button
         className="mr-2 text-[#23475F] hover:text-[#01CD6C] active:scale-95 transition-all hidden md:block"
         onClick={toggleSidebar}
       >
         <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d={
-              isSidebarOpen
-                ? "M6 18L18 6M6 6l12 12"        // X cuando abierto
-                : "M4 6h16M4 12h16M4 18h16"     // Hamburguesa cuando cerrado
-            }
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+            d={isSidebarOpen ? "M6 18L18 6M6 6l12 12" : "M4 6h16M4 12h16M4 18h16"}
           />
         </svg>
       </button>
@@ -143,7 +135,8 @@ const Sidebar = ({
   onLogout,
   user,
   empresa,
-  isSidebarOpen
+  isSidebarOpen,
+  activePanelRole
 }) => {
   return (
     <div
@@ -153,20 +146,16 @@ const Sidebar = ({
         ${isSidebarOpen ? "translate-x-0" : "-translate-x-64"}
       `}
     >
-      {/* Header del sidebar */}
+      {/* HEADER DEL SIDEBAR */}
       <div className="px-5 py-5 border-b flex flex-col items-start gap-3 bg-white/60 backdrop-blur-md">
 
-        {/* LOGO + SISTEMA */}
         <div className="flex items-center gap-3 w-full">
           <img
-            src={
-              empresa?.logo_imagen
-                ? getImageUrl(empresa.logo_imagen)
-                : "/placeholder-logo.png"
-            }
+            src={empresa?.logo_imagen ? getImageUrl(empresa.logo_imagen) : "/placeholder-logo.png"}
             alt="logo"
             className="w-12 h-12 rounded-xl object-cover border shadow-sm bg-[#0F2634]"
           />
+
           <div className="flex flex-col">
             <span className="text-lg font-bold text-[#23475F] leading-none">
               {empresa?.nombre_sistema || "Sistema"}
@@ -175,20 +164,36 @@ const Sidebar = ({
           </div>
         </div>
 
-        {/* USUARIO */}
+        {/* USUARIO Y ROL ACTIVO */}
         <div className="mt-1 text-left w-full">
           <p className="text-sm text-[#23475F]">
             Hola, <span className="font-semibold">{user?.nombre}</span>
           </p>
-          <p className="text-[11px] bg-[#01CD6C]/20 text-[#01CD6C] px-2 py-1 rounded-md inline-block mt-1">
-            {getUserRoles(user)[0]}
-          </p>
+
+          {/* SOLO EL ROL ACTIVO */}
+          <div className="flex flex-wrap gap-1 mt-1">
+            {activePanelRole && (
+              <span
+                className={`
+                  text-[11px] px-2 py-1 rounded-md font-semibold
+                  ${activePanelRole === "ADMINISTRADOR"
+                    ? "bg-[#01CD6C]/20 text-[#01CD6C]"
+                    : ""
+                  }
+                  ${activePanelRole === "ADMIN_ESP_DEP"
+                    ? "bg-[#01CD6C]/15 text-[#01CD6C]"
+                    : ""
+                  }
+                `}
+              >
+                {activePanelRole}
+              </span>
+            )}
+          </div>
         </div>
 
-        {/* BOTONES DE PERFIL */}
+        {/* PERFIL */}
         <div className="w-full mt-1 flex flex-col gap-1 text-sm">
-
-          {/* Ver perfil */}
           <Link
             to="/administrador/perfil"
             className="flex items-center gap-2 text-[#23475F] hover:bg-[#01CD6C]/10 hover:text-[#01CD6C] px-2 py-2 rounded-lg transition-all"
@@ -200,18 +205,16 @@ const Sidebar = ({
             </svg>
             Ver perfil
           </Link>
-          {!user.roles?.some(r => String(r.rol).toUpperCase() === "ADMINISTRADOR") && (
-            <Link
-              to="/"
-              className="flex items-center gap-2 text-[#23475F] hover:bg-[#01CD6C]/10 hover:text-[#01CD6C] px-2 py-2 rounded-lg transition-all"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M3 4h18l-1 7H4L3 4z"/>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 11v9h14v-9"/>
-              </svg>
-              Ir a Vista Cliente
-            </Link>
-          )}
+          <Link
+            to="/"
+            className="flex items-center gap-2 text-[#23475F] hover:bg-[#01CD6C]/10 hover:text-[#01CD6C] px-2 py-2 rounded-lg transition-all"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3 4h18l-1 7H4L3 4z" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 11v9h14v-9" />
+            </svg>
+            Ir a Vista Cliente
+          </Link>
         </div>
       </div>
 
@@ -267,6 +270,7 @@ const DashboardAdministradores = () => {
   const [routes, setRoutes] = useState([]);
   const [empresa, setEmpresa] = useState(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [activePanelRole, setActivePanelRole] = useState(null);
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -300,8 +304,10 @@ const DashboardAdministradores = () => {
       const preferredRole = storedPanelRole ? storedPanelRole.toUpperCase() : null;
 
       const effectiveRole = pickEffectiveRole(parsed, preferredRole);
-      const roleRoutes = effectiveRole ? roleRoutesConfig[effectiveRole] : [];
 
+      setActivePanelRole(effectiveRole);
+
+      const roleRoutes = effectiveRole ? roleRoutesConfig[effectiveRole] : [];
       setRoutes(roleRoutes);
 
       const currentPath = location.pathname.replace("/administrador/", "");
@@ -353,7 +359,6 @@ const DashboardAdministradores = () => {
   return (
     <div className="flex h-screen bg-white overflow-hidden relative">
 
-      {/* SIDEBAR en PC/LAPTOP con toggle */}
       <div className="hidden md:block">
         {routes.length > 0 && (
           <Sidebar
@@ -367,19 +372,23 @@ const DashboardAdministradores = () => {
             user={user}
             empresa={empresa}
             isSidebarOpen={isSidebarOpen}
+            activePanelRole={activePanelRole}
           />
         )}
       </div>
 
-      {/* CONTENIDO PRINCIPAL */}
       <div className={`flex-1 flex flex-col min-w-0 transition-all duration-300 
         ${isSidebarOpen ? "md:ml-64" : "md:ml-0"}`}
       >
-        <Header title={pageTitle} toggleSidebar={toggleSidebar} isSidebarOpen={isSidebarOpen} />
+        <Header
+          title={pageTitle}
+          toggleSidebar={toggleSidebar}
+          isSidebarOpen={isSidebarOpen}
+        />
 
         <main className="flex-1 p-3 md:p-6 overflow-auto">
           <Routes>
-            <Route path="inicio" element={<InicioModulos user={user} routes={routes} />} />
+            <Route path="inicio" element={<InicioModulos user={user} routes={routes} panelBasePath="administrador" />} />
             <Route path="perfil" element={<PerfilAdmin user={user} />} />
 
             {routes.map((route) => (
@@ -394,9 +403,8 @@ const DashboardAdministradores = () => {
         </main>
       </div>
 
-      {/* TABBAR SOLO EN MÓVILES */}
       <div className="md:hidden">
-        <MobileTabBar  user={user} onLogout={handleLogout} />
+        <MobileTabBar user={user} onLogout={handleLogout} panelBasePath="administrador" />
       </div>
     </div>
   );

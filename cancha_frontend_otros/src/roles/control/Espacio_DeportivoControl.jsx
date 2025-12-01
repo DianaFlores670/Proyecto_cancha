@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import api from "../../services/api";
+import { FiMoreVertical, FiX } from "react-icons/fi";
 
 const getImageUrl = (path) => {
   if (!path) return "";
@@ -18,7 +19,7 @@ const Espacio_DeportivoControl = () => {
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const limit = 10;
-
+  const [mobileModal, setMobileModal] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [currentEspacio, setCurrentEspacio] = useState(null);
 
@@ -104,33 +105,29 @@ const Espacio_DeportivoControl = () => {
   };
 
   return (
-    <div className="bg-white rounded-lg shadow p-6">
-      <h2 className="text-xl font-semibold mb-4">Espacios deportivos asignados</h2>
-
-      <div className="flex flex-col xl:flex-row gap-4 mb-6 items-stretch">
-        <div className="flex-1">
-          <form onSubmit={handleSearch} className="flex h-full">
+    <div className="bg-white rounded-lg shadow px-4 py-6 md:p-6">
+      <h2 className="text-2xl font-bold mb-6 text-[#23475F] border-l-4 border-[#01CD6C] pl-3">Espacios deportivos asignados</h2>
+      <div className="sticky top-0 bg-white z-40 pb-4 pt-2 border-b md:border-0 md:static md:top-auto">
+        <div className="flex flex-col md:flex-row gap-3">
+          <form onSubmit={handleSearch} className="flex flex-1 bg-[#F1F5F9] rounded-full shadow-sm overflow-hidden">
             <input
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Buscar por nombre, direccion, descripcion o admin"
-              className="border rounded-l px-4 py-2 w-full"
+              className="bg-transparent flex-1 px-4 py-2 focus:outline-none text-md"
             />
             <button
               type="submit"
-              className="bg-blue-500 text-white px-4 py-2 rounded-r hover:bg-blue-600 whitespace-nowrap"
+              className="bg-[#23475F] text-white px-6 text-md font-medium rounded-full"
             >
               Buscar
             </button>
           </form>
-        </div>
-
-        <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
           <select
             value={filtro}
             onChange={handleFiltroChange}
-            className="border rounded px-3 py-2 flex-1 sm:min-w-[180px]"
+            className="bg-[#F1F5F9] rounded-full px-4 py-2 shadow-sm text-md"
           >
             <option value="">Todos - sin filtro</option>
             <option value="nombre">Por nombre</option>
@@ -142,13 +139,13 @@ const Espacio_DeportivoControl = () => {
       {loading ? (
         <p>Cargando espacios...</p>
       ) : error ? (
-        <p className="text-red-500">{error}</p>
+        <p className="text-red-500 mt-3">{error}</p>
       ) : (
         <>
-          <div className="overflow-x-auto">
-            <table className="min-w-full table-auto border-collapse">
-              <thead>
-                <tr className="bg-gray-50">
+          <div className="hidden md:block mt-6 overflow-x-auto">
+            <table className="min-w-full border-collapse rounded-lg overflow-hidden shadow-sm">
+              <thead className="bg-[#23475F] text-white text-md">
+                <tr>
                   <th className="px-4 py-2 text-left">#</th>
                   <th className="px-4 py-2 text-left">Nombre</th>
                   <th className="px-4 py-2 text-left">Direccion</th>
@@ -158,20 +155,20 @@ const Espacio_DeportivoControl = () => {
                   <th className="px-4 py-2 text-left">Acciones</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="text-md">
                 {espacios.map((e, index) => (
-                  <tr key={e.id_espacio} className="border-t">
-                    <td className="px-4 py-2">{(page - 1) * limit + index + 1}</td>
-                    <td className="px-4 py-2">{e.nombre}</td>
-                    <td className="px-4 py-2">{e.direccion || "-"}</td>
-                    <td className="px-4 py-2">{e.horario_apertura || "-"}</td>
-                    <td className="px-4 py-2">{e.horario_cierre || "-"}</td>
-                    <td className="px-4 py-2">
+                  <tr key={e.id_espacio} className="border-t hover:bg-gray-50 transition">
+                    <td className="px-4 py-3">{(page - 1) * limit + index + 1}</td>
+                    <td className="px-4 py-3">{e.nombre}</td>
+                    <td className="px-4 py-3">{e.direccion || "-"}</td>
+                    <td className="px-4 py-3">{e.horario_apertura || "-"}</td>
+                    <td className="px-4 py-3">{e.horario_cierre || "-"}</td>
+                    <td className="px-4 py-3">
                       {e.admin_nombre || e.admin_apellido
                         ? `${e.admin_nombre || ""} ${e.admin_apellido || ""}`
                         : "Sin admin"}
                     </td>
-                    <td className="px-4 py-2">
+                    <td className="px-4 py-3">
                       <button
                         onClick={() => openViewModal(e.id_espacio)}
                         className="text-blue-500 hover:text-blue-700"
@@ -184,24 +181,85 @@ const Espacio_DeportivoControl = () => {
               </tbody>
             </table>
           </div>
+          {/* CARDS MOBILE */}
+          <div className="md:hidden mt-6 space-y-4 pb-32">
+            {espacios.map((espacio, index) => (
+              <div key={espacio.id_espacio} className="border bg-white rounded-lg p-4 shadow-sm">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <div className="font-bold text-[#23475F]">
+                      {espacio.nombre}
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      Espacio #{(page - 1) * limit + index + 1}
+                    </div>
+                    <div className="mt-3 text-sm space-y-1">
+                      <div>
+                        <span className="font-semibold">Direccion: </span>
+                        {espacio.direccion || '-'}
+                      </div>
+                      <div>
+                        <span className="font-semibold">Horario: </span>
+                        {espacio.horario_apertura && espacio.horario_cierre
+                          ? `${espacio.horario_apertura} - ${espacio.horario_cierre}`
+                          : '-'}
+                      </div>
+                      <div>
+                        <span className="font-semibold">Administrador: </span>
+                        {espacio.admin_nombre && espacio.admin_apellido
+                          ? `${espacio.admin_nombre} ${espacio.admin_apellido}`
+                          : 'Sin administrador'}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center">
+                    <button onClick={() => setMobileModal(espacio)}>
+                      <FiMoreVertical size={22} />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
 
-          <div className="flex justify-center mt-4">
+            {/* PAGINACIÓN SOLO MOVIL */}
+            <div className="md:hidden w-full flex justify-center items-center gap-3 py-4">
+              <button
+                onClick={() => handlePageChange(page - 1)}
+                disabled={page === 1}
+                className="px-4 py-2 bg-gray-200 rounded-full text-sm disabled:opacity-40"
+              >
+                Anterior
+              </button>
+
+              <div className="px-4 py-2 bg-gray-100 rounded-full text-sm">
+                Pag {page} de {Math.ceil(total / limit) || 1}
+              </div>
+
+              <button
+                onClick={() => handlePageChange(page + 1)}
+                disabled={page === Math.ceil(total / limit)}
+                className="px-4 py-2 bg-gray-200 rounded-full text-sm disabled:opacity-40"
+              >
+                Siguiente
+              </button>
+            </div>
+          </div>
+          {/* PAGINACION STICKY */}
+          <div className="fixed md:static bottom-0 left-0 right-0 bg-white border-t shadow-lg py-3 flex justify-center gap-3 z-50 mt-6">
             <button
               onClick={() => handlePageChange(page - 1)}
               disabled={page === 1}
-              className="bg-gray-300 text-gray-800 px-4 py-2 rounded-l hover:bg-gray-400 disabled:opacity-50"
+              className="px-4 py-2 bg-gray-200 rounded-full disabled:opacity-40"
             >
               Anterior
             </button>
-
-            <span className="px-4 py-2 bg-gray-100">
-              Pagina {page} de {Math.ceil(total / limit) || 1}
+            <span className="px-4 py-2 bg-gray-100 rounded-full text-md">
+              Pag {page} de {Math.ceil(total / limit)}
             </span>
-
             <button
               onClick={() => handlePageChange(page + 1)}
-              disabled={page === Math.ceil(total / limit) || total === 0}
-              className="bg-gray-300 text-gray-800 px-4 py-2 rounded-r hover:bg-gray-400 disabled:opacity-50"
+              disabled={page === Math.ceil(total / limit)}
+              className="px-4 py-2 bg-gray-200 rounded-full disabled:opacity-40"
             >
               Siguiente
             </button>
@@ -210,120 +268,98 @@ const Espacio_DeportivoControl = () => {
       )}
 
       {modalOpen && currentEspacio && (
-        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full mx-4 p-6 md:p-8 max-h-[85vh] overflow-y-auto">
-            <div className="flex items-start justify-between gap-4 mb-6">
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl p-6 md:p-8 max-h-[80vh] overflow-y-auto transition-all">
+            <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-8">
               <div>
-                <p className="text-[11px] uppercase tracking-[0.14em] text-gray-400">
-                  Espacio deportivo
-                </p>
-                <h3 className="text-xl md:text-2xl font-semibold text-gray-900">
+
+                <h3 className="text-2xl font-bold text-gray-900">
                   Datos del espacio
                 </h3>
-                <p className="text-xs text-gray-500 mt-1">
-                  Administrado por {currentEspacio.admin_nombre || ""}{" "}
-                  {currentEspacio.admin_apellido || ""}
-                </p>
               </div>
 
-              <div className="text-right">
-                <p className="text-[11px] text-gray-400">Horario</p>
-                <p className="text-xs font-medium text-gray-700">
-                  {currentEspacio.horario_apertura || "--:--"} h -{" "}
-                  {currentEspacio.horario_cierre || "--:--"} h
+              <div className="text-left">
+                <p className="text-[11px] uppercase tracking-widest text-gray-500">Horario de atención</p>
+                <p className="text-sm font-semibold text-gray-800">
+                  {currentEspacio.horario_apertura || "--:--"} h – {currentEspacio.horario_cierre || "--:--"} h
                 </p>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm mb-6">
-              <div className="space-y-1">
-                <p className="text-[11px] text-gray-500">Nombre</p>
-                <p className="font-medium text-gray-900">
-                  {currentEspacio.nombre}
-                </p>
+            {/* GRID DE DATOS */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 text-sm mb-8">
+
+              <div>
+                <p className="text-[12px] text-gray-500 uppercase">Nombre</p>
+                <p className="text-base font-semibold text-gray-900">{currentEspacio.nombre}</p>
               </div>
 
-              <div className="space-y-1">
-                <p className="text-[11px] text-gray-500">Direccion</p>
-                <p className="font-medium text-gray-900">
-                  {currentEspacio.direccion || "-"}
-                </p>
+              <div>
+                <p className="text-[12px] text-gray-500 uppercase">Dirección</p>
+                <p className="text-base font-semibold text-gray-900">{currentEspacio.direccion || "-"}</p>
               </div>
 
-              <div className="space-y-1 md:col-span-2">
-                <p className="text-[11px] text-gray-500">Descripcion</p>
-                <p className="text-sm text-gray-800 leading-snug">
+              <div className="sm:col-span-2 lg:col-span-3">
+                <p className="text-[12px] text-gray-500 uppercase">Descripción</p>
+                <p className="text-sm text-gray-800 mt-1">
                   {currentEspacio.descripcion || "Sin descripcion registrada."}
                 </p>
               </div>
 
-              <div className="space-y-1">
-                <p className="text-[11px] text-gray-500">Latitud</p>
-                <p className="font-mono text-gray-900">
-                  {currentEspacio.latitud || "-"}
+            </div>
+
+            {/* TARJETA ADMIN */}
+            <div className="bg-gray-50 rounded-xl border border-gray-200 px-5 py-4 mb-8 flex flex-col sm:flex-row justify-between gap-4">
+              <div>
+                <p className="text-[12px] text-gray-500 uppercase">Administrado por: </p>
+                <p className="text-base font-semibold text-gray-900">
+                  {currentEspacio.admin_nombre} {currentEspacio.admin_apellido}
                 </p>
               </div>
-
-              <div className="space-y-1">
-                <p className="text-[11px] text-gray-500">Longitud</p>
-                <p className="font-mono text-gray-900">
-                  {currentEspacio.longitud || "-"}
-                </p>
-              </div>
-
-              <div className="space-y-1 md:col-span-2 mt-2 rounded-xl border border-gray-100 bg-gray-50 px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                <div>
-                  <p className="text-[11px] text-gray-500">Administrador</p>
-                  <p className="font-medium text-gray-900">
-                    {(currentEspacio.admin_nombre || "") +
-                      " " +
-                      (currentEspacio.admin_apellido || "")}
-                  </p>
-                </div>
-                <div className="sm:text-right">
-                  <p className="text-[11px] text-gray-500">Correo admin</p>
-                  <p className="text-sm text-gray-800">
-                    {currentEspacio.admin_correo || "-"}
-                  </p>
-                </div>
+              <div className="text-left sm:text-right">
+                <p className="text-[12px] text-gray-500 uppercase">Correo</p>
+                <p className="text-sm text-gray-800">{currentEspacio.admin_correo || "-"}</p>
               </div>
             </div>
 
-            <div className="mt-4">
+            {/* IMAGENES */}
+            <div>
               <div className="flex items-center justify-between mb-3">
                 <h4 className="text-sm font-semibold text-gray-900">
                   Imagenes del espacio
                 </h4>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+
+                {/* Imagen principal */}
                 {currentEspacio.imagen_principal && (
-                  <div className="relative overflow-hidden rounded-xl border border-gray-200">
+                  <div className="rounded-xl border overflow-hidden relative group">
                     <img
                       src={getImageUrl(currentEspacio.imagen_principal)}
-                      alt="espacio_principal"
-                      className="w-full h-48 object-cover"
+                      className="w-full h-48 object-cover group-hover:brightness-90 transition"
                     />
-                    <span className="absolute top-2 left-2 px-2 py-1 rounded-full bg-black/60 text-[10px] text-white font-medium">
+                    <span className="absolute top-2 left-2 bg-black/60 text-white text-[10px] px-2 py-1 rounded-full">
                       Principal
                     </span>
                   </div>
                 )}
 
+                {/* Imagenes secundarias */}
                 {[1, 2, 3, 4].map((i) => {
                   const key = `imagen_sec_${i}`;
                   if (!currentEspacio[key]) return null;
+
                   return (
                     <div
                       key={key}
-                      className="relative overflow-hidden rounded-xl border border-gray-200"
+                      className="rounded-xl border overflow-hidden relative group"
                     >
                       <img
                         src={getImageUrl(currentEspacio[key])}
-                        alt={key}
-                        className="w-full h-40 object-cover"
+                        className="w-full h-40 object-cover group-hover:brightness-90 transition"
                       />
-                      <span className="absolute top-2 left-2 px-2 py-1 rounded-full bg-black/55 text-[10px] text-white font-medium">
+                      <span className="absolute top-2 left-2 bg-black/60 text-white text-[10px] px-2 py-1 rounded-full">
                         Extra {i}
                       </span>
                     </div>
@@ -333,23 +369,56 @@ const Espacio_DeportivoControl = () => {
 
               {!currentEspacio.imagen_principal &&
                 ![1, 2, 3, 4].some((i) => currentEspacio[`imagen_sec_${i}`]) && (
-                  <p className="text-xs text-gray-500 mt-2">
+                  <p className="text-xs text-gray-500 mt-3">
                     Este espacio no tiene imagenes registradas.
                   </p>
                 )}
             </div>
 
-            <div className="flex justify-end mt-6">
+            {/* BOTON CERRAR */}
+            <div className="flex justify-end mt-8">
               <button
                 onClick={closeModal}
-                className="px-5 py-2.5 rounded-lg bg-gray-800 text-white text-sm font-semibold hover:bg-gray-900 transition-colors"
+                className="px-6 py-2.5 rounded-full bg-gray-800 text-white text-sm font-semibold hover:bg-gray-900 transition"
               >
                 Cerrar
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+      {mobileModal && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center">
+          <div className="bg-white rounded-2xl w-72 p-5 shadow-xl animate-scaleIn">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="font-bold text-[#23475F] text-lg">Opciones</h3>
+              <button onClick={() => setMobileModal(null)}>
+                <FiX size={20} />
+              </button>
+            </div>
+
+            <div className="flex flex-col text-md">
+              <button
+                onClick={() => {
+                  setMobileModal(null);
+                  openViewModal(mobileModal.id_espacio); // Abre el modal para ver datos del control
+                }}
+                className="px-3 py-2 text-left hover:bg-gray-100"
+              >
+                Ver datos
+              </button>
+              <button
+                onClick={() => setMobileModal(null)}
+                className="px-3 py-2 text-left text-gray-700 hover:bg-gray-100 mt-1 rounded"
+              >
+                Cancelar
               </button>
             </div>
           </div>
         </div>
       )}
+
     </div>
   );
 };

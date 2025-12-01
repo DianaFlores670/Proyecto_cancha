@@ -326,9 +326,10 @@ const ReservarCliente = () => {
 
       try {
         const reservaDate = parseDateInput(fechaReserva);
-        const baseDate = reservaDate && !Number.isNaN(reservaDate.getTime())
-          ? reservaDate
-          : new Date();
+        const baseDate =
+          reservaDate && !Number.isNaN(reservaDate.getTime())
+            ? reservaDate
+            : new Date();
         const expira = new Date(baseDate.getTime() + 24 * 60 * 60 * 1000);
         const bodyQr = {
           id_reserva: idReserva,
@@ -388,9 +389,9 @@ const ReservarCliente = () => {
     return (
       <>
         <Header />
-        <div className="min-h-screen bg-white pt-32 px-4">
-          <div className="max-w-xl mx-auto bg-white rounded-lg shadow p-6">
-            <p className="text-red-600 text-center">
+        <div className="min-h-screen bg-[#F1F5F9] pt-28 px-3 sm:px-4 pb-10">
+          <div className="max-w-md mx-auto bg-white rounded-2xl shadow-lg px-6 py-8 text-center">
+            <p className="text-red-600 font-semibold text-sm sm:text-base">
               No tiene acceso como cliente para crear reservas
             </p>
           </div>
@@ -406,256 +407,304 @@ const ReservarCliente = () => {
   return (
     <>
       <Header />
-      <div className="min-h-screen bg-[#F5F7FA] pt-32 px-4 pb-10">
-        <div className="max-w-5xl mx-auto bg-white rounded-2xl shadow-lg p-6 md:p-8">
-          <h1 className="text-2xl md:text-3xl font-bold text-[#0F2634] mb-6">
-            Generar reserva
-          </h1>
+      <div className="min-h-screen bg-[#F5F7FA] pt-28 sm:pt-32 px-3 sm:px-4 pb-24">
+        <div className="w-full max-w-7xl mx-auto bg-white rounded-2xl shadow-lg p-4 sm:p-6 md:p-8">
+          <div className="mb-4 sm:mb-6">
+            <h1 className="text-2xl sm:text-3xl font-bold text-[#0F2634]">
+              Generar reserva
+            </h1>
+            <p className="mt-2 text-xs sm:text-sm text-[#64748B] max-w-2xl">
+              Seleccione la fecha y los horarios disponibles para crear su reserva.
+              El monto se calcula automaticamente segun el precio por hora.
+            </p>
+          </div>
 
-          {loadingCancha && (
-            <div className="mb-4 text-sm text-[#23475F]">
-              Cargando datos de cancha...
-            </div>
-          )}
-
-          {loadingSlots && fechaReserva && (
-            <div className="mb-4 text-sm text-[#23475F]">
-              Cargando horarios disponibles...
-            </div>
-          )}
-
-          {error && (
-            <div className="mb-4 bg-red-100 text-red-700 px-4 py-2 rounded">
-              {error}
-            </div>
-          )}
-
-          {success && (
-            <div className="mb-4 bg-green-100 text-green-700 px-4 py-2 rounded">
-              {success}
-            </div>
-          )}
-
-          {cancha && (
-            <form onSubmit={handleSubmit} className="space-y-8">
-              <section className="border border-[#E2E8F0] rounded-xl p-4 md:p-5 bg-[#F8FAFC]">
-                <h2 className="text-lg font-semibold text-[#0F2634] mb-4">
-                  Datos de la cancha
-                </h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-[#23475F] mb-1">
-                      Nombre
-                    </label>
-                    <input
-                      type="text"
-                      value={cancha.nombre || ""}
-                      disabled
-                      className="w-full border border-[#CBD5E1] rounded-md px-3 py-2 bg-gray-100 text-[#23475F]"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-[#23475F] mb-1">
-                      Espacio deportivo
-                    </label>
-                    <input
-                      type="text"
-                      value={cancha.espacio_nombre || ""}
-                      disabled
-                      className="w-full border border-[#CBD5E1] rounded-md px-3 py-2 bg-gray-100 text-[#23475F]"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-[#23475F] mb-1">
-                      Ubicacion
-                    </label>
-                    <input
-                      type="text"
-                      value={cancha.ubicacion || ""}
-                      disabled
-                      className="w-full border border-[#CBD5E1] rounded-md px-3 py-2 bg-gray-100 text-[#23475F]"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-[#23475F] mb-1">
-                      Precio por hora
-                    </label>
-                    <input
-                      type="text"
-                      value={cancha.monto_por_hora ? "Bs. " + cancha.monto_por_hora : ""}
-                      disabled
-                      className="w-full border border-[#CBD5E1] rounded-md px-3 py-2 bg-gray-100 text-[#23475F] font-semibold"
-                    />
-                  </div>
-                  {cancha.horario_apertura && (
-                    <div>
-                      <label className="block text-sm font-medium text-[#23475F] mb-1">
-                        Horario apertura
-                      </label>
-                      <input
-                        type="text"
-                        value={cancha.horario_apertura}
-                        disabled
-                        className="w-full border border-[#CBD5E1] rounded-md px-3 py-2 bg-gray-100 text-[#23475F]"
-                      />
-                    </div>
-                  )}
-                  {cancha.horario_cierre && (
-                    <div>
-                      <label className="block text-sm font-medium text-[#23475F] mb-1">
-                        Horario cierre
-                      </label>
-                      <input
-                        type="text"
-                        value={cancha.horario_cierre}
-                        disabled
-                        className="w-full border border-[#CBD5E1] rounded-md px-3 py-2 bg-gray-100 text-[#23475F]"
-                      />
-                    </div>
-                  )}
-                </div>
-              </section>
-
-              <section className="border border-[#E2E8F0] rounded-xl p-4 md:p-5">
-                <h2 className="text-lg font-semibold text-[#0F2634] mb-4">
-                  Datos de la reserva
-                </h2>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-[#23475F] mb-1">
-                      Fecha
-                    </label>
-                    <input
-                      type="date"
-                      value={fechaReserva}
-                      onChange={(e) => setFechaReserva(e.target.value)}
-                      className="w-full border border-[#CBD5E1] rounded-md px-3 py-2 text-[#23475F]"
-                      required
-                      min={todayString}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-[#23475F] mb-1">
-                      Cupo
-                    </label>
-                    <input
-                      type="number"
-                      min="1"
-                      value={cupo}
-                      onChange={(e) => setCupo(e.target.value)}
-                      className="w-full border border-[#CBD5E1] rounded-md px-3 py-2 text-[#23475F]"
-                    />
-                  </div>
-                </div>
-              </section>
-
-              <section className="border border-[#E2E8F0] rounded-xl p-4 md:p-5">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-lg font-semibold text-[#0F2634]">
-                    Seleccionar horarios
-                  </h2>
-                  <span className="text-sm text-[#64748B]">
-                    Solo se muestran horarios dentro del rango de apertura y cierre
-                  </span>
-                </div>
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                  {allowedSlots.map((slot) => {
-                    const active = selectedSlots.includes(slot.id);
-                    const busy = busySlots.includes(slot.id);
-                    let disabledSlot = busy;
-
-                    if (isTodaySelected) {
-                      if (slot.end <= nowTimeForUi) {
-                        disabledSlot = true;
-                      }
-                    }
-
-                    const classes =
-                      "px-3 py-2 rounded-md text-sm border transition-all " +
-                      (disabledSlot
-                        ? "bg-gray-200 border-gray-300 text-gray-500 cursor-not-allowed"
-                        : active
-                        ? "bg-[#01CD6C] border-[#01CD6C] text-white shadow"
-                        : "bg-white border-[#CBD5E1] text-[#23475F] hover:border-[#01CD6C]");
-
-                    return (
-                      <button
-                        key={slot.id}
-                        type="button"
-                        onClick={() => handleSlotClick(slot.id, disabledSlot)}
-                        disabled={disabledSlot}
-                        className={classes}
-                      >
-                        {slot.label}
-                      </button>
-                    );
-                  })}
-                  {allowedSlots.length === 0 && (
-                    <p className="col-span-full text-sm text-[#64748B]">
-                      No hay horarios configurados para este espacio
-                    </p>
-                  )}
-                </div>
-                <div className="mt-4 flex flex-col md:flex-row md:items-center md:justify-between gap-2">
-                  <p className="text-sm text-[#23475F]">
-                    Horas seleccionadas:{" "}
-                    <span className="font-semibold">
-                      {selectedSlots.length}
-                    </span>
-                  </p>
-                  <p className="text-base md:text-lg text-[#0F2634] font-semibold">
-                    Monto estimado:{" "}
-                    <span className="text-[#01CD6C]">
-                      Bs. {computeMontoTotal()}
-                    </span>
-                  </p>
-                </div>
-              </section>
-
-              <div className="flex justify-end gap-3 pt-2">
-                <button
-                  type="submit"
-                  disabled={saving}
-                  className={
-                    "px-6 py-2 rounded-md font-semibold text-white " +
-                    (saving
-                      ? "bg-[#94A3B8] cursor-not-allowed"
-                      : "bg-[#01CD6C] hover:bg-[#00b359] shadow-md hover:shadow-lg transition-all")
-                  }
-                >
-                  {saving ? "Guardando..." : "Confirmar reserva"}
-                </button>
+          <div className="">
+            {loadingCancha && (
+              <div className="mb-2 text-xs sm:text-sm text-[#23475F]">
+                Cargando datos de cancha...
               </div>
-            </form>
-          )}
+            )}
 
-          {!loadingCancha && !cancha && !error && (
-            <div className="text-center text-[#23475F]">
-              No se encontro la cancha
-            </div>
-          )}
+            {loadingSlots && fechaReserva && (
+              <div className="mb-2 text-xs sm:text-sm text-[#23475F]">
+                Cargando horarios disponibles...
+              </div>
+            )}
+
+            {error && (
+              <div className="bg-red-100 text-red-700 px-4 py-2 rounded-lg text-xs sm:text-sm">
+                {error}
+              </div>
+            )}
+
+            {success && (
+              <div className="bg-green-100 text-green-700 px-4 py-2 rounded-lg text-xs sm:text-sm">
+                {success}
+              </div>
+            )}
+
+            {cancha && (
+              <form onSubmit={handleSubmit} className="space-y-6 sm:space-y-8">
+                <section className="border border-[#E2E8F0] rounded-2xl p-4 sm:p-5 bg-[#F8FAFC]">
+                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
+                    <div>
+                      <h2 className="text-base sm:text-lg font-semibold text-[#0F2634]">
+                        Datos de la cancha
+                      </h2>
+                      <p className="text-xs sm:text-sm text-[#64748B] mt-1">
+                        Revise la información principal antes de confirmar su reserva.
+                      </p>
+                    </div>
+                    {cancha.monto_por_hora && (
+                      <div className="px-4 py-2 bg-[#ECFDF5] border border-[#BBF7D0] rounded-full text-xs sm:text-sm text-[#166534] font-semibold flex items-center justify-center">
+                        Precio por hora: Bs. {cancha.monto_por_hora}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+                    <div className="flex flex-col gap-1">
+                      <span className="text-[11px] sm:text-xs text-[#64748B] font-medium">
+                        Nombre
+                      </span>
+                      <div className="border border-[#CBD5E1] bg-white rounded-xl px-3 py-2 text-xs sm:text-sm text-[#0F2634] font-semibold">
+                        {cancha.nombre || "-"}
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col gap-1">
+                      <span className="text-[11px] sm:text-xs text-[#64748B] font-medium">
+                        Espacio deportivo
+                      </span>
+                      <div className="border border-[#CBD5E1] bg-white rounded-xl px-3 py-2 text-xs sm:text-sm text-[#0F2634]">
+                        {cancha.espacio_nombre || "-"}
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col gap-1">
+                      <span className="text-[11px] sm:text-xs text-[#64748B] font-medium">
+                        Ubicación
+                      </span>
+                      <div className="border border-[#CBD5E1] bg-white rounded-xl px-3 py-2 text-xs sm:text-sm text-[#0F2634]">
+                        {cancha.ubicacion || "-"}
+                      </div>
+                    </div>
+
+                    {cancha.horario_apertura && (
+                      <div className="flex flex-col gap-1">
+                        <span className="text-[11px] sm:text-xs text-[#64748B] font-medium">
+                          Horario apertura
+                        </span>
+                        <div className="border border-[#CBD5E1] bg-white rounded-xl px-3 py-2 text-xs sm:text-sm text-[#0F2634]">
+                          {cancha.horario_apertura}
+                        </div>
+                      </div>
+                    )}
+
+                    {cancha.horario_cierre && (
+                      <div className="flex flex-col gap-1">
+                        <span className="text-[11px] sm:text-xs text-[#64748B] font-medium">
+                          Horario cierre
+                        </span>
+                        <div className="border border-[#CBD5E1] bg-white rounded-xl px-3 py-2 text-xs sm:text-sm text-[#0F2634]">
+                          {cancha.horario_cierre}
+                        </div>
+                      </div>
+                    )}
+
+                    {cancha.capacidad != null && (
+                      <div className="flex flex-col gap-1">
+                        <span className="text-[11px] sm:text-xs text-[#64748B] font-medium">
+                          Capacidad máxima
+                        </span>
+                        <div className="border border-[#CBD5E1] bg-white rounded-xl px-3 py-2 text-xs sm:text-sm text-[#0F2634]">
+                          {cancha.capacidad} personas
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </section>
+
+                <section className="border border-[#E2E8F0] rounded-2xl p-4 sm:p-5">
+                  <h2 className="text-base sm:text-lg font-semibold text-[#0F2634] mb-4">
+                    Datos de la reserva
+                  </h2>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+                    <div className="flex flex-col gap-1">
+                      <label className="text-xs sm:text-sm font-medium text-[#23475F]">
+                        Fecha
+                      </label>
+                      <input
+                        type="date"
+                        value={fechaReserva}
+                        onChange={(e) => setFechaReserva(e.target.value)}
+                        className="w-full border border-[#CBD5E1] rounded-xl px-3 py-2 text-xs sm:text-sm text-[#23475F] focus:ring-2 focus:ring-[#01CD6C] focus:border-[#01CD6C] outline-none bg-white"
+                        required
+                        min={todayString}
+                      />
+                      <span className="text-[11px] text-[#94A3B8]">
+                        Solo se permiten fechas desde hoy en adelante.
+                      </span>
+                    </div>
+
+                    <div className="flex flex-col gap-1">
+                      <label className="text-xs sm:text-sm font-medium text-[#23475F]">
+                        Cupo
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={cupo}
+                        onChange={(e) => setCupo(e.target.value)}
+                        className="w-full border border-[#CBD5E1] rounded-xl px-3 py-2 text-xs sm:text-sm text-[#23475F] focus:ring-2 focus:ring-[#01CD6C] focus:border-[#01CD6C] outline-none bg-white"
+                      />
+                      <span className="text-[11px] text-[#94A3B8]">
+                        Cantidad de personas que participarán en la actividad.
+                      </span>
+                    </div>
+                  </div>
+                </section>
+
+                <section className="border border-[#E2E8F0] rounded-2xl p-4 sm:p-5">
+                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
+                    <div>
+                      <h2 className="text-base sm:text-lg font-semibold text-[#0F2634]">
+                        Seleccionar horarios
+                      </h2>
+                      <p className="text-[11px] sm:text-xs text-[#64748B] mt-1">
+                        Solo se muestran horarios dentro del rango de apertura y cierre.
+                        Los horarios ocupados se deshabilitan automáticamente.
+                      </p>
+                    </div>
+                    {isTodaySelected && (
+                      <div className="px-3 py-1 rounded-full bg-[#EFF6FF] border border-[#BFDBFE] text-[11px] sm:text-xs text-[#1D4ED8]">
+                        Algunos horarios pueden estar bloqueados por ser anteriores a la hora actual.
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-2 xs:grid-cols-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 sm:gap-3">
+                    {allowedSlots.map((slot) => {
+                      const active = selectedSlots.includes(slot.id);
+                      const busy = busySlots.includes(slot.id);
+                      let disabledSlot = busy;
+
+                      if (isTodaySelected) {
+                        if (slot.end <= nowTimeForUi) {
+                          disabledSlot = true;
+                        }
+                      }
+
+                      const classes =
+                        "px-2 sm:px-3 py-2 rounded-xl text-[11px] sm:text-sm border text-center whitespace-nowrap transition-all " +
+                        (disabledSlot
+                          ? "bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed"
+                          : active
+                          ? "bg-[#01CD6C] border-[#01CD6C] text-white shadow-md scale-[1.02]"
+                          : "bg-white border-[#CBD5E1] text-[#23475F] hover:border-[#01CD6C] hover:bg-[#F0FDF4]");
+
+                      return (
+                        <button
+                          key={slot.id}
+                          type="button"
+                          onClick={() => handleSlotClick(slot.id, disabledSlot)}
+                          disabled={disabledSlot}
+                          className={classes}
+                        >
+                          {slot.label}
+                        </button>
+                      );
+                    })}
+
+                    {allowedSlots.length === 0 && (
+                      <p className="col-span-full text-xs sm:text-sm text-[#64748B]">
+                        No hay horarios configurados para este espacio.
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="mt-5 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <p className="text-xs sm:text-sm text-[#23475F]">
+                        Horas seleccionadas:{" "}
+                        <span className="font-semibold">
+                          {selectedSlots.length}
+                        </span>
+                      </p>
+                      {busySlots.length > 0 && (
+                        <p className="text-[11px] text-[#94A3B8]">
+                          Horarios ocupados: {busySlots.length}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row sm:items-end gap-1 sm:gap-3">
+                      <p className="text-xs sm:text-sm text-[#64748B]">
+                        Monto estimado total
+                      </p>
+                      <p className="text-lg sm:text-xl text-[#0F2634] font-bold">
+                        <span className="text-[#01CD6C]">
+                          Bs. {computeMontoTotal()}
+                        </span>
+                      </p>
+                    </div>
+                  </div>
+                </section>
+
+                <div className="flex flex-col sm:flex-row sm:justify-end gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => navigate(-1)}
+                    className="w-full sm:w-auto px-5 py-2.5 rounded-full border border-[#CBD5E1] bg-white text-xs sm:text-sm font-semibold text-[#0F2634] hover:bg-[#F1F5F9] transition-all"
+                  >
+                    Volver
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={saving}
+                    className={
+                      "w-full sm:w-auto px-6 py-2.5 rounded-full font-semibold text-white text-xs sm:text-sm " +
+                      (saving
+                        ? "bg-[#94A3B8] cursor-not-allowed"
+                        : "bg-[#01CD6C] hover:bg-[#00b359] shadow-md hover:shadow-lg transition-all")
+                    }
+                  >
+                    {saving ? "Guardando..." : "Confirmar reserva"}
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {!loadingCancha && !cancha && !error && (
+              <div className="text-center text-[#23475F] text-sm sm:text-base">
+                No se encontro la cancha
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
       {showQrModal && qrInfo && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg mx-4 p-6 relative">
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-3">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-auto p-5 sm:p-6 md:p-7 relative">
             <button
               onClick={handleCloseModal}
-              className="absolute top-3 right-3 w-8 h-8 rounded-full flex items-center justify-center bg-black text-white text-xl leading-none"
+              className="absolute top-3 right-3 w-8 h-8 rounded-full flex items-center justify-center bg-black text-white text-xl leading-none hover:bg-black/80"
             >
               ×
             </button>
-            <h2 className="text-2xl font-bold text-[#0F2634] mb-2 text-center">
+            <h2 className="text-xl sm:text-2xl font-bold text-[#0F2634] mb-2 text-center">
               Reserva creada con exito
             </h2>
-            <p className="text-sm text-[#475569] mb-4 text-center">
-              Comparte este codigo con los deportistas para que puedan ingresar al espacio deportivo
+            <p className="text-xs sm:text-sm text-[#475569] mb-4 text-center max-w-sm mx-auto">
+              Comparta este codigo con los deportistas para que puedan unirse a la reserva
+              e ingresar al espacio deportivo.
             </p>
 
             <div className="flex justify-center mb-4">
               {qrInfo?.codigo_qr ? (
-                <div className="bg-white p-3 rounded shadow">
+                <div className="bg-white p-3 rounded-2xl border border-[#E2E8F0] shadow-inner">
                   <QRCode
                     value={qrInfo.codigo_qr}
                     size={192}
@@ -670,29 +719,29 @@ const ReservarCliente = () => {
             </div>
 
             <div className="mb-4">
-              <label className="block text-sm font-medium text-[#23475F] mb-1">
+              <label className="block text-xs sm:text-sm font-medium text-[#23475F] mb-1">
                 Enlace para compartir
               </label>
-              <div className="flex gap-2">
+              <div className="flex flex-col sm:flex-row gap-2">
                 <input
                   type="text"
                   readOnly
                   value={linkUnirse || ""}
-                  className="flex-1 border border-[#CBD5E1] rounded-md px-3 py-2 text-sm text-[#23475F] bg-gray-50"
+                  className="flex-1 border border-[#CBD5E1] rounded-xl px-3 py-2 text-xs sm:text-sm text-[#23475F] bg-gray-50"
                 />
                 <button
                   type="button"
                   onClick={handleCopyLink}
-                  className="px-4 py-2 rounded-md bg-[#23475F] text-white text-sm font-semibold hover:bg-[#01CD6C] transition-all"
+                  className="w-full sm:w-auto px-4 py-2 rounded-xl bg-[#23475F] text-white text-xs sm:text-sm font-semibold hover:bg-[#01CD6C] transition-all"
                 >
                   Copiar
                 </button>
               </div>
             </div>
 
-            <div className="mt-2 bg-[#FEF3C7] text-[#92400E] text-sm px-4 py-3 rounded-lg">
-              Recuerde que debe realizar el pago de la reserva al menos 24 horas antes del inicio del horario reservado.
-              Si no se registra el pago, la reserva puede ser cancelada.
+            <div className="mt-2 bg-[#FEF3C7] text-[#92400E] text-[11px] sm:text-xs px-4 py-3 rounded-xl leading-relaxed">
+              Recuerde que debe realizar el pago de la reserva antes del inicio del horario reservado.
+              Si no se registra el pago, la reserva puede ser cancelada automaticamente.
             </div>
           </div>
         </div>

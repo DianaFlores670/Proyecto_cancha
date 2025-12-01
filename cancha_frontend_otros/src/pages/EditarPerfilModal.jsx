@@ -68,44 +68,55 @@ const EditarPerfilModal = ({
     setPreview(URL.createObjectURL(file));
   };
 
-  const handleEditProfileSubmit = async (e) => {
-    e.preventDefault();
+const handleEditProfileSubmit = async (e) => {
+  e.preventDefault();
 
-    if (passwordMatchError) return;
+  if (passwordMatchError) return;
 
-    setSaving(true);
+  setSaving(true);
+  setError(null);
 
-    try {
-      const fd = new FormData();
+  try {
+    const fd = new FormData();
 
-      Object.entries(formData).forEach(([key, value]) => {
+    Object.entries(formData).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) {
         fd.append(key, value);
-      });
-
-      if (selectedFile) fd.append("imagen_perfil", selectedFile);
-
-      if (passwords.nueva_contrasena) {
-        fd.append("nueva_contrasena", passwords.nueva_contrasena);
       }
+    });
 
-      const res = await api.put(
-        `/usuario/editar/${userData.id_persona}`,
-        fd,
-        { headers: { "Content-Type": "multipart/form-data" } }
-      );
-
-      if (res.data.exito) {
-        onUpdated();
-        onClose();
-      } else {
-        setError(res.data.mensaje);
-      }
-    } catch (err) {
-      setError(err.response?.data?.mensaje || "Error al actualizar perfil.");
-    } finally {
-      setSaving(false);
+    if (selectedFile) {
+      fd.append("imagen_perfil", selectedFile);
     }
-  };
+
+    if (passwords.nueva_contrasena) {
+      fd.append("nueva_contrasena", passwords.nueva_contrasena);
+    }
+
+    const res = await api.patch(
+      `/usuario/${userData.id_persona}`,
+      fd
+    );
+
+    if (res.data?.exito || res.data?.success) {
+      onUpdated(res.data);
+      onClose();
+    } else {
+      setError(res.data?.mensaje || res.data?.message || "Error al actualizar perfil");
+    }
+  } catch (err) {
+    console.log("error editar perfil", err.response || err);
+
+    const serverMsg =
+      err.response?.data?.mensaje ||
+      err.response?.data?.message ||
+      err.response?.data?.error;
+
+    setError(serverMsg || "Error al actualizar perfil");
+  } finally {
+    setSaving(false);
+  }
+};
 
   const handleClose = () => {
     onClose();
@@ -152,15 +163,6 @@ const EditarPerfilModal = ({
             Actualiza tu información personal
           </p>
         </div>
-
-        {error && (
-          <div className="bg-red-50 border border-red-200 rounded-full px-4 py-3 text-center mb-5">
-            <p className="text-[#A31621] text-xs sm:text-sm font-medium">
-              {error}
-            </p>
-          </div>
-        )}
-
         {/* FORMULARIO */}
         <form onSubmit={handleEditProfileSubmit} className="space-y-8">
 
@@ -253,7 +255,13 @@ const EditarPerfilModal = ({
               )}
             </div>
           </div>
-
+          {error && (
+            <div className="bg-red-50 border border-red-200 rounded-full px-4 py-3 text-center">
+              <p className="text-[#A31621] text-xs sm:text-sm font-medium">
+                {error}
+              </p>
+            </div>
+          )}
           {/* BOTONES */}
           <div className="flex flex-col sm:flex-row justify-end gap-3 border-t border-gray-200 pt-4">
             <button

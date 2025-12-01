@@ -69,11 +69,15 @@ const obtenerReservasActivas = async () => {
       u.nombre AS cliente_nombre,
       u.apellido AS cliente_apellido,
       ca.id_cancha,
-      ca.nombre AS cancha_nombre
+      ca.nombre AS cancha_nombre,
+      ed.id_espacio,
+      ed.nombre AS espacio_nombre,
+      ed.direccion AS espacio_direccion
     FROM reserva r
     JOIN cliente c ON r.id_cliente = c.id_cliente
     JOIN usuario u ON c.id_cliente = u.id_persona
     JOIN cancha ca ON r.id_cancha = ca.id_cancha
+    JOIN espacio_deportivo ed ON ca.id_espacio = ed.id_espacio
     WHERE r.estado IN ('pendiente', 'en_cuotas')
     ORDER BY r.fecha_reserva ASC
   `;
@@ -94,11 +98,15 @@ const obtenerDatosEspecificos = async (limite, offset) => {
       p.nombre AS cliente_nombre,
       p.apellido AS cliente_apellido,
       ca.id_cancha,
-      ca.nombre AS cancha_nombre
+      ca.nombre AS cancha_nombre,
+      ed.id_espacio,
+      ed.nombre AS espacio_nombre,
+      ed.direccion AS espacio_direccion
     FROM reserva r
     JOIN cliente c ON r.id_cliente = c.id_cliente
     JOIN usuario p ON c.id_cliente = p.id_persona
     JOIN cancha ca ON r.id_cancha = ca.id_cancha
+    JOIN espacio_deportivo ed ON ca.id_espacio = ed.id_espacio
     ORDER BY r.id_reserva
     LIMIT $1 OFFSET $2
   `;
@@ -135,11 +143,15 @@ const obtenerReservasFiltradas = async (tipoFiltro, limite, offset) => {
       p.nombre AS cliente_nombre,
       p.apellido AS cliente_apellido,
       ca.id_cancha,
-      ca.nombre AS cancha_nombre
+      ca.nombre AS cancha_nombre,
+      ed.id_espacio,
+      ed.nombre AS espacio_nombre,
+      ed.direccion AS espacio_direccion
     FROM reserva r
     JOIN cliente c ON r.id_cliente = c.id_cliente
     JOIN usuario p ON c.id_cliente = p.id_persona
     JOIN cancha ca ON r.id_cancha = ca.id_cancha
+    JOIN espacio_deportivo ed ON ca.id_espacio = ed.id_espacio
     ORDER BY ${orden}
     LIMIT $1 OFFSET $2
   `;
@@ -169,11 +181,15 @@ const buscarReservas = async (texto, limite, offset) => {
       p.nombre AS cliente_nombre,
       p.apellido AS cliente_apellido,
       ca.id_cancha,
-      ca.nombre AS cancha_nombre
+      ca.nombre AS cancha_nombre,
+      ed.id_espacio,
+      ed.nombre AS espacio_nombre,
+      ed.direccion AS espacio_direccion
     FROM reserva r
     JOIN cliente c ON r.id_cliente = c.id_cliente
     JOIN usuario p ON c.id_cliente = p.id_persona
     JOIN cancha ca ON r.id_cancha = ca.id_cancha
+    JOIN espacio_deportivo ed ON ca.id_espacio = ed.id_espacio
     WHERE 
       p.nombre ILIKE $1 OR 
       p.apellido ILIKE $1 OR 
@@ -189,6 +205,7 @@ const buscarReservas = async (texto, limite, offset) => {
     JOIN cliente c ON r.id_cliente = c.id_cliente
     JOIN usuario p ON c.id_cliente = p.id_persona
     JOIN cancha ca ON r.id_cancha = ca.id_cancha
+    JOIN espacio_deportivo ed ON ca.id_espacio = ed.id_espacio
     WHERE 
       p.nombre ILIKE $1 OR 
       p.apellido ILIKE $1 OR 
@@ -215,15 +232,26 @@ const obtenerReservaPorId = async (id) => {
       p.correo AS cliente_correo,
       ca.id_cancha,
       ca.nombre AS cancha_nombre,
+      ed.id_espacio,
+      ed.nombre AS espacio_nombre,
+      ed.direccion AS espacio_direccion,
       MIN(rh.hora_inicio) AS hora_inicio,
       MAX(rh.hora_fin) AS hora_fin
     FROM reserva r
     JOIN cliente c ON r.id_cliente = c.id_cliente
     JOIN usuario p ON c.id_cliente = p.id_persona
     JOIN cancha ca ON r.id_cancha = ca.id_cancha
+    JOIN espacio_deportivo ed ON ca.id_espacio = ed.id_espacio
     LEFT JOIN reserva_horario rh ON r.id_reserva = rh.id_reserva
     WHERE r.id_reserva = $1
-    GROUP BY r.id_reserva, c.id_cliente, p.id_persona, ca.id_cancha
+    GROUP BY 
+      r.id_reserva,
+      c.id_cliente,
+      p.id_persona,
+      ca.id_cancha,
+      ed.id_espacio,
+      ed.nombre,
+      ed.direccion
   `;
   const result = await pool.query(query, [id]);
   return result.rows[0] || null;
