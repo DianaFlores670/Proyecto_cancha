@@ -253,11 +253,17 @@ const ReservarCliente = () => {
       setError("El cupo debe ser un numero positivo");
       return;
     }
-    const capacidadCancha = cancha.capacidad != null ? Number(cancha.capacidad) : null;
-    if (capacidadCancha != null && cupoNum > capacidadCancha) {
+    const capacidadCanchaRaw = cancha.capacidad;
+    const capacidadCancha = capacidadCanchaRaw == null
+      ? null
+      : Number(String(capacidadCanchaRaw).trim());
+    console.log("capacidad raw:", cancha.capacidad, "capacidad num:", capacidadCancha, "cupo:", cupoNum);
+
+    if (capacidadCancha !== null && !Number.isNaN(capacidadCancha) && cupoNum > capacidadCancha) {
       setError("El cupo no puede ser mayor a la capacidad de la cancha (" + capacidadCancha + ")");
       return;
     }
+
     if (selectedSlots.length === 0) {
       setError("Debe seleccionar al menos un horario");
       return;
@@ -343,8 +349,8 @@ const ReservarCliente = () => {
           setQrInfo(qr);
           const origin =
             typeof window !== "undefined" &&
-            window.location &&
-            window.location.origin
+              window.location &&
+              window.location.origin
               ? window.location.origin
               : "";
           if (origin && qr.codigo_qr) {
@@ -429,18 +435,6 @@ const ReservarCliente = () => {
             {loadingSlots && fechaReserva && (
               <div className="mb-2 text-xs sm:text-sm text-[#23475F]">
                 Cargando horarios disponibles...
-              </div>
-            )}
-
-            {error && (
-              <div className="bg-red-100 text-red-700 px-4 py-2 rounded-lg text-xs sm:text-sm">
-                {error}
-              </div>
-            )}
-
-            {success && (
-              <div className="bg-green-100 text-green-700 px-4 py-2 rounded-lg text-xs sm:text-sm">
-                {success}
               </div>
             )}
 
@@ -601,8 +595,8 @@ const ReservarCliente = () => {
                         (disabledSlot
                           ? "bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed"
                           : active
-                          ? "bg-[#01CD6C] border-[#01CD6C] text-white shadow-md scale-[1.02]"
-                          : "bg-white border-[#CBD5E1] text-[#23475F] hover:border-[#01CD6C] hover:bg-[#F0FDF4]");
+                            ? "bg-[#01CD6C] border-[#01CD6C] text-white shadow-md scale-[1.02]"
+                            : "bg-white border-[#CBD5E1] text-[#23475F] hover:border-[#01CD6C] hover:bg-[#F0FDF4]");
 
                       return (
                         <button
@@ -651,7 +645,17 @@ const ReservarCliente = () => {
                     </div>
                   </div>
                 </section>
+                {error && (
+                  <div className="mt-1 bg-red-100 text-red-700 px-4 py-2 rounded-lg text-xs sm:text-sm">
+                    {error}
+                  </div>
+                )}
 
+                {success && (
+                  <div className="mt-1 bg-green-100 text-green-700 px-4 py-2 rounded-lg text-xs sm:text-sm">
+                    {success}
+                  </div>
+                )}
                 <div className="flex flex-col sm:flex-row sm:justify-end gap-3 pt-2">
                   <button
                     type="button"
