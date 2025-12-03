@@ -10,6 +10,8 @@ const { unlinkFile, createUploadAndProcess } = require("../../middleware/multer"
 
 // Clave secreta para JWT (en producción, usar variable de entorno)
 const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret_key';
+const PASSWORD_REGEX = /^(?=.*[A-Z])(?=.*[a-z])(?=.*\d).{8,}$/;
+const isPasswordValid = (p) => PASSWORD_REGEX.test(String(p || ''));
 
 // --- Modelos ---
 // --- Helpers de Solicitud admin_esp_dep ---
@@ -283,22 +285,6 @@ const asignarRolEncargado = async (idUsuario, datos) => {
   return result.rows[0];
 };
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 async function loginUsuario(correo, contrasena) {
   const query = 'SELECT * FROM USUARIO WHERE correo = $1';
   const result = await pool.query(query, [correo]);
@@ -396,20 +382,20 @@ const crearUsuario = async (datosUsuario) => {
 
     // --- Asignar rol si se proporciona ---
     // --- Asignar rol si se proporciona ---
-if (rolAAgregar) {
-  if (rolAAgregar === 'admin_esp_dep') {
-    const idEspacio = parseInt(datosUsuario.id_espacio);
-    if (!idEspacio) {
-      throw new Error('Debe seleccionar un espacio deportivo (id_espacio) para solicitar admin_esp_dep');
+    if (rolAAgregar) {
+      if (rolAAgregar === 'admin_esp_dep') {
+        const idEspacio = parseInt(datosUsuario.id_espacio);
+        if (!idEspacio) {
+          throw new Error('Debe seleccionar un espacio deportivo (id_espacio) para solicitar admin_esp_dep');
+        }
+        // En lugar de crear el rol directamente, creamos la SOLICITUD
+        await crearSolicitudAdmEspDep(idUsuario, idEspacio, datosUsuario.motivo || datosUsuario.carta || null);
+        rolAsignado = null; // aún no tiene el rol, queda en "pendiente"
+      } else {
+        // Otros roles se pueden crear directo como antes
+        rolAsignado = await asignarRolUsuario(idUsuario, rolAAgregar, datosUsuario.datos_especificos || {});
+      }
     }
-    // En lugar de crear el rol directamente, creamos la SOLICITUD
-    await crearSolicitudAdmEspDep(idUsuario, idEspacio, datosUsuario.motivo || datosUsuario.carta || null);
-    rolAsignado = null; // aún no tiene el rol, queda en "pendiente"
-  } else {
-    // Otros roles se pueden crear directo como antes
-    rolAsignado = await asignarRolUsuario(idUsuario, rolAAgregar, datosUsuario.datos_especificos || {});
-  }
-}
 
 
     // Obtener datos completos para retornar
@@ -545,6 +531,12 @@ const crearUsuarioController = async (req, res) => {
       );
     }
 
+    if (!isPasswordValid(datos.contrasena)) {
+      return res.status(400).json(
+        response(false, 'Contraseña inválida, debe tener mínimo 8 carácteres, una mayúscula, una minúscula y un número')
+      );
+    }
+
     const nuevoUsuario = await crearUsuario(datos);
 
     // Mensaje según rol solicitado
@@ -628,7 +620,7 @@ const actualizarUsuarioController = async (req, res) => {
       mensaje += '. Imagen de perfil actualizada';
     }
 
-    res.json(respuesta(true, mensaje, { usuario: usuarioActualizado }));
+    res.json(response(true, mensaje, { usuario: usuarioActualizado }));
   } catch (error) {
     console.error('Error in actualizarUsuarioController:', error);
 

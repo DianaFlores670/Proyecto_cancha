@@ -10,8 +10,8 @@ const router = express.Router();
 const jwt = require('jsonwebtoken');
 const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret_key';
 
-let sendMail = async () => {};
-let notifyAdminNuevaSolicitud = async () => {};
+let sendMail = async () => { };
+let notifyAdminNuevaSolicitud = async () => { };
 const getCorreosAdmins = async () => {
   const q = `
     SELECT LOWER(TRIM(u.correo)) AS correo
@@ -55,7 +55,7 @@ try {
       await sendMail({ to, bcc, subject, html, replyTo: correo || undefined });
     };
   }
-} catch (_) {}
+} catch (_) { }
 
 
 const listarEspaciosLibres = async (req, res) => {
@@ -430,27 +430,27 @@ const crearUsuario = async (datosUsuario) => {
       await asignarRolUsuario(idUsuario, rawRol, datosUsuario.datos_especificos || {});
     }
 
-if (wantsAdmin) {
-  const idEsp = Number(datosUsuario.id_espacio);
-  if (Number.isInteger(idEsp)) {
-    const { solicitud, espacio_nombre } = await crearSolicitudAdmEspDep(
-      idUsuario,
-      idEsp,
-      datosUsuario.motivo || datosUsuario.carta || null
-    );
-    try {
-      const adminEmails = await getCorreosAdmins();
-      const u = await pool.query('SELECT usuario, correo FROM usuario WHERE id_persona=$1', [idUsuario]);
-      await notifyAdminNuevaSolicitud({
-        toList: adminEmails,
-        id_solicitud: solicitud.id_solicitud,
-        usuario: u.rows[0]?.usuario || null,
-        correo: u.rows[0]?.correo || null,
-        espacio_nombre
-      });
-    } catch (_) {}
-  }
-}
+    if (wantsAdmin) {
+      const idEsp = Number(datosUsuario.id_espacio);
+      if (Number.isInteger(idEsp)) {
+        const { solicitud, espacio_nombre } = await crearSolicitudAdmEspDep(
+          idUsuario,
+          idEsp,
+          datosUsuario.motivo || datosUsuario.carta || null
+        );
+        try {
+          const adminEmails = await getCorreosAdmins();
+          const u = await pool.query('SELECT usuario, correo FROM usuario WHERE id_persona=$1', [idUsuario]);
+          await notifyAdminNuevaSolicitud({
+            toList: adminEmails,
+            id_solicitud: solicitud.id_solicitud,
+            usuario: u.rows[0]?.usuario || null,
+            correo: u.rows[0]?.correo || null,
+            espacio_nombre
+          });
+        } catch (_) { }
+      }
+    }
 
 
     const usuarioCompleto = await obtenerUsuarioPorId(idUsuario);
@@ -876,7 +876,13 @@ const obtenerUsuarioPorIdController = async (req, res) => {
   }
 };
 
+//minimo 8 caracteres
+//al menos una mayuscula
+//al menos una minuscula
+//al menos un digito
 
+const PASSWORD_REGEX = /^(?=.*[A-Z])(?=.*[a-z])(?=.*\d).{8,}$/;
+const esContrasenaValida = (c) => PASSWORD_REGEX.test(String(c || ""));
 
 //Controlador para POST - Crear usuario (con Multer para form-data)
 const crearUsuarioController = async (req, res) => {
@@ -900,6 +906,15 @@ const crearUsuarioController = async (req, res) => {
       }
       return res.status(400).json(
         respuesta(false, `Faltan campos obligatorios: ${faltantes.join(', ')}`)
+      );
+    }
+
+    if (!esContrasenaValida(datos.contrasena)) {
+      if (processedFiles.imagen_perfil) {
+        await unlinkFile(processedFiles.imagen_perfil);
+      }
+      return res.status(400).json(
+        respuesta(false, 'Contraseña invalida, debe tener mínimo 8 carácteres, una mayúscula, una minúscula y un número')
       );
     }
 
@@ -961,6 +976,15 @@ const actualizarUsuarioController = async (req, res) => {
     const processedFiles = await createUploadAndProcess(["imagen_perfil"], nombreFolder, usuarioActual.nombre)(req, res);
 
     const camposActualizar = { ...req.body };
+
+    if (camposActualizar.nueva_contrasena && !esContrasenaValida(camposActualizar.nueva_contrasena)) {
+      if (uploadedFile) {
+        await unlinkFile(uploadedFile);
+      }
+      return res.status(400).json(
+        respuesta(false, 'Contraseña inválida, debe tener mínimo 8 carácteres, una mayúscula, una minúscula y un número')
+      );
+    }
 
     if (camposActualizar.nueva_contrasena) {
       const hash = await bcrypt.hash(camposActualizar.nueva_contrasena, 10);

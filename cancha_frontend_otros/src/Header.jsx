@@ -381,7 +381,7 @@ const Header = () => {
     } catch (err) {
       setLoginError(
         err.response?.data?.message ||
-        "Error al iniciar sesion. Verifica tus credenciales."
+        "Error al iniciar sesión. Verifica tus credenciales."
       );
     } finally {
       setLoginLoading(false);
@@ -454,7 +454,7 @@ const Header = () => {
       );
       setSubmissionMessage(
         rol === "cliente"
-          ? "Bienvenido. Puede iniciar sesion."
+          ? "Bienvenido. Puede iniciar sesión."
           : "Solicitud creada. Te avisaremos por correo cuando se revise."
       );
       setShowSubmissionModal(true);
@@ -640,7 +640,7 @@ const Header = () => {
         if (next.nueva_contrasena && next.confirmar_contrasena) {
           setPasswordMatchError(
             next.nueva_contrasena !== next.confirmar_contrasena
-              ? "Las contrasenas no coinciden"
+              ? "Las contraseñas no coinciden"
               : null
           );
         } else {
@@ -842,7 +842,7 @@ const Header = () => {
       passwordData.nueva_contrasena &&
       passwordData.nueva_contrasena !== passwordData.confirmar_contrasena
     ) {
-      setEditProfileError("Las contrasenas no coinciden");
+      setEditProfileError("Las contraseñas no coinciden");
       setEditProfileLoading(false);
       return;
     }
@@ -1047,7 +1047,7 @@ const Header = () => {
                 }}
                 className="bg-[#01CD6C] px-3 py-1 rounded-lg text-white font-semibold text-sm"
               >
-                Iniciar sesion
+                Iniciar sesión
               </button>
             )}
           </div>
@@ -1403,7 +1403,7 @@ const Header = () => {
                   className="bg-[#01CD6C] hover:bg-[#00b359] text-white font-semibold py-2 px-4 rounded-full shadow-md hover:shadow-lg transition-all duration-300 hover:-translate-y-[2px] text-sm"
                   aria-label="Iniciar sesion"
                 >
-                  Iniciar sesion
+                  Iniciar sesión
                 </button>
               )}
             </div>
@@ -1423,7 +1423,7 @@ const Header = () => {
             </button>
 
             <h2 className="text-2xl sm:text-3xl font-bold text-center text-[#23475F] mb-6">
-              Iniciar sesion
+              Iniciar sesión
             </h2>
 
             <div className="space-y-5">
@@ -1448,7 +1448,7 @@ const Header = () => {
 
               <div>
                 <label className="block text-xs sm:text-sm font-medium text-[#23475F] mb-1">
-                  Contrasena
+                  Contraseña
                 </label>
                 <div className="flex items-center gap-3 bg-white border border-[#23475F]/40 rounded-full px-3 py-2 shadow-sm focus-within:ring-2 focus-within:ring-[#01CD6C] transition-all">
                   <FaLock className="text-[#01CD6C] text-lg" />
@@ -1548,7 +1548,7 @@ const Header = () => {
 
               <div>
                 <label className="block text-xs sm:text-sm font-medium text-[#23475F] mb-1">
-                  Contrasena
+                  Contraseña
                 </label>
                 <div className="flex items-center gap-3 bg-white border border-[#23475F]/40 rounded-full px-3 py-2 shadow-sm focus-within:ring-2 focus-within:ring-[#01CD6C] transition-all">
                   <FaLock className="text-[#01CD6C] text-lg" />
@@ -1567,7 +1567,7 @@ const Header = () => {
 
               <div>
                 <label className="block text-xs sm:text-sm font-medium text-[#23475F] mb-1">
-                  Confirmar contrasena
+                  Confirmar contraseña
                 </label>
                 <div className="flex items-center gap-3 bg-white border border-[#23475F]/40 rounded-full px-3 py-2 shadow-sm focus-within:ring-2 focus-within:ring-[#01CD6C] transition-all">
                   <FaLock className="text-[#01CD6C] text-lg" />
@@ -1578,7 +1578,7 @@ const Header = () => {
                     value={registerData.confirmarContrasena}
                     onChange={handleInputChange}
                     required
-                    placeholder="Repite tu contrasena"
+                    placeholder="Repite tu contraseña"
                     className="w-full bg-transparent outline-none text-[#23475F] text-sm"
                   />
                 </div>
@@ -2217,7 +2217,7 @@ const Header = () => {
               <div className="bg-white border border-gray-200 shadow-sm rounded-2xl p-5 sm:p-6">
                 <h4 className="text-base sm:text-lg font-bold text-[#23475F] mb-3 sm:mb-4 flex items-center gap-2">
                   <FaKey className="text-[#01CD6C]" />
-                  Cambiar contrasena
+                  Cambiar contraseña
                 </h4>
 
                 <div className="space-y-3 sm:space-y-4">
@@ -2245,7 +2245,7 @@ const Header = () => {
                       value={passwordData.confirmar_contrasena}
                       onChange={handleInputChange}
                       className="w-full mt-1 px-4 py-2 border border-gray-300 rounded-full focus:ring-2 focus:ring-[#01CD6C] text-sm"
-                      placeholder="Confirmar contrasena"
+                      placeholder="Confirmar contraseña"
                     />
                     {passwordMatchError && (
                       <p className="text-[#A31621] text-xs sm:text-sm mt-1.5">
